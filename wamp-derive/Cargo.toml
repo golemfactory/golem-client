@@ -1,0 +1,10 @@
+[package]
+name = "wamp-derive"
+version = "0.1.0"
+authors = ["Przemysław K. Rekucki <przemyslaw.rekucki@golem.network>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]

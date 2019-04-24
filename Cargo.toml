@@ -1,0 +1,6 @@
+[workspace]
+members= [
+    'golem-rpc-api',
+    'wamp-derive',
+]
+
