@@ -10,7 +10,6 @@ default=["crypto-mac/std"]
 [dependencies]
 actix = "0.8.1"
 actix-http = "0.1.4"
-openssl="0.10.20"
 failure="0.1"
 flexi_logger = "0.11.4"
 rmp-serde = "0.13.7"
@@ -29,3 +28,8 @@ rand = "0.6.5"
 [dependencies.actix-web]
 version = "1.0.0-beta.2"
 features = ['ssl']
+
+[dependencies.openssl]
+version="0.10.20"
+features=['vendored']
+

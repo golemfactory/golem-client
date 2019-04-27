@@ -29,5 +29,5 @@ features = ['ssl', 'client']
 
 [dependencies.openssl]
 version="0.10.20"
-#features=['vendored']
+features=['vendored']
 
