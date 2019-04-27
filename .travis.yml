@@ -3,13 +3,10 @@ rust:
 - stable
 - beta
 script:
-- cargo build --verbose --no-default-features
-- cargo test --verbose --no-default-features
 - cargo build --verbose
 - cargo test --verbose
 env:
   global:
-  - RUSTFLAGS="-C link-dead-code"
   - secure: eTVC8/BsOE9mr8mEcW1jifGF21tfx6tLF1ESI0EjIceCzgD/SJTA6cHNNoRGvBWoJlb7EQkBgiNENPgEpLdIWndh6gaJch99qadgyBGq+8RaskpYeD3kGprFDlVcNXvtaqN33tqlL6PY9U5cJ2L8SurVBv8YQYwZ3U1Nf3KlIov4H8x9ZLVTti1dtF5Gg9xQqIfCcXTH5n/n0fU4cAioLKtvD+NCbLaQFotXiewm6Ugdak2n0WjI0pLlpltsZc77asfOb9xKpYyM8pBinth4kMUuYswpf8HmNQx78c0bOvwUHgWM5D3zpD8q302W+vHMkr+6o8nOgw4Nmahn/xZ9XlI6GEgdH2jzd07/AWKn+13twGjJykdp85+a8oGQns+3fSc6Maws5Y8/uNyHDr3T4DAlrOiDC5bUorVTBiAuA9MoVyGzOehJICKVCvZskXZ42k+miXszQrmptkCL2l2Ygzjoo2VagzE9RkNVDiFcyPgNS7BFT+LjuEen8CQOKB2x6sY28kN9JmkUcSvcLv/6ce4s1ve2Ptks2GLBa4GldEeqgE/GrT3WEFtXFe/wzCHJwj8emWbmyFV4GLN9UnKW25EqzURWU+Eklqap8AMi9GRNG5x8as/gFfD8ukP6gAuQfqVWeoJ8e27zFJjTFuyAJQNUlIGl2gD9yQtEFgT492k=
 after_success: |
   git clone https://gist.github.com/deaf3815d2eecce72279.git ./publish_doc &&
