@@ -213,7 +213,7 @@ where
         match item {
             ws::Frame::Binary(Some(bytes)) => {
                 let value = rmpv::decode::read_value(&mut Cursor::new(&bytes)).unwrap();
-                eprintln!("v={}", value);
+                log::trace!("got message ={}", value);
 
                 match value[0].as_i64().unwrap() as u8 {
                     CHALLENGE => {
@@ -239,7 +239,7 @@ where
                     _ => {}
                 }
             }
-            _ => eprintln!("h={:?}", item),
+            _ => log::debug!("h={:?}", item),
         }
     }
 

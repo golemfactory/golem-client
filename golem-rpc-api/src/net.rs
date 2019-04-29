@@ -43,6 +43,15 @@ pub trait GolemNet {
     fn get_connected_peers(&mut self) -> Result<Vec<PeerInfo>>;
 }
 
+/*
+{"node_name": "", "key": "b6178fcd50f429dcb89b68a6c8c7b92a527d93ba9db1d1649e71819ca3eb1ad4aa145b04dc3780274aeb64044353be481586bc0b1c76a76672c7bfaebf6dd370",
+ "prv_port": 40103, "pub_port": 40103, "p2p_prv_port": 40102, "p2p_pub_port": 40102, "prv_addr": "10.30.8.179", "pub_addr": "5.226.70.4",
+  "prv_addresses": ["10.30.8.179", "25.52.239.71", "172.17.0.1", "172.18.0.1", "172.19.0.1", "172.21.0.1"],
+  "hyperdrive_prv_port": 3282, "hyperdrive_pub_port": 3282,
+   "port_statuses": {40102: "timeout", 40103: "timeout", 3282: "timeout"},
+   "nat_type": []}
+*/
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NodeInfo {
     pub node_name: String,
@@ -54,7 +63,7 @@ pub struct NodeInfo {
     pub prv_addr: String,
     pub pub_addr: String,
     pub prv_addresses: Vec<String>,
-    pub nat_type: String, // - TODO enum
+    pub nat_type: Vec<String>, // - TODO enum
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -6,24 +6,30 @@ use serde_json::Value;
 use std::borrow::Cow;
 
 pub trait ToArgs {
-    fn into_json(self) -> Result<Value, Error>;
+    fn into_json(self) -> Result<Option<Value>, Error>;
+}
+
+impl ToArgs for () {
+    fn into_json(self) -> Result<Option<Value>, Error> {
+        Ok(None)
+    }
 }
 
 impl<T1: Serialize> ToArgs for (T1,) {
-    fn into_json(self) -> Result<Value, Error> {
-        Ok(serde_json::to_value(self)?)
+    fn into_json(self) -> Result<Option<Value>, Error> {
+        Ok(Some(serde_json::to_value(self)?))
     }
 }
 
 impl<T1: Serialize, T2: Serialize> ToArgs for (T1, T2) {
-    fn into_json(self) -> Result<Value, Error> {
-        Ok(serde_json::to_value(self)?)
+    fn into_json(self) -> Result<Option<Value>, Error> {
+        Ok(Some(serde_json::to_value(self)?))
     }
 }
 
 impl<T1: Serialize, T2: Serialize, T3: Serialize> ToArgs for (T1, T2, T3) {
-    fn into_json(self) -> Result<Value, Error> {
-        Ok(serde_json::to_value(self)?)
+    fn into_json(self) -> Result<Option<Value>, Error> {
+        Ok(Some(serde_json::to_value(self)?))
     }
 }
 
@@ -49,7 +55,7 @@ impl RpcCallRequest {
         Ok(RpcCallRequest {
             uri: Cow::Borrowed(uri),
             options: None,
-            args: Some(args.into_json()?),
+            args: args.into_json()?,
             kw_args: None,
         })
     }
@@ -66,7 +72,7 @@ impl Message for RpcCallRequest {
 }
 
 pub trait RpcEndpoint {
-    type Response: Future<Item = RpcCallResponse, Error = Error>;
+    type Response: Future<Item = RpcCallResponse, Error = Error> + 'static;
 
     fn rpc_call(&self, request: RpcCallRequest) -> Self::Response;
 }

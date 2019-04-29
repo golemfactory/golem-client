@@ -12,7 +12,7 @@ pub use auth::AuthMethod;
 pub use error::Error;
 pub use transport::wss;
 
-pub use args::{RpcCallRequest, RpcCallResponse, RpcEndpoint};
+pub use args::{RpcCallRequest, RpcCallResponse, RpcEndpoint, ToArgs};
 use futures::Future;
 
 pub struct SessionBuilder {

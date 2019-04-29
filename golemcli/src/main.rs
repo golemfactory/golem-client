@@ -1,10 +1,20 @@
+#![allow(unused_imports)]
+
+use crate::context::CliCtx;
 use actix::prelude::*;
 use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
+use std::convert::TryInto;
+use std::fmt::Debug;
 use std::path::PathBuf;
 use std::process::Command;
 use structopt::*;
-use std::fmt::Debug;
 
+mod account;
+mod context;
+mod network;
+
+mod rpc;
+mod eth;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]
@@ -45,93 +55,44 @@ struct CliArgs {
 enum CommandSection {
     /// Manage network
     #[structopt(name = "network")]
-    Network(NetworkSection),
+    Network(network::NetworkSection),
 
     /// Manage account
     #[structopt(name = "account")]
-    Account(AccountSection),
+    Account(account::AccountSection),
 
     #[structopt(name = "_int")]
     #[structopt(raw(setting = "structopt::clap::AppSettings::Hidden"))]
     Internal(InternalSection),
 }
 
-#[derive(StructOpt, Debug)]
-enum NetworkSection {
-    /// Block provider
-    #[structopt(name = "block")]
-    Block {
-        /// ID of a node
-        node_id: String,
-    },
-    /// Connect to a node
-    #[structopt(name = "connect")]
-    Connect {
-        /// Remote IP address
-        ip: String,
-        /// Remote TCP port
-        port: u16,
-    },
-    /// Show known nodes
-    #[structopt(name = "dht")]
-    Dht,
-    /// Show connected nodes
-    #[structopt(name = "show")]
-    Show {
-        /// Show full table contents
-        #[structopt(long)]
-        full: bool,
-
-        /// Sort nodes
-        /// ip, port, id, name
-        #[structopt(long)]
-        sort: Option<String>,
-    },
-    /// Show client status
-    #[structopt(name = "status")]
-    Status,
-}
-
-#[derive(StructOpt, Debug)]
-enum AccountSection {
-    /// Display account & financial info
-    #[structopt(name = "info")]
-    Info,
-    /// Trigger graceful shutdown of your golem
-    #[structopt(name = "shutdown")]
-    Shutdown,
-    /// Unlock account, will prompt for your password
-    #[structopt(name = "unlock")]
-    Unlock,
-}
-
 #[derive(StructOpt)]
 enum InternalSection {
-
     /// Generates autocomplete script fro given shell
     #[structopt(name = "complete")]
     Complete {
         /// Describes which shell to produce a completions file for
         #[structopt(
             parse(try_from_str),
-            raw(possible_values = "&clap::Shell::variants()", case_insensitive = "true")
+            raw(
+                possible_values = "&clap::Shell::variants()",
+                case_insensitive = "true"
+            )
         )]
-        shell: clap::Shell
-    }
+        shell: clap::Shell,
+    },
 }
 
 impl Debug for InternalSection {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match self {
-            InternalSection::Complete { shell } => {
-                writeln!(f, "complete({})", shell)
-            }
+            InternalSection::Complete { shell } => writeln!(f, "complete({})", shell),
         }
     }
 }
 
 impl CliArgs {
-    fn get_data_dir(&self) -> PathBuf {
+    pub fn get_data_dir(&self) -> PathBuf {
         match &self.data_dir {
             Some(data_dir) => data_dir.join("rinkeby"),
             None => appdirs::user_data_dir(Some("golem"), None, false)
@@ -141,68 +102,44 @@ impl CliArgs {
         }
     }
 
-    fn connect_to_app(
-        &mut self,
-        sys: &mut SystemRunner,
-    ) -> Result<impl RpcEndpoint + Clone, Error> {
-        let data_dir = self.get_data_dir();
-
-        let auth_method =
-            actix_wamp::challenge_response_auth(move |auth_id| -> Result<_, std::io::Error> {
-                let secret_file_path = data_dir.join(format!("crossbar/secrets/{}.tck", auth_id));
-                log::debug!("reading secret from: {}", secret_file_path.display());
-                Ok(std::fs::read(secret_file_path)?)
-            });
-
+    pub fn get_rcp_address(&self) -> failure::Fallible<(String, u16)> {
         let address = match &self.address {
             Some(a) => a.as_str(),
             None => "127.0.0.1",
         };
 
-        sys.block_on(
-            actix_wamp::SessionBuilder::with_auth("golem", "golemcli", auth_method)
-                .create_wss(address, self.port.unwrap_or(61000)),
-        )
+        Ok((address.into(), self.port.unwrap_or(61000)))
     }
 
-    fn run_command(&self, sys: &mut SystemRunner, endpoint: impl RpcEndpoint + Clone) {
+    fn run_command(&self) {
+        let mut ctx: CliCtx = self.try_into().unwrap();
         match &self.command {
             None => <Self as StructOpt>::clap().print_help().unwrap(),
-            Some(CommandSection::Internal(ref command)) => {
-                command.run_command(sys, endpoint)
-            }
+            Some(CommandSection::Internal(ref command)) => command.run_command(),
+            Some(CommandSection::Account(ref command)) => command.run(&mut ctx).unwrap(),
             _ => Self::clap().print_help().unwrap(),
         }
         eprintln!();
     }
 }
 
-
 impl InternalSection {
-
-    fn run_command(&self, sys: &mut SystemRunner, endpoint: impl RpcEndpoint + Clone) {
+    fn run_command(&self) {
         match self {
             InternalSection::Complete { shell } => {
                 CliArgs::clap().gen_completions_to("golemcli", *shell, &mut std::io::stdout())
             }
         }
     }
-
 }
 
 fn main() -> failure::Fallible<()> {
-    let mut args = CliArgs::from_args();
+    let args = CliArgs::from_args();
 
-    flexi_logger::Logger::with_env_or_str("info")
+    flexi_logger::Logger::with_env_or_str("error")
         .start()
         .unwrap();
 
-    let mut sys = System::new("golemcli");
-    use actix_wamp::RpcEndpoint;
-    let endpoint = args.connect_to_app(&mut sys)?;
-
-    args.run_command(&mut sys, endpoint.clone());
-    //let _ = sys.run();
-
+    args.run_command();
     Ok(())
 }
