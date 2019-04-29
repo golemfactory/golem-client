@@ -1,7 +1,7 @@
 [package]
 name = "golemcli"
 version = "0.1.0"
-authors = ["Przemysław K. Rekucki <przemyslaw.rekucki@golem.network>"]
+authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
 
 [dependencies]
@@ -21,6 +21,8 @@ serde="1.0"
 serde_derive="1.0"
 base64 = "0.10.1"
 rand = "0.6.5"
+appdirs="0.2"
+structopt="0.2.15"
 
 [dependencies.actix-web]
 version = "1.0.0-beta.2"
@@ -31,3 +33,5 @@ features = ['ssl', 'client']
 version="0.10.20"
 features=['vendored']
 
+[dependencies.actix-wamp]
+path="../actix-wamp"

@@ -20,7 +20,7 @@ where
         CRA_AUTH_METHOD_ID
     }
 
-    fn challenge(&mut self, auth_id: &str, extra: Dict) -> Result<(String, Dict), Error> {
+    fn challenge(&mut self, auth_id: &str, extra: &Dict) -> Result<(String, Dict), Error> {
         use hmac::Mac;
 
         let challenge = match extra
@@ -43,9 +43,9 @@ where
 ///
 pub fn challenge_response_auth<SecretProvider, Err>(
     secret_provider: SecretProvider,
-) -> impl AuthMethod
+) -> impl AuthMethod + Sync + Send + 'static
 where
-    SecretProvider: FnMut(&str) -> Result<Vec<u8>, Err>,
+    SecretProvider: FnMut(&str) -> Result<Vec<u8>, Err> + Sync + Send + 'static,
     Err: std::error::Error + Sync + Send + 'static,
 {
     WAMPCra(secret_provider, PhantomData)

@@ -1,6 +1,9 @@
 use serde_derive::*;
 use serde_json::{Map, Value};
+use std::collections::btree_map::BTreeMap;
 use std::fmt::Display;
+
+pub type RoleMap = BTreeMap<Role, RoleDesc>;
 
 pub type Dict = Map<String, Value>;
 
@@ -28,13 +31,13 @@ pub struct RoleDesc {
     pub features: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Hash, PartialOrd, PartialEq, Eq, Ord)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
-    Caller(RoleDesc),
-    Callee(RoleDesc),
-    Publisher(RoleDesc),
-    Dealer(RoleDesc),
+    Caller,
+    Callee,
+    Publisher,
+    Dealer,
 }
 
 /*
@@ -181,9 +184,8 @@ impl serde::Serialize for ErrorKind {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(default)]
 pub struct HelloSpec<'a> {
-    pub roles: Vec<Role>,
+    pub roles: RoleMap,
     #[serde(rename = "authmethods")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub auth_methods: Vec<&'a str>,
@@ -208,4 +210,16 @@ mod test {
         );
     }
 
+    #[test]
+    fn test_hello() {
+        let val = HelloSpec {
+            roles: vec![(Role::Caller, RoleDesc::default())]
+                .into_iter()
+                .collect(),
+            auth_methods: vec![],
+            authid: None,
+        };
+
+        eprintln!("json={}", serde_json::to_value(&val).unwrap());
+    }
 }

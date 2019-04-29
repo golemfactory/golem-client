@@ -11,10 +11,10 @@ default=["crypto-mac/std"]
 actix = "0.8.1"
 actix-http = "0.1.4"
 failure="0.1"
-flexi_logger = "0.11.4"
+log = "0.4.6"
 rmp-serde = "0.13.7"
 rmp = "0.8.7"
-rmpv = "0.4.0"
+
 futures="0.1"
 hmac = "0.7.0"
 sha2 = "0.8.0"
@@ -33,3 +33,6 @@ features = ['ssl']
 version="0.10.20"
 features=['vendored']
 
+[dependencies.rmpv]
+version="0.4"
+features=["with-serde"]

@@ -1,16 +1,20 @@
 use super::messages::types::*;
+use crate::args::*;
+use crate::error::Error;
 use crate::messages::Dict;
-use crate::AuthMethod;
+use crate::{AuthMethod, ErrorKind};
 use actix::io::WriteHandler;
 use actix::prelude::*;
 use actix_http::ws;
 use futures::prelude::*;
 use futures::stream::SplitSink;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::borrow::Cow;
+use futures::unsync::oneshot;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::io::Cursor;
+
+use crate::args::RpcEndpoint;
+//use crate::messages::types as msg_type;
 
 fn gen_id() -> u64 {
     use rand::Rng;
@@ -23,18 +27,11 @@ fn gen_id() -> u64 {
 pub struct OpenSession {
     realm_id: String,
     auth_id: Option<String>,
-    auth_methods: Vec<Box<dyn AuthMethod>>,
+    auth_methods: Vec<Box<dyn AuthMethod + Send + 'static>>,
 }
 
 impl Message for OpenSession {
     type Result = Result<u64, crate::error::Error>;
-}
-
-pub struct RpcCall {
-    uri: Cow<'static, str>,
-    options: Option<Dict>,
-    args: Option<Value>,
-    kw_args: Option<Value>,
 }
 
 pub struct Connection<W>
@@ -48,17 +45,24 @@ where
 enum ConnectionState {
     Closed,
     Establishing {
-        auth: Vec<Box<dyn AuthMethod>>,
+        auth: Vec<Box<dyn AuthMethod + Send + 'static>>,
+        auth_id: Option<String>,
+        tx: Option<oneshot::Sender<Result<u64, Error>>>,
     },
-    Authenticating,
+    Authenticating {
+        tx: oneshot::Sender<Result<u64, Error>>,
+    },
     Established {
+        #[allow(dead_code)]
         session_id: u64,
         pending_calls: HashMap<u64, CallDesc>,
     },
     Failed,
 }
 
-struct CallDesc;
+struct CallDesc {
+    tx: oneshot::Sender<Result<RpcCallResponse, Error>>,
+}
 
 impl OpenSession {
     pub fn anonymous(realm_id: String) -> Self {
@@ -69,7 +73,7 @@ impl OpenSession {
         }
     }
 
-    pub fn with_auth<A: AuthMethod + 'static>(
+    pub fn with_auth<A: AuthMethod + 'static + Send>(
         realm_id: String,
         auth_id: String,
         auth_method: A,
@@ -93,81 +97,96 @@ where
         }
     }
 
-    fn send_message<M: Serialize>(&mut self, msg: &M) {
-        let bytes = rmp_serde::to_vec(msg).unwrap();
+    fn send_message<M: Serialize>(&mut self, msg: &M) -> Result<(), Error> {
+        let bytes = rmp_serde::to_vec(&serde_json::to_value(msg)?)?;
+        //let bytes = rmp_serde::to_vec(&serde_json::to_value(msg)?)?;
 
-        let out_value = rmpv::decode::read_value(&mut Cursor::new(&bytes)).unwrap();
-        eprintln!("send message {}", out_value);
-
-        self.writer.write(ws::Message::Binary(bytes.into()));
-    }
-
-    fn send_authenticate(&mut self, sign: &str) {
-        self.send_message(&(AUTHENTICATE, sign, serde_json::json!({})))
-    }
-
-    fn send_call<Args: Serialize>(&mut self, procedure_uri: &str, args: &Args) -> u64 {
-        let id = gen_id();
-
-        self.send_message(&(CALL, id, serde_json::json!({}), procedure_uri, args));
-
-        id
-    }
-
-    fn send_hello(&mut self, realm: &str) {
-        use rmpv::encode::write_value;
-        use rmpv::Value;
-        let message = rmpv::Value::Array(vec![
-            HELLO.into(),
-            realm.into(),
-            Value::Map(vec![
-                (
-                    "roles".into(),
-                    Value::Map(vec![
-                        ("subscriber".into(), Value::Map(vec![])),
-                        ("publisher".into(), Value::Map(vec![])),
-                    ]),
-                ),
-                ("authmethods".into(), Value::Array(vec!["wampcra".into()])),
-                ("authid".into(), "golemcli".into()),
-            ]),
-        ]);
-        let mut bytes = Vec::new();
-
-        //let bytes = rmp_serde::to_vec(&message).unwrap();
-        write_value(&mut bytes, &message);
+        if log::log_enabled!(log::Level::Debug) {
+            let out_value = rmpv::decode::read_value(&mut Cursor::new(&bytes)).unwrap();
+            log::debug!("send message {}", out_value);
+        }
 
         self.writer.write(ws::Message::Binary(bytes.into()));
+        Ok(())
     }
 
-    fn handle_challenge(&mut self, auth_method: &str, extra: &serde_json::Value) {
-        /*let challenge = extra
-            .as_object()
-            .and_then(|extra| extra.get("challenge"))
-            .and_then(|challenge| challenge.as_str());
-
-        if let Some(challenge) = challenge {
-            use hmac::Mac;
-            let secret = get_secret("golemcli");
-            let mut hmac = hmac::Hmac::<sha2::Sha256>::new_varkey(secret.as_ref()).unwrap();
-            hmac.input(challenge.as_bytes());
-            let r = hmac.result().code();
-            let b = base64::encode(&r);
-            eprintln!("result={}", b);
-            self.send_authenticate(&b);
-        }*/
-    }
-
-    fn handle_welcome(&mut self, session_id: u64, extra: &serde_json::Value) {
-        self.state = ConnectionState::Established {
-            session_id: session_id,
-            pending_calls: HashMap::new(),
+    fn handle_challenge(&mut self, auth_method: &str, extra: &Dict) -> Result<(), Error> {
+        use crate::messages::types::AUTHENTICATE;
+        let (auth_methods, auth_id, tx) = match &mut self.state {
+            ConnectionState::Establishing {
+                auth, auth_id, tx, ..
+            } => match auth_id {
+                Some(auth_id) => (auth, auth_id.as_str(), tx),
+                None => {
+                    return Err(Error::protocol_err(
+                        "unexpected challenge on anonymous handshake",
+                    ))
+                }
+            },
+            _ => {
+                return Err(Error::wamp_error(
+                    ErrorKind::OptionNotAllowed,
+                    "invalid connection state".into(),
+                ))
+            }
         };
-        eprintln!("session established");
-        let id = self.send_call("golem.password.set", &("123456",));
-        eprintln!("set passwrod = {}", id);
-        let id = self.send_call("golem.terms.accept", &(true, true));
-        eprintln!("accept_terms = {}", id);
+
+        for auth in auth_methods {
+            if auth.auth_method() == auth_method {
+                let (signature, extra) = auth.challenge(auth_id, extra)?;
+                let tx = tx.take().unwrap();
+                self.state = ConnectionState::Authenticating { tx };
+                self.send_message(&(AUTHENTICATE, signature, extra))?;
+                return Ok(());
+            }
+        }
+
+        self.state = ConnectionState::Failed;
+        Err(Error::protocol_err("unexpected auth method received"))
+    }
+
+    fn handle_welcome(&mut self, session_id: u64, extra: &serde_json::Value) -> Result<(), Error> {
+        log::debug!("got welcome: {}", extra);
+        let old_state = std::mem::replace(
+            &mut self.state,
+            ConnectionState::Established {
+                session_id,
+                pending_calls: HashMap::new(),
+            },
+        );
+        match old_state {
+            ConnectionState::Establishing { tx, .. } => {
+                let _ = tx.unwrap().send(Ok(session_id));
+            }
+            ConnectionState::Authenticating { tx, .. } => {
+                let _ = tx.send(Ok(session_id));
+            }
+            _ => (),
+        };
+
+        Ok(())
+    }
+
+    fn pending_calls(&mut self) -> Result<&mut HashMap<u64, CallDesc>, Error> {
+        match &mut self.state {
+            ConnectionState::Established { pending_calls, .. } => Ok(pending_calls),
+            _ => Err(Error::InvalidState("session is closed or pending")),
+        }
+    }
+
+    fn handle_result(&mut self, call_id: u64, args: Option<rmpv::Value>) -> Result<(), Error> {
+        if let Some(CallDesc { tx }) = self.pending_calls()?.remove(&call_id) {
+            let args = args
+                .and_then(|args| serde_json::to_value(args).ok())
+                .and_then(|args| args.as_array().cloned())
+                .unwrap_or_default();
+
+            tx.send(Ok(RpcCallResponse {
+                args,
+                kw_args: None,
+            }));
+        }
+        Ok(())
     }
 }
 
@@ -177,9 +196,12 @@ where
 {
     type Context = Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _ctx: &mut Self::Context) {
         let _ = self.writer.write(ws::Message::Ping("smok".to_string()));
-        self.send_hello("golem");
+    }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        log::debug!("connection stopped");
     }
 }
 
@@ -187,20 +209,30 @@ impl<W: 'static> StreamHandler<ws::Frame, ws::ProtocolError> for Connection<W>
 where
     W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>,
 {
-    fn handle(&mut self, item: ws::Frame, ctx: &mut Self::Context) {
+    fn handle(&mut self, item: ws::Frame, _ctx: &mut Self::Context) {
         match item {
             ws::Frame::Binary(Some(bytes)) => {
                 let value = rmpv::decode::read_value(&mut Cursor::new(&bytes)).unwrap();
                 eprintln!("v={}", value);
 
-                let json_msg: Vec<serde_json::Value> =
-                    rmp_serde::from_slice(bytes.as_ref()).unwrap();
-                match json_msg[0].as_i64().unwrap() as u8 {
+                match value[0].as_i64().unwrap() as u8 {
                     CHALLENGE => {
-                        self.handle_challenge(json_msg[1].as_str().unwrap(), &json_msg[2]);
+                        self.handle_challenge(
+                            value[1].as_str().unwrap(),
+                            &serde_json::to_value(&value[2])
+                                .unwrap()
+                                .as_object()
+                                .unwrap(),
+                        );
                     }
                     WELCOME => {
-                        self.handle_welcome(json_msg[1].as_u64().unwrap(), &json_msg[2]);
+                        self.handle_welcome(
+                            value[1].as_u64().unwrap(),
+                            &serde_json::to_value(&value[2].as_map()).unwrap(),
+                        );
+                    }
+                    RESULT => {
+                        self.handle_result(value[1].as_u64().unwrap(), Some(value[3].clone()));
                     }
                     _ => {}
                 }
@@ -209,12 +241,150 @@ where
         }
     }
 
-    fn started(&mut self, ctx: &mut Self::Context) {}
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        // TODO
+    }
 }
 
-impl<W: 'static> WriteHandler<ws::ProtocolError> for Connection<W> where
-    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
+impl<W: 'static> WriteHandler<ws::ProtocolError> for Connection<W>
+where
+    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>,
 {
+    fn error(&mut self, err: ws::ProtocolError, _ctx: &mut Self::Context) -> Running {
+        log::error!("protocol error: {}", err);
+        self.state = ConnectionState::Failed;
+        Running::Stop
+    }
+}
+
+impl<W> Handler<OpenSession> for Connection<W>
+where
+    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError> + 'static,
+{
+    type Result = ActorResponse<Self, u64, crate::error::Error>;
+
+    fn handle(
+        &mut self,
+        OpenSession {
+            realm_id,
+            auth_id,
+            auth_methods,
+        }: OpenSession,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        use crate::messages::{types::HELLO, HelloSpec, Role, RoleDesc};
+
+        // check state
+        match self.state {
+            ConnectionState::Closed => (),
+            _ => {
+                return ActorResponse::reply(Err(Error::InvalidState(
+                    "session is already opened or operation pending",
+                )))
+            }
+        }
+
+        let (tx, rx) = futures::unsync::oneshot::channel();
+        let auth_methods_id = auth_methods.iter().map(|method| method.auth_method());
+
+        let auth_id_ref = match &auth_id {
+            Some(v) => Some(v.as_str()),
+            None => None,
+        };
+
+        self.send_message(&(
+            HELLO,
+            realm_id,
+            HelloSpec {
+                roles: vec![(Role::Caller, RoleDesc::default())]
+                    .into_iter()
+                    .collect(),
+                auth_methods: auth_methods_id.collect(),
+                authid: auth_id_ref,
+            },
+        ));
+        self.state = ConnectionState::Establishing {
+            auth: auth_methods,
+            auth_id,
+            tx: Some(tx),
+        };
+
+        ActorResponse::r#async(
+            rx.then(|r| match r {
+                Err(_e) => Err(Error::ConnectionClosed),
+                Ok(resp) => resp,
+            })
+            .into_actor(self),
+        )
+    }
+}
+
+impl<W> Handler<RpcCallRequest> for Connection<W>
+where
+    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError> + 'static,
+{
+    type Result = ActorResponse<Self, RpcCallResponse, crate::error::Error>;
+
+    fn handle(
+        &mut self,
+        RpcCallRequest {
+            uri,
+            options,
+            args,
+            kw_args,
+        }: RpcCallRequest,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let pending_calls = match &mut self.state {
+            ConnectionState::Established { pending_calls, .. } => pending_calls,
+            _ => {
+                return ActorResponse::reply(Err(Error::InvalidState(
+                    "session is closed or pending",
+                )))
+            }
+        };
+
+        // generate rpc-call-id. spec says that is should be random.
+        let id = {
+            let mut id = gen_id();
+
+            while pending_calls.contains_key(&id) {
+                id = gen_id()
+            }
+
+            id
+        };
+        let (tx, rx) = oneshot::channel();
+
+        pending_calls.insert(id, CallDesc { tx });
+
+        let result = match (args, kw_args) {
+            (None, None) => self.send_message(&(CALL, id, options.unwrap_or_default(), uri)),
+            (Some(args), None) => {
+                self.send_message(&(CALL, id, options.unwrap_or_default(), uri, args))
+            }
+            (args, Some(kw_args)) => self.send_message(&(
+                CALL,
+                id,
+                options.unwrap_or_default(),
+                uri,
+                args.unwrap_or_else(|| serde_json::json!([])),
+                kw_args,
+            )),
+        };
+
+        if let Err(e) = result {
+            return ActorResponse::reply(Err(e));
+        }
+
+        ActorResponse::r#async(
+            rx.then(|r| match r {
+                Err(_) => Err(Error::ConnectionClosed),
+                Ok(resp) => resp,
+            })
+            .into_actor(self),
+        )
+    }
 }
 
 pub fn connect<Transport>(transport: Transport) -> Addr<Connection<SplitSink<Transport>>>
@@ -228,4 +398,20 @@ where
         Connection::add_stream(split_stream, ctx);
         Connection::new(split_sink, ctx)
     })
+}
+
+impl<Transport> RpcEndpoint for Addr<Connection<SplitSink<Transport>>>
+where
+    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
+        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+        + 'static,
+{
+    type Response = Box<dyn Future<Item = RpcCallResponse, Error = Error> + 'static>;
+
+    fn rpc_call(&self, request: RpcCallRequest) -> Self::Response {
+        Box::new(self.send(request).then(|resp| match resp {
+            Err(e) => Err(Error::MailboxError(e)),
+            Ok(v) => v,
+        }))
+    }
 }
