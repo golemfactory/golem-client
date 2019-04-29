@@ -3,8 +3,8 @@ use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
 use std::path::PathBuf;
 use std::process::Command;
 use structopt::*;
+use std::fmt::Debug;
 
-mod data_dir;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]
@@ -50,6 +50,10 @@ enum CommandSection {
     /// Manage account
     #[structopt(name = "account")]
     Account(AccountSection),
+
+    #[structopt(name = "_int")]
+    #[structopt(raw(setting = "structopt::clap::AppSettings::Hidden"))]
+    Internal(InternalSection),
 }
 
 #[derive(StructOpt, Debug)]
@@ -101,12 +105,38 @@ enum AccountSection {
     Unlock,
 }
 
+#[derive(StructOpt)]
+enum InternalSection {
+
+    /// Generates autocomplete script fro given shell
+    #[structopt(name = "complete")]
+    Complete {
+        /// Describes which shell to produce a completions file for
+        #[structopt(
+            parse(try_from_str),
+            raw(possible_values = "&clap::Shell::variants()", case_insensitive = "true")
+        )]
+        shell: clap::Shell
+    }
+}
+
+impl Debug for InternalSection {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            InternalSection::Complete { shell } => {
+                writeln!(f, "complete({})", shell)
+            }
+        }
+    }
+}
+
 impl CliArgs {
     fn get_data_dir(&self) -> PathBuf {
         match &self.data_dir {
             Some(data_dir) => data_dir.join("rinkeby"),
             None => appdirs::user_data_dir(Some("golem"), None, false)
                 .unwrap()
+                .join("default")
                 .join("rinkeby"),
         }
     }
@@ -119,9 +149,9 @@ impl CliArgs {
 
         let auth_method =
             actix_wamp::challenge_response_auth(move |auth_id| -> Result<_, std::io::Error> {
-                Ok(std::fs::read(
-                    data_dir.join(format!("crossbar/secrets/{}.tck", auth_id)),
-                )?)
+                let secret_file_path = data_dir.join(format!("crossbar/secrets/{}.tck", auth_id));
+                log::debug!("reading secret from: {}", secret_file_path.display());
+                Ok(std::fs::read(secret_file_path)?)
             });
 
         let address = match &self.address {
@@ -135,19 +165,33 @@ impl CliArgs {
         )
     }
 
-    fn run_command(&self, sys: &mut SystemRunner, endpoint : impl RpcEndpoint + Clone) {
-        match self.command {
+    fn run_command(&self, sys: &mut SystemRunner, endpoint: impl RpcEndpoint + Clone) {
+        match &self.command {
             None => <Self as StructOpt>::clap().print_help().unwrap(),
+            Some(CommandSection::Internal(ref command)) => {
+                command.run_command(sys, endpoint)
+            }
             _ => Self::clap().print_help().unwrap(),
         }
         eprintln!();
     }
 }
 
+
+impl InternalSection {
+
+    fn run_command(&self, sys: &mut SystemRunner, endpoint: impl RpcEndpoint + Clone) {
+        match self {
+            InternalSection::Complete { shell } => {
+                CliArgs::clap().gen_completions_to("golemcli", *shell, &mut std::io::stdout())
+            }
+        }
+    }
+
+}
+
 fn main() -> failure::Fallible<()> {
     let mut args = CliArgs::from_args();
-
-    eprintln!("args={:?}", args);
 
     flexi_logger::Logger::with_env_or_str("info")
         .start()
