@@ -5,6 +5,5 @@ pub enum Section {
     /// Accept terms of use
     Accept,
     /// Show terms of use
-    Show
+    Show,
 }
-

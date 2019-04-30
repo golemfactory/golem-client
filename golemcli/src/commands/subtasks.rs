@@ -5,5 +5,5 @@ pub enum Section {
     /// Restart a subtask
     Restart,
     /// Show subtask details
-    Show
+    Show,
 }

@@ -48,7 +48,6 @@ struct CliArgs {
     command: Option<commands::CommandSection>,
 }
 
-
 impl CliArgs {
     pub fn get_data_dir(&self) -> PathBuf {
         match &self.data_dir {
@@ -76,7 +75,10 @@ impl CliArgs {
                 <Self as StructOpt>::clap().print_help().unwrap();
                 eprintln!();
             }
-            Some(command) => command.run_command(&mut ctx),
+            Some(command) => {
+                let resp = command.run_command(&mut ctx);
+                ctx.output(resp.unwrap());
+            }
         }
     }
 }

@@ -1,7 +1,9 @@
-use crate::context::CliCtx;
+use crate::context::*;
+use crate::eth::Currency;
 use crate::rpc::*;
+use bigdecimal::BigDecimal;
 use failure::Fallible;
-use futures::future::Future;
+use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -17,6 +19,7 @@ pub enum AccountSection {
     #[structopt(name = "unlock")]
     Unlock,
 
+    /// Withdraw GNT/ETH (withdrawals are not available for the testnet)
     #[structopt(name = "withdraw")]
     Withdraw {
         /// Address to send the funds to
@@ -31,63 +34,87 @@ pub enum AccountSection {
 }
 
 impl AccountSection {
-    pub fn run(&self, ctx: &mut CliCtx) -> Fallible<()> {
-        Ok(match self {
-            AccountSection::Unlock => self.account_unlock(ctx)?,
-            AccountSection::Info => self.account_info(ctx)?,
-            AccountSection::Shutdown => self.account_shutdown(ctx)?,
+    pub fn run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+        match self {
+            AccountSection::Unlock => Box::new(self.account_unlock(endpoint)),
+            AccountSection::Info => Box::new(self.account_info(endpoint)),
+            AccountSection::Shutdown => Box::new(self.account_shutdown(endpoint)),
             AccountSection::Withdraw {
                 destination,
                 amount,
                 currency,
                 gas_price,
-            } => self.withdraw(destination, amount, currency, gas_price, ctx)?,
-        })
-    }
-
-    fn account_unlock(&self, ctx: &mut CliCtx) -> Fallible<()> {
-        let (mut sys, rpc) = ctx.connect_to_app()?;
-
-        let unlocked: bool =
-            sys.block_on(rpc.as_invoker().rpc_call("golem.password.unlocked", ()))?;
-
-        if unlocked {
-            ctx.message("Account already unlocked");
-        } else {
-            let password = rpassword::read_password_from_tty(Some(
-                "Unlock your account to start golem\n\
-                 This command will time out in 30 seconds.\n\
-                 Password: ",
-            ))?;
-
-            if sys.block_on(rpc.as_invoker().rpc_call("golem.password.set", (password,)))? {
-                ctx.message("Account unlock success");
-            } else {
-                ctx.message("Incorrect password");
-            }
+            } => Box::new(self.withdraw(destination, amount, currency, gas_price, endpoint)),
         }
-        Ok(())
     }
 
-    fn account_info(&self, ctx: &mut CliCtx) -> Fallible<()> {
-        let (mut sys, rpc) = ctx.connect_to_app()?;
+    fn account_unlock(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        let unlocked = endpoint
+            .as_invoker()
+            .rpc_call("golem.password.unlocked", &());
 
-        let json : serde_json::Value = sys.block_on(rpc.as_invoker().rpc_call("net.ident", ()).and_then(
-            |node: golem_rpc_api::net::NodeInfo| {
-                let node_id = node.key.clone();
+        unlocked
+            .and_then(move |unlocked| {
+                if unlocked {
+                    return future::Either::B(future::ok(CommandResponse::Object(
+                        serde_json::json!("Account already unlocked"),
+                    )));
+                }
 
+                future::Either::A(
+                    rpassword::read_password_from_tty(Some(
+                        "Unlock your account to start golem\n\
+                         This command will time out in 30 seconds.\n\
+                         Password: ",
+                    ))
+                    .into_future()
+                    .from_err()
+                    .and_then(move |password| {
+                        endpoint
+                            .as_invoker()
+                            .rpc_call("golem.password.set", &(password,))
+                    })
+                    .and_then(|result: bool| {
+                        if result {
+                            Ok(CommandResponse::Object(serde_json::json!(
+                                "Account unlock success"
+                            )))
+                        } else {
+                            Ok(CommandResponse::Object(serde_json::json!(
+                                "Incorrect password"
+                            )))
+                        }
+                    }),
+                )
+            })
+            .from_err()
+    }
+
+    fn account_info(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint.as_invoker().rpc_call("net.ident", &()).and_then(
+            move |node: golem_rpc_api::net::NodeInfo| {
                 let query = {
-
-                    let computing_trust = rpc.as_invoker().rpc_call("rep.comp", (node_id.clone(), ));
-                    let requesting_trust = rpc.as_invoker().rpc_call("rep.requesting", (node_id.clone(), ));
-                    let payment_address = rpc.as_invoker().rpc_call("pay.ident", ()); // Option<String>
-                    let balance = rpc.as_invoker().rpc_call("pay.balance", ());
-                    let deposit_balance = rpc.as_invoker().rpc_call("pay.deposit_balance", ());
+                    let node_id = node.key.to_string();
+                    let computing_trust = endpoint.as_invoker().rpc_call("rep.comp", &(node_id.clone(), ));
+                    let requesting_trust = endpoint.as_invoker().rpc_call("rep.requesting", &(node_id, ));
+                    let payment_address = endpoint.as_invoker().rpc_call("pay.ident", &()); // Option<String>
+                    let balance = endpoint.as_invoker().rpc_call("pay.balance", &());
+                    let deposit_balance = endpoint.as_invoker().rpc_call("pay.deposit_balance", &());
 
                     computing_trust
                         .join5(requesting_trust, payment_address, balance, deposit_balance)
                 };
 
+                // TODO: deposit_balance formating
                 query
                     .and_then(
                         move |(
@@ -100,41 +127,48 @@ impl AccountSection {
                             Option<f64>,
                             Option<f64>,
                             String,
-                            serde_json::Value,
+                            Balance,
                             Option<DepositBalance>,
                         )| {
-                            Ok(serde_json::json!({
+                            let eth_available = Currency::ETH.format_decimal(&balance.eth);
+                            let eth_locked = Currency::ETH.format_decimal(&balance.eth_lock);
+                            let gnt_available = Currency::GNT.format_decimal(&balance.av_gnt);
+                            let gnt_unadopted = Currency::GNT.format_decimal(&balance.gnt_nonconverted);
+
+                            Ok(CommandResponse::Object(serde_json::json!({
                                 "node_name": node.node_name,
                                 "Golem_ID": node.key,
                                 "requestor_reputation": (requesting_trust.unwrap_or_default()*100.0) as u64,
                                 "provider_reputation": (computing_trust.unwrap_or_default()*100.0) as u64,
                                 "finances": {
                                     "eth_address": payment_address,
-                                    "eth_available": balance["eth"],
-                                    "eth_locked": balance["eth_lock"],
-                                    "gnt_available": balance["av_gnt"],
-                                    "gnt_locked": balance["gnt_lock"],
-                                    "gnt_unadopted": balance["gnt_nonconverted"],
+                                    "eth_available": eth_available,
+                                    "eth_locked": eth_locked,
+                                    "gnt_available": gnt_available,
+                                    "gnt_locked": balance.gnt_lock,
+                                    "gnt_unadopted": gnt_unadopted,
                                     "deposit_balance": deposit_balance
                                 }
-                            }))
+                            })))
+
                         },
                     )
             },
-        ))?;
-
-        ctx.message(&format!("{:#}", json));
-
-        Ok(())
+        ).from_err()
     }
 
-    fn account_shutdown(&self, ctx: &mut CliCtx) -> Fallible<()> {
-        let (mut sys, rpc) = ctx.connect_to_app()?;
-
-        let ret: u64 = sys.block_on(rpc.as_invoker().rpc_call("golem.graceful_shutdown", ()))?;
-        ctx.message(&format!("Graceful shutdown triggered result: {}", ret));
-        // "" -> quit=0, off=1, on=1
-        Ok(())
+    fn account_shutdown(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_invoker()
+            .rpc_call("golem.graceful_shutdown", &())
+            .and_then(|ret: u64| {
+                let result = format!("Graceful shutdown triggered result: {}", ret);
+                Ok(CommandResponse::Object(result.into()))
+            })
+            .from_err()
     }
 
     fn withdraw(
@@ -143,18 +177,21 @@ impl AccountSection {
         amount: &bigdecimal::BigDecimal,
         currency: &crate::eth::Currency,
         gas_price: &Option<bigdecimal::BigDecimal>,
-        ctx: &mut CliCtx,
-    ) -> Fallible<()> {
-        let (mut sys, rpc) = ctx.connect_to_app()?;
-
-        let transactions: Vec<String> = sys.block_on(
-            rpc.as_invoker()
-                .rpc_call("pay.withdraw", (amount, destination, currency)),
-        )?;
-
-        ctx.message(&format!("{:?}", transactions));
-
-        Ok(())
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_invoker()
+            .rpc_call(
+                "pay.withdraw",
+                &(
+                    amount.clone(),
+                    destination.clone(),
+                    currency.clone(),
+                    gas_price.clone(),
+                ),
+            )
+            .from_err()
+            .and_then(|transactions: Vec<String>| CommandResponse::object(transactions))
     }
 }
 
@@ -171,4 +208,18 @@ struct DepositBalance {
     value: String,
     status: DepositStatus,
     timelock: String,
+}
+
+#[derive(Deserialize, Serialize)]
+struct Balance {
+    #[serde(default)]
+    eth: BigDecimal,
+    #[serde(default)]
+    eth_lock: BigDecimal,
+    #[serde(default)]
+    av_gnt: BigDecimal,
+    #[serde(default)]
+    gnt_lock: BigDecimal,
+    #[serde(default)]
+    gnt_nonconverted: BigDecimal,
 }

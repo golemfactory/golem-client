@@ -2,7 +2,6 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-
     Abort,
     /// Create a task from file. Note: no client-side validation is performed yet.
     /// This will change in the future
@@ -26,5 +25,5 @@ pub enum Section {
     /// Dump a task template
     Template,
     /// Show statistics for unsupported tasks
-    Unsupport
+    Unsupport,
 }

@@ -1,17 +1,17 @@
-use structopt::{StructOpt, clap::arg_enum};
+use structopt::{clap::arg_enum, StructOpt};
 
 #[derive(StructOpt, Debug)]
 pub struct Section {
-    filter_by : Option<crate::eth::PaymentStatus>,
-    #[structopt(long="sort")]
-    sort_by : Option<Column>
+    filter_by: Option<crate::eth::PaymentStatus>,
+    #[structopt(long = "sort")]
+    sort_by: Option<Column>,
 }
 
 arg_enum! {
     #[derive(Debug)]
     pub enum Column {
-        payer,
-        status,
-        value
+        Payer,
+        Status,
+        Value
     }
 }

@@ -1,30 +1,28 @@
-use structopt::*;
+use crate::context::{CliCtx, CommandResponse};
 use std::fmt::{self, Debug};
-use crate::context::CliCtx;
-
+use structopt::*;
 
 mod account;
 #[cfg(feature = "concent_cli")]
 mod concent;
 #[cfg(feature = "debug_cli")]
 mod debug;
-mod envs;
-mod network;
-mod incomes;
-mod payments;
 #[cfg(feature = "concent_cli")]
 mod deposit_payments;
+mod envs;
+mod incomes;
+mod network;
+mod payments;
 mod res;
 mod settings;
-mod tasks;
 mod subtasks;
+mod tasks;
 mod terms;
 #[cfg(feature = "test_task_cli")]
 mod test_task;
 
 #[derive(StructOpt, Debug)]
 pub enum CommandSection {
-
     /// Manage account
     #[structopt(name = "account")]
     Account(account::AccountSection),
@@ -91,15 +89,23 @@ pub enum CommandSection {
 }
 
 impl CommandSection {
-
-    pub fn run_command(&self, ctx : &mut CliCtx) {
+    pub fn run_command(&self, ctx: &mut CliCtx) -> Result<CommandResponse, crate::context::Error> {
         match &self {
             CommandSection::Internal(ref command) => command.run_command(),
-            CommandSection::Account(ref command) => command.run(ctx).unwrap(),
-            _ => Self::clap().print_help().unwrap(),
+            CommandSection::Account(ref command) => {
+                let (mut sys, endpoint) = ctx.connect_to_app().unwrap();
+                sys.block_on(command.run(endpoint))
+            }
+            CommandSection::Debug(ref command) => {
+                let (mut sys, endpoint) = ctx.connect_to_app().unwrap();
+                sys.block_on(command.run(endpoint))
+            }
+            &section => {
+                eprintln!("unimplemented command: {:?}", section);
+                Ok(CommandResponse::NoOutput)
+            }
         }
     }
-
 }
 
 #[derive(StructOpt)]
@@ -109,11 +115,11 @@ pub enum InternalSection {
     Complete {
         /// Describes which shell to produce a completions file for
         #[structopt(
-        parse(try_from_str),
-        raw(
-        possible_values = "&clap::Shell::variants()",
-        case_insensitive = "true"
-        )
+            parse(try_from_str),
+            raw(
+                possible_values = "&clap::Shell::variants()",
+                case_insensitive = "true"
+            )
         )]
         shell: clap::Shell,
     },
@@ -128,11 +134,15 @@ impl Debug for InternalSection {
 }
 
 impl InternalSection {
-    fn run_command(&self) {
+    fn run_command(&self) -> Result<CommandResponse, crate::context::Error> {
         match self {
-            InternalSection::Complete { shell } => {
-                super::CliArgs::clap().gen_completions_to("golemcli", *shell, &mut std::io::stdout())
-            }
+            InternalSection::Complete { shell } => super::CliArgs::clap().gen_completions_to(
+                "golemcli",
+                *shell,
+                &mut std::io::stdout(),
+            ),
         }
+
+        Ok(CommandResponse::NoOutput)
     }
 }

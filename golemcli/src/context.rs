@@ -1,7 +1,25 @@
 use super::CliArgs;
-use failure::Error;
+pub use failure::Error;
+use futures::Future;
+use serde::Serialize;
 use std::convert::TryFrom;
 use std::path::PathBuf;
+
+#[derive(Debug)]
+pub enum CommandResponse {
+    NoOutput,
+    Object(serde_json::Value),
+    Table {
+        headers: Vec<String>,
+        values: Vec<serde_json::Value>,
+    },
+}
+
+impl CommandResponse {
+    pub fn object<T: Serialize>(value: T) -> Result<Self, Error> {
+        Ok(CommandResponse::Object(serde_json::to_value(value)?))
+    }
+}
 
 pub struct CliCtx {
     rpc_addr: (String, u16),
@@ -52,5 +70,19 @@ impl CliCtx {
 
     pub fn message(&mut self, message: &str) {
         eprintln!("{}", message);
+    }
+
+    pub fn output(&self, resp: CommandResponse) {
+        match resp {
+            CommandResponse::NoOutput => {}
+            CommandResponse::Table { .. } => {}
+            CommandResponse::Object(v) => {
+                if self.json_output {
+                    println!("{}", serde_json::to_string_pretty(&v).unwrap())
+                } else {
+                    println!("{}", serde_yaml::to_string(&v).unwrap())
+                }
+            }
+        }
     }
 }

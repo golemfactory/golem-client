@@ -3,7 +3,9 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub enum Section {
     /// Clear provider / requestor resources
-    clear,
+    #[structopt(name = "clear")]
+    Clear,
     /// Show information on used resources
-    show
+    #[structopt(name = "show")]
+    Show,
 }

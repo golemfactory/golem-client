@@ -1,9 +1,8 @@
-use structopt::{clap::arg_enum, StructOpt};
 use std::str::FromStr;
+use structopt::{clap::arg_enum, StructOpt};
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-
     /// Soft Switch
     #[structopt(name = "switch")]
     Switch(Switch),
@@ -18,13 +17,10 @@ pub enum Switch {
     #[structopt(name = "turn")]
     Turn {
         #[structopt(
-        parse(try_from_str),
-        raw(
-        possible_values = "&[\"on\",\"off\"]",
-        case_insensitive = "true"
-        )
+            parse(try_from_str),
+            raw(possible_values = "&[\"on\",\"off\"]", case_insensitive = "true")
         )]
-        on_off: OnOff
+        on_off: OnOff,
     },
     #[structopt(name = "is_on")]
     IsOn,
@@ -35,7 +31,7 @@ pub enum Terms {
     #[structopt(name = "accept")]
     Accept,
     #[structopt(name = "show")]
-    Show
+    Show,
 }
 
 arg_enum! {
@@ -45,4 +41,3 @@ arg_enum! {
         Off
     }
 }
-

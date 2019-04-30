@@ -5,5 +5,5 @@ pub enum Section {
     /// Change settings
     Set,
     /// Show current settings
-    Show
+    Show,
 }

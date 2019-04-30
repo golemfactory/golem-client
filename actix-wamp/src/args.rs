@@ -6,32 +6,29 @@ use serde_json::Value;
 use std::borrow::Cow;
 
 pub trait ToArgs {
-    fn into_json(self) -> Result<Option<Value>, Error>;
+    fn as_json(&self) -> Result<Option<Value>, Error>;
 }
 
 impl ToArgs for () {
-    fn into_json(self) -> Result<Option<Value>, Error> {
+    fn as_json(&self) -> Result<Option<Value>, Error> {
         Ok(None)
     }
 }
 
-impl<T1: Serialize> ToArgs for (T1,) {
-    fn into_json(self) -> Result<Option<Value>, Error> {
-        Ok(Some(serde_json::to_value(self)?))
-    }
+macro_rules! def_args {
+    ($($t:ident),+) => {
+        impl< $($t : Serialize),+ > ToArgs for ($($t,)+) {
+            fn as_json(&self) -> Result<Option<Value>, Error> {
+                Ok(Some(serde_json::to_value(self)?))
+            }
+        }
+    };
 }
 
-impl<T1: Serialize, T2: Serialize> ToArgs for (T1, T2) {
-    fn into_json(self) -> Result<Option<Value>, Error> {
-        Ok(Some(serde_json::to_value(self)?))
-    }
-}
-
-impl<T1: Serialize, T2: Serialize, T3: Serialize> ToArgs for (T1, T2, T3) {
-    fn into_json(self) -> Result<Option<Value>, Error> {
-        Ok(Some(serde_json::to_value(self)?))
-    }
-}
+def_args!(T1);
+def_args!(T1, T2);
+def_args!(T1, T2, T3);
+def_args!(T1, T2, T3, T4);
 
 #[derive(Debug)]
 pub struct RpcCallRequest {
@@ -42,6 +39,18 @@ pub struct RpcCallRequest {
 }
 
 impl RpcCallRequest {
+    pub fn with_va_args<T: Serialize>(
+        uri: impl Into<Cow<'static, str>>,
+        va_args: &Vec<T>,
+    ) -> Result<Self, Error> {
+        Ok(RpcCallRequest {
+            uri: uri.into(),
+            options: None,
+            args: Some(serde_json::to_value(va_args)?),
+            kw_args: None,
+        })
+    }
+
     pub fn with_no_args(uri: &'static str) -> Self {
         RpcCallRequest {
             uri: Cow::Borrowed(uri),
@@ -51,11 +60,11 @@ impl RpcCallRequest {
         }
     }
 
-    pub fn with_args(uri: &'static str, args: impl crate::args::ToArgs) -> Result<Self, Error> {
+    pub fn with_args(uri: &'static str, args: &impl crate::args::ToArgs) -> Result<Self, Error> {
         Ok(RpcCallRequest {
             uri: Cow::Borrowed(uri),
             options: None,
-            args: args.into_json()?,
+            args: args.as_json()?,
             kw_args: None,
         })
     }
