@@ -4,6 +4,12 @@ version = "0.1.0"
 authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
 
+[features]
+default=["concent_cli", "debug_cli"]
+concent_cli=[]
+debug_cli=[]
+test_task_cli=[]
+
 [dependencies]
 actix = "0.8.1"
 actix-http = "0.1.4"

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 pub struct CliCtx {
     rpc_addr: (String, u16),
     data_dir: PathBuf,
-    json_output : bool,
+    json_output: bool,
 }
 
 impl TryFrom<&CliArgs> for CliCtx {
@@ -17,7 +17,11 @@ impl TryFrom<&CliArgs> for CliCtx {
         let rpc_addr = value.get_rcp_address()?;
         let json_output = value.json;
 
-        Ok(CliCtx { rpc_addr, data_dir, json_output })
+        Ok(CliCtx {
+            rpc_addr,
+            data_dir,
+            json_output,
+        })
     }
 }
 

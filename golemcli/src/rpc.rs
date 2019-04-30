@@ -17,7 +17,7 @@ impl<Inner: RpcEndpoint + Clone> AsInvoker for Inner {
 }
 
 impl<'a, Inner: RpcEndpoint + Sized> Invoker<'a, Inner> {
-    pub fn rpc_call<Args: ToArgs, Ret: DeserializeOwned  + 'static>(
+    pub fn rpc_call<Args: ToArgs, Ret: DeserializeOwned + 'static>(
         &self,
         uri: &'static str,
         args: Args,
@@ -26,21 +26,19 @@ impl<'a, Inner: RpcEndpoint + Sized> Invoker<'a, Inner> {
             Ok(resuest) => resuest,
             Err(e) => return future::Either::B(future::err(e)),
         };
-        future::Either::A(
-            self.0
-                .rpc_call(request)
-                .and_then(move |RpcCallResponse { args, .. }| {
-                    if args.len() != 1 {
-                        Err(Error::protocol_err(
-                            "invalid rpc response, only 1 args expected",
-                        ))
-                    } else {
-                        Ok(serde_json::from_value(args[0].clone()).map_err(move |e| {
-                            log::error!("on {} unable to parse: {:?}: {}", uri, args, e);
-                            e
-                        })?)
-                    }
-                }),
-        )
+        future::Either::A(self.0.rpc_call(request).and_then(
+            move |RpcCallResponse { args, .. }| {
+                if args.len() != 1 {
+                    Err(Error::protocol_err(
+                        "invalid rpc response, only 1 args expected",
+                    ))
+                } else {
+                    Ok(serde_json::from_value(args[0].clone()).map_err(move |e| {
+                        log::error!("on {} unable to parse: {:?}: {}", uri, args, e);
+                        e
+                    })?)
+                }
+            },
+        ))
     }
 }

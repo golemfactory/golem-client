@@ -223,7 +223,8 @@ where
                                 .unwrap()
                                 .as_object()
                                 .unwrap(),
-                        ).unwrap_or_else(|e| {
+                        )
+                        .unwrap_or_else(|e| {
                             log::error!("auth mathod failed with: {}", e);
                         });
                     }

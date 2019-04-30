@@ -6,15 +6,12 @@ use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::path::PathBuf;
-use std::process::Command;
 use structopt::*;
 
-mod account;
-mod context;
-mod network;
-
-mod rpc;
-mod eth;
+pub(crate) mod commands;
+pub(crate) mod context;
+pub(crate) mod eth;
+pub(crate) mod rpc;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]
@@ -48,48 +45,9 @@ struct CliArgs {
     json: bool,
 
     #[structopt(subcommand)]
-    command: Option<CommandSection>,
+    command: Option<commands::CommandSection>,
 }
 
-#[derive(StructOpt, Debug)]
-enum CommandSection {
-    /// Manage network
-    #[structopt(name = "network")]
-    Network(network::NetworkSection),
-
-    /// Manage account
-    #[structopt(name = "account")]
-    Account(account::AccountSection),
-
-    #[structopt(name = "_int")]
-    #[structopt(raw(setting = "structopt::clap::AppSettings::Hidden"))]
-    Internal(InternalSection),
-}
-
-#[derive(StructOpt)]
-enum InternalSection {
-    /// Generates autocomplete script fro given shell
-    #[structopt(name = "complete")]
-    Complete {
-        /// Describes which shell to produce a completions file for
-        #[structopt(
-            parse(try_from_str),
-            raw(
-                possible_values = "&clap::Shell::variants()",
-                case_insensitive = "true"
-            )
-        )]
-        shell: clap::Shell,
-    },
-}
-
-impl Debug for InternalSection {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        match self {
-            InternalSection::Complete { shell } => writeln!(f, "complete({})", shell),
-        }
-    }
-}
 
 impl CliArgs {
     pub fn get_data_dir(&self) -> PathBuf {
@@ -114,21 +72,11 @@ impl CliArgs {
     fn run_command(&self) {
         let mut ctx: CliCtx = self.try_into().unwrap();
         match &self.command {
-            None => <Self as StructOpt>::clap().print_help().unwrap(),
-            Some(CommandSection::Internal(ref command)) => command.run_command(),
-            Some(CommandSection::Account(ref command)) => command.run(&mut ctx).unwrap(),
-            _ => Self::clap().print_help().unwrap(),
-        }
-        eprintln!();
-    }
-}
-
-impl InternalSection {
-    fn run_command(&self) {
-        match self {
-            InternalSection::Complete { shell } => {
-                CliArgs::clap().gen_completions_to("golemcli", *shell, &mut std::io::stdout())
+            None => {
+                <Self as StructOpt>::clap().print_help().unwrap();
+                eprintln!();
             }
+            Some(command) => command.run_command(&mut ctx),
         }
     }
 }

@@ -2,8 +2,8 @@ use crate::context::CliCtx;
 use crate::rpc::*;
 use failure::Fallible;
 use futures::future::Future;
+use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use serde::{Serialize, Deserialize};
 
 #[derive(StructOpt, Debug)]
 pub enum AccountSection {
@@ -17,17 +17,17 @@ pub enum AccountSection {
     #[structopt(name = "unlock")]
     Unlock,
 
-    #[structopt(name="withdraw")]
+    #[structopt(name = "withdraw")]
     Withdraw {
         /// Address to send the funds to
-        destination : String,
+        destination: String,
         /// Amount to withdraw, eg 1.45
-        amount : bigdecimal::BigDecimal,
+        amount: bigdecimal::BigDecimal,
         /// ETH or GNT
-        currency : crate::eth::Currency,
+        currency: crate::eth::Currency,
         /// Gas price in wei (not gwei)
-        gas_price : Option<bigdecimal::BigDecimal>
-    }
+        gas_price: Option<bigdecimal::BigDecimal>,
+    },
 }
 
 impl AccountSection {
@@ -36,9 +36,12 @@ impl AccountSection {
             AccountSection::Unlock => self.account_unlock(ctx)?,
             AccountSection::Info => self.account_info(ctx)?,
             AccountSection::Shutdown => self.account_shutdown(ctx)?,
-            AccountSection::Withdraw { destination, amount, currency, gas_price } => {
-                self.withdraw(destination, amount, currency, gas_price, ctx)?
-            }
+            AccountSection::Withdraw {
+                destination,
+                amount,
+                currency,
+                gas_price,
+            } => self.withdraw(destination, amount, currency, gas_price, ctx)?,
         })
     }
 
@@ -54,7 +57,8 @@ impl AccountSection {
             let password = rpassword::read_password_from_tty(Some(
                 "Unlock your account to start golem\n\
                  This command will time out in 30 seconds.\n\
-                 Password: "))?;
+                 Password: ",
+            ))?;
 
             if sys.block_on(rpc.as_invoker().rpc_call("golem.password.set", (password,)))? {
                 ctx.message("Account unlock success");
@@ -127,25 +131,30 @@ impl AccountSection {
     fn account_shutdown(&self, ctx: &mut CliCtx) -> Fallible<()> {
         let (mut sys, rpc) = ctx.connect_to_app()?;
 
-        let ret : u64 = sys.block_on(rpc.as_invoker().rpc_call("golem.graceful_shutdown", ()))?;
+        let ret: u64 = sys.block_on(rpc.as_invoker().rpc_call("golem.graceful_shutdown", ()))?;
         ctx.message(&format!("Graceful shutdown triggered result: {}", ret));
         // "" -> quit=0, off=1, on=1
         Ok(())
     }
 
-    fn withdraw(&self, destination : &String,
-                amount : &bigdecimal::BigDecimal,
-                currency : &crate::eth::Currency,
-                gas_price : &Option<bigdecimal::BigDecimal>,
-                ctx: &mut CliCtx) -> Fallible<()> {
+    fn withdraw(
+        &self,
+        destination: &String,
+        amount: &bigdecimal::BigDecimal,
+        currency: &crate::eth::Currency,
+        gas_price: &Option<bigdecimal::BigDecimal>,
+        ctx: &mut CliCtx,
+    ) -> Fallible<()> {
         let (mut sys, rpc) = ctx.connect_to_app()?;
 
-        let transactions : Vec<String> = sys.block_on(rpc.as_invoker().rpc_call("pay.withdraw", (amount, destination, currency)))?;
+        let transactions: Vec<String> = sys.block_on(
+            rpc.as_invoker()
+                .rpc_call("pay.withdraw", (amount, destination, currency)),
+        )?;
 
         ctx.message(&format!("{:?}", transactions));
 
         Ok(())
-
     }
 }
 
