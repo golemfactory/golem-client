@@ -7,12 +7,39 @@ use serde::Serialize;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 
+pub struct ResponseTable {
+    pub columns: Vec<String>,
+    pub values: Vec<serde_json::Value>,
+}
+
+impl ResponseTable {
+    pub fn sort_by(mut self, arg_key: &Option<impl AsRef<str>>) -> Self {
+        let key = match arg_key {
+            None => return self,
+            Some(k) => k.as_ref(),
+        };
+        let idx =
+            match self
+                .columns
+                .iter()
+                .enumerate()
+                .find_map(|(idx, v)| if v == key { Some(idx) } else { None })
+            {
+                None => return self,
+                Some(idx) => idx,
+            };
+        self.values
+            .sort_by_key(|v| Some(v.as_array()?.get(idx)?.to_string()));
+        self
+    }
+}
+
 #[derive(Debug)]
 pub enum CommandResponse {
     NoOutput,
     Object(serde_json::Value),
     Table {
-        headers: Vec<String>,
+        columns: Vec<String>,
         values: Vec<serde_json::Value>,
     },
 }
@@ -20,6 +47,15 @@ pub enum CommandResponse {
 impl CommandResponse {
     pub fn object<T: Serialize>(value: T) -> Result<Self, Error> {
         Ok(CommandResponse::Object(serde_json::to_value(value)?))
+    }
+}
+
+impl From<ResponseTable> for CommandResponse {
+    fn from(table: ResponseTable) -> Self {
+        CommandResponse::Table {
+            columns: table.columns,
+            values: table.values,
+        }
     }
 }
 
@@ -77,7 +113,20 @@ impl CliCtx {
     pub fn output(&self, resp: CommandResponse) {
         match resp {
             CommandResponse::NoOutput => {}
-            CommandResponse::Table { .. } => {}
+            CommandResponse::Table { columns, values } => {
+                if self.json_output {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({
+                            "headers": columns,
+                            "values": values
+                        }))
+                        .unwrap()
+                    )
+                } else {
+                    print_table(columns, values);
+                }
+            }
             CommandResponse::Object(v) => {
                 if self.json_output {
                     println!("{}", serde_json::to_string_pretty(&v).unwrap())
@@ -87,4 +136,56 @@ impl CliCtx {
             }
         }
     }
+}
+
+fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
+    use prettytable::*;
+    let mut table = Table::new();
+    //table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+    table.set_format(*FORMAT_BASIC);
+
+    table.set_titles(Row::new(
+        columns
+            .iter()
+            .map(|c| Cell::new(c).with_style(Attr::Bold))
+            .collect(),
+    ));
+    for row in values {
+        if let Some(row_items) = row.as_array() {
+            use serde_json::Value;
+
+            let row_strings = row_items
+                .iter()
+                .map(|v| match v {
+                    Value::String(s) => s.to_string(),
+                    Value::Null => "".into(),
+                    v => v.to_string(),
+                })
+                .collect();
+            table.add_row(row_strings);
+        }
+    }
+    let _ = table.printstd();
+}
+
+use prettytable::{format, format::TableFormat};
+lazy_static::lazy_static! {
+
+    pub static ref FORMAT_BASIC: TableFormat = format::FormatBuilder::new()
+        .column_separator('│')
+        .borders('│')
+        .separators(
+            &[format::LinePosition::Top],
+            format::LineSeparator::new('─', '┬', '┌', '┐')
+        )
+        .separators(
+            &[format::LinePosition::Title],
+            format::LineSeparator::new('─', '┼', '├', '┤')
+        )
+        .separators(
+            &[format::LinePosition::Bottom],
+            format::LineSeparator::new('─', '┴', '└', '┘')
+        )
+        .padding(1, 1)
+        .build();
 }

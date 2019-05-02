@@ -32,7 +32,7 @@ pub enum CommandSection {
     #[structopt(name = "concent")]
     Concent(concent::Section),
 
-    /// Debug RPC (unimplemented)
+    /// Debug RPC
     #[cfg(feature = "debug_cli")]
     #[structopt(name = "debug")]
     Debug(debug::Section),
@@ -41,7 +41,7 @@ pub enum CommandSection {
     #[structopt(name = "envs")]
     Envs(envs::Section),
 
-    /// Manage network (unimplemented)
+    /// Manage network
     #[structopt(name = "network")]
     Network(network::NetworkSection),
 
@@ -97,6 +97,10 @@ impl CommandSection {
                 sys.block_on(command.run(endpoint))
             }
             CommandSection::Debug(ref command) => {
+                let (mut sys, endpoint) = ctx.connect_to_app().unwrap();
+                sys.block_on(command.run(endpoint))
+            }
+            CommandSection::Network(ref command) => {
                 let (mut sys, endpoint) = ctx.connect_to_app().unwrap();
                 sys.block_on(command.run(endpoint))
             }

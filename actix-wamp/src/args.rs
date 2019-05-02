@@ -70,7 +70,7 @@ impl RpcCallRequest {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RpcCallResponse {
     pub args: Vec<Value>,
     pub kw_args: Option<Dict>,

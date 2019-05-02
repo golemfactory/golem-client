@@ -1,6 +1,6 @@
 use crate::context::*;
-use golem_rpc_api::rpc::AsInvoker;
 use futures::{future, prelude::*};
+use golem_rpc_api::rpc::AsInvoker;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]

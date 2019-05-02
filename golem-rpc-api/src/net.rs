@@ -1,31 +1,31 @@
-use super::{Map, Result};
+use super::Map;
+use crate::rpc::*;
 use serde_derive::*;
-use wamp_derive::*;
 
-#[wamp_interface]
-pub trait GolemNet {
-    #[wamp(id = "net.ident")]
-    fn get_node(&mut self) -> Result<NodeInfo>;
+rpc_interface! {
+trait GolemNet {
+    #[id = "net.ident"]
+    fn get_node(&self) -> Result<NodeInfo>;
 
-    #[wamp(id = "net.ident.key")]
-    fn get_node_key(&mut self) -> Result<String>;
+    #[id = "net.ident.key"]
+    fn get_node_key(&self) -> Result<String>;
 
-    #[wamp(id = "net.ident.name")]
-    fn get_node_name(&mut self) -> Result<String>;
+    #[id = "net.ident.name"]
+    fn get_node_name(&self) -> Result<String>;
 
-    #[wamp(id = "net.p2p.port")]
-    fn get_p2p_port(&mut self) -> Result<u16>;
+    #[id = "net.p2p.port"]
+    fn get_p2p_port(&self) -> Result<u16>;
 
-    #[wamp(id = "net.tasks.port")]
-    fn get_task_server_port(&mut self) -> Result<u16>;
+    #[id = "net.tasks.port"]
+    fn get_task_server_port(&self) -> Result<u16>;
 
-    #[wamp(id = "net.status")]
-    fn connection_status(&mut self) -> Result<NetStatus>;
+    #[id = "net.status"]
+    fn connection_status(&self) -> Result<NetStatus>;
 
     /// Connect to specific node
     ///
-    #[wamp(id = "net.peer.connect")]
-    fn connect(&mut self, peer: (String, u16)) -> Result<()>;
+    #[id = "net.peer.connect"]
+    fn connect(&self, peer: (String, u16)) -> Result<()>;
 
     ///
     /// Returns:
@@ -33,14 +33,25 @@ pub trait GolemNet {
     ///    (true, None) - if node is successively blocked.
     ///    (false, reason) - on error
     ///
-    #[wamp(id = "net.peer.block")]
-    fn block_node(&mut self, node_id: String) -> Result<(bool, String)>;
+    #[id = "net.peer.block"]
+    fn block_node(&self, node_id: String) -> Result<(bool, String)>;
 
-    #[wamp(id = "net.peers.known")]
-    fn get_known_peers(&mut self) -> Result<Vec<PeerInfo>>;
+    #[id = "net.peers.known"]
+    fn get_known_peers(&self) -> Result<Vec<NodeInfo>>;
 
-    #[wamp(id = "net.peers.connected'")]
-    fn get_connected_peers(&mut self) -> Result<Vec<PeerInfo>>;
+    #[id = "net.peers.connected"]
+    fn get_connected_peers(&self) -> Result<Vec<PeerInfo>>;
+}
+}
+
+pub trait AsGolemNet: wamp::RpcEndpoint {
+    fn as_golem_net<'a>(&'a self) -> GolemNet<'a, Self>;
+}
+
+impl<Endpoint: wamp::RpcEndpoint> AsGolemNet for Endpoint {
+    fn as_golem_net<'a>(&'a self) -> GolemNet<'a, Endpoint> {
+        GolemNet(self.as_invoker())
+    }
 }
 
 /*
@@ -57,9 +68,9 @@ pub struct NodeInfo {
     pub node_name: String,
     pub key: String,
     pub prv_port: u16,
-    pub pub_port: u16,
+    pub pub_port: Option<u16>,
     pub p2p_prv_port: u16,
-    pub p2p_pub_port: u16,
+    pub p2p_pub_port: Option<u16>,
     pub prv_addr: String,
     pub pub_addr: String,
     pub prv_addresses: Vec<String>,
@@ -76,7 +87,7 @@ pub struct PeerInfo {
     pub node_name: String,
     pub node_info: NodeInfo,
     pub listen_port: u16,
-    pub conn_id: i128,
+    pub conn_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -1,4 +1,4 @@
-use super::{Map, Result};
+use super::Map;
 use serde_derive::*;
 use wamp_derive::*;
 

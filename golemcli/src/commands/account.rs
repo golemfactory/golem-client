@@ -1,9 +1,10 @@
 use crate::context::*;
 use crate::eth::Currency;
-use golem_rpc_api::rpc::*;
 use bigdecimal::BigDecimal;
 use failure::Fallible;
 use futures::{future, prelude::*};
+use golem_rpc_api::net::AsGolemNet;
+use golem_rpc_api::rpc::*;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -100,7 +101,7 @@ impl AccountSection {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint.as_invoker().rpc_call("net.ident", &()).and_then(
+        endpoint.as_golem_net().get_node().and_then(
             move |node: golem_rpc_api::net::NodeInfo| {
                 let query = {
                     let node_id = node.key.to_string();
