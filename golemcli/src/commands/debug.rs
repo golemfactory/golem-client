@@ -1,5 +1,5 @@
 use crate::context::*;
-use crate::rpc::AsInvoker;
+use golem_rpc_api::rpc::AsInvoker;
 use futures::{future, prelude::*};
 use structopt::StructOpt;
 
@@ -22,8 +22,8 @@ pub enum Section {
 impl Section {
     pub fn run(
         &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone,
-    ) -> impl Future<Item = CommandResponse, Error = Error> {
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         match self {
             Section::ExposedProcedures => future::Either::A(
                 endpoint

@@ -11,7 +11,6 @@ use structopt::*;
 pub(crate) mod commands;
 pub(crate) mod context;
 pub(crate) mod eth;
-pub(crate) mod rpc;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]

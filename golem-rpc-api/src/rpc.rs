@@ -1,6 +1,5 @@
 use actix_wamp::{Error, RpcCallRequest, RpcCallResponse, RpcEndpoint, ToArgs};
-use futures::future::{Future, IntoFuture};
-use futures::{future, prelude::*};
+use futures::future::{Future, self};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::CliArgs;
 pub use failure::Error;
 use futures::Future;

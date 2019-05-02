@@ -1,5 +1,6 @@
 pub mod comp;
 pub mod net;
+pub mod rpc;
 
 type Map<K, V> = std::collections::HashMap<K, V>;
 

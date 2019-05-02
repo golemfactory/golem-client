@@ -1,6 +1,6 @@
 use crate::context::*;
 use crate::eth::Currency;
-use crate::rpc::*;
+use golem_rpc_api::rpc::*;
 use bigdecimal::BigDecimal;
 use failure::Fallible;
 use futures::{future, prelude::*};
