@@ -8,3 +8,8 @@
 * golem-rpc-api - Typesafe binding for golemapp rpc services.
 * wamp-derive - procedural macros for WAMP rpc binding generator.
 
+## Prerequisites (Windows)
+
+* `rustup upgrade` - get latest stable Rust toolset
+* Install Perl
+* Install OpenSSL
