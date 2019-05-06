@@ -1,6 +1,6 @@
+use super::Map;
 use crate::rpc::*;
 use serde_derive::*;
-use super::Map;
 use serde_json::Value;
 
 rpc_interface! {
@@ -49,14 +49,13 @@ impl<Endpoint: wamp::RpcEndpoint> AsGolemCore for Endpoint {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum Stage {
     Pre,
     Post,
     Warning,
-    Exception
+    Exception,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -66,9 +65,8 @@ pub struct ComponentReport(
     /// Stage
     pub Stage,
     /// Extra
-    pub Value
+    pub Value,
 );
-
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(default)]
@@ -82,5 +80,5 @@ pub struct ServerStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ethereum: Option<ComponentReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hyperdrive: Option<ComponentReport>
+    pub hyperdrive: Option<ComponentReport>,
 }

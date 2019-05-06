@@ -1,8 +1,8 @@
 use super::Map;
-use serde_derive::*;
 use crate::rpc::*;
-use serde_json::Value;
 use bigdecimal::BigDecimal;
+use serde_derive::*;
+use serde_json::Value;
 
 rpc_interface! {
 
@@ -64,7 +64,7 @@ rpc_interface! {
     }
 }
 
-pub trait AsGolemComp : wamp::RpcEndpoint {
+pub trait AsGolemComp: wamp::RpcEndpoint {
     fn as_golem_comp<'a>(&'a self) -> GolemComp<'a, Self>;
 }
 
@@ -78,7 +78,7 @@ impl<Endpoint: wamp::RpcEndpoint> AsGolemComp for Endpoint {
 pub enum TaskTestStatus {
     Started,
     Success,
-    Error
+    Error,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -90,7 +90,7 @@ pub struct TaskTestResult {
     #[serde(default)]
     pub estimated_memory: Option<f64>,
     #[serde(default)]
-    pub time_spent : Option<f64>,
+    pub time_spent: Option<f64>,
     // string, or array
     #[serde(default)]
     pub error: Value,
@@ -101,9 +101,9 @@ pub struct TaskTestResult {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum TaskStatus {
-    #[serde(rename="Not started")]
+    #[serde(rename = "Not started")]
     NotStarted,
-    #[serde(rename="Creating the deposit")]
+    #[serde(rename = "Creating the deposit")]
     CreatingDeposit,
     Sending,
     Waiting,
@@ -112,29 +112,34 @@ pub enum TaskStatus {
     Finished,
     Aborted,
     Timeout,
-    Restarted
+    Restarted,
 }
 
 impl TaskStatus {
-
     pub fn is_active(&self) -> bool {
         match self {
-            TaskStatus::Sending | TaskStatus::Waiting | TaskStatus::Starting | TaskStatus::Computing => true,
-            _ => false
+            TaskStatus::Sending
+            | TaskStatus::Waiting
+            | TaskStatus::Starting
+            | TaskStatus::Computing => true,
+            _ => false,
         }
     }
 
     pub fn is_completed(&self) -> bool {
         match self {
-            TaskStatus::Finished | TaskStatus::Aborted | TaskStatus::Timeout | TaskStatus::Restarted => true,
-            _ => false
+            TaskStatus::Finished
+            | TaskStatus::Aborted
+            | TaskStatus::Timeout
+            | TaskStatus::Restarted => true,
+            _ => false,
         }
     }
 
     pub fn is_preparing(&self) -> bool {
         match self {
             TaskStatus::NotStarted | TaskStatus::CreatingDeposit => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -143,11 +148,11 @@ impl TaskStatus {
 // TODO: Add generic deserialization to different task definition schemas.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TaskInfo {
-    pub id : String,
-    pub status : TaskStatus,
+    pub id: String,
+    pub status: TaskStatus,
     /// Remaining time in seconds
-    pub time_remaining : Option<f64>,
-    pub subtasks_count : Option<u32>,
+    pub time_remaining: Option<f64>,
+    pub subtasks_count: Option<u32>,
 
     // Note: golemcli.py code is strange here. it allows:
     //
@@ -157,14 +162,13 @@ pub struct TaskInfo {
     //
     // I believe that Option<f64> should be valid type here.
     //
-    pub progress : Value,
+    pub progress: Value,
 
-    pub cost : Option<BigDecimal>,
+    pub cost: Option<BigDecimal>,
     pub fee: Option<BigDecimal>,
-    pub estimated_cost : Option<BigDecimal>,
+    pub estimated_cost: Option<BigDecimal>,
     pub estimated_fee: Option<BigDecimal>,
 
-
     #[serde(flatten)]
-    pub extra : Map<String, Value>
+    pub extra: Map<String, Value>,
 }
