@@ -1,29 +1,227 @@
+use crate::context::*;
+use futures::prelude::*;
+use golem_rpc_api::comp::{AsGolemComp, TaskInfo};
+use openssl::rsa::Padding;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
+use std::fs::OpenOptions;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-    Abort,
+    /// Abort a task
+    #[structopt(name = "abort")]
+    Abort {
+        /// Task identifier
+        id: String,
+    },
     /// Create a task from file. Note: no client-side validation is performed yet.
     /// This will change in the future
-    Create,
+    #[structopt(name = "create")]
+    Create {
+        /// Task file
+        file_name: PathBuf,
+    },
     /// Delete a task
-    Delete,
+    #[structopt(name = "delete")]
+    Delete {
+        /// Task identifier
+        id: String,
+    },
     /// Dump an existing task
-    Dump,
+    #[structopt(name = "dump")]
+    Dump {
+        /// Task identifier
+        id: String,
+        ///  Output file
+        out_file: Option<PathBuf>,
+    },
     /// Deletes all tasks
+    #[structopt(name = "purge")]
     Purge,
     /// Restart a task
-    Restart,
+    #[structopt(name = "restart")]
+    Restart {
+        /// Task identifier
+        id : String,
+    },
     /// Restart given subtasks from a task
-    RestartSubtasks,
+    #[structopt(name = "restart_subtasks")]
+    RestartSubtasks {
+        id : String,
+        subtask_ids : Vec<String>
+    },
     /// Show task details
-    Show,
-    /// Show statistics for tasks
+    #[structopt(name = "show")]
+    Show {
+        /// Task identifier
+        id : Option<String>,
+        /// Show only current tasks
+        #[structopt(long)]
+        current : bool,
+
+        /// Sort tasks
+        #[structopt(long)]
+        sort : Option<String>,
+    },
+    /// Show statistics for tasks (unimplemented)
+    #[structopt(name = "stats")]
     Stats,
-    /// Show sub-tasks
+    /// Show sub-tasks (unimplemented)
+    #[structopt(name = "subtasks")]
     Subtasks,
-    /// Dump a task template
+    /// Dump a task template (unimplemented)
+    #[structopt(name = "template")]
     Template,
-    /// Show statistics for unsupported tasks
+    /// Show statistics for unsupported tasks (unimplemented)
+    #[structopt(name = "unsupport")]
     Unsupport,
+}
+
+impl Section {
+    pub fn run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> Box<dyn Future<Item=CommandResponse, Error=Error> + 'static> {
+        match self {
+            Section::Abort { id } => Box::new(self.abort(endpoint, id)),
+            Section::Create { file_name } => Box::new(self.create(endpoint, file_name)),
+            Section::Abort { id} => Box::new(self.abort(endpoint, id)),
+            Section::Delete { id } => Box::new(self.delete(endpoint, id)),
+            Section::Dump { id , out_file} => Box::new(self.dump(endpoint, id, out_file)),
+            Section::Purge => Box::new(self.purge(endpoint)),
+            Section::Restart { id } => Box::new(self.restart(endpoint, id)),
+            Section::RestartSubtasks { id, subtask_ids} => Box::new(self.restart_subtasks(endpoint, id, subtask_ids)),
+            Section::Show { id, current, sort } => Box::new(self.show(endpoint, id, *current, sort)),
+            _ => Box::new(futures::future::err(unimplemented!())),
+
+        }
+    }
+
+    fn create(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        file_name: &Path,
+    ) -> impl Future<Item=CommandResponse, Error=Error> + 'static {
+        use std::fs;
+
+        fs::OpenOptions::new()
+            .read(true)
+            .open(file_name)
+            .into_future()
+            .and_then(|file| Ok(serde_json::from_reader(file)?))
+            .from_err()
+            .and_then(move |task_spec| endpoint.as_golem_comp().create_task(task_spec).from_err())
+            .and_then(|(task_id, err_msg)| CommandResponse::object(task_id.or(err_msg)))
+    }
+
+    fn abort(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        task_id: &str,
+    ) -> impl Future<Item=CommandResponse, Error=Error> + 'static {
+        endpoint.as_golem_comp().abort_task(task_id.into())
+            .from_err().and_then(|()| CommandResponse::object("Completed"))
+    }
+
+    fn delete(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        task_id: &str,
+    ) -> impl Future<Item=CommandResponse, Error=Error> + 'static {
+        endpoint.as_golem_comp().delete_task(task_id.into())
+            .from_err()
+            .and_then(|()| CommandResponse::object("Completed"))
+    }
+
+    fn purge(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static
+    ) -> impl Future<Item=CommandResponse, Error=Error> + 'static {
+        endpoint.as_golem_comp().purge_tasks().from_err().and_then(|()| CommandResponse::object("Completed"))
+    }
+
+    fn restart(
+        &self,
+        endpoint : impl actix_wamp::RpcEndpoint + Clone + 'static,
+        task_id : &str
+    ) -> impl Future<Item=CommandResponse, Error=Error> + 'static {
+        endpoint.as_golem_comp().restart_task(task_id.into())
+            .from_err()
+            .and_then(|(task_id, err_msg)| CommandResponse::object(task_id.or(err_msg)))
+    }
+
+    fn restart_subtasks(
+        &self,
+        endpoint : impl actix_wamp::RpcEndpoint + Clone + 'static,
+        task_id : &str,
+        subtasks_ids : &Vec<String>
+    ) -> impl Future<Item=CommandResponse, Error=Error> + 'static {
+        endpoint.as_golem_comp().restart_subtasks_from_task(task_id.into(), subtasks_ids.clone())
+            .from_err()
+            .and_then(|()| CommandResponse::object("Completed"))
+    }
+
+
+    fn dump(
+        &self,
+        endpoint : impl actix_wamp::RpcEndpoint + Clone + 'static,
+        task_id : &str,
+        out_file: &Option<PathBuf>) -> impl Future<Item=CommandResponse, Error=Error> + 'static {
+        let out_file = out_file.clone();
+
+        endpoint.as_golem_comp()
+            .get_task(task_id.into())
+            .from_err()
+            .and_then(move |v| {
+                if let Some(out_file) = out_file {
+                    serde_json::to_writer_pretty(
+                        OpenOptions::new().write(true).truncate(true).create(true).open(out_file)?,
+                        &v)?;
+                } else {
+                    println!("{}", serde_json::to_string_pretty(&v)?)
+                }
+                Ok(CommandResponse::NoOutput)
+            })
+    }
+
+    fn show(&self,
+            endpoint : impl actix_wamp::RpcEndpoint + 'static,
+            opt_task_id : &Option<String>,
+            current : bool,
+            sort : &Option<String>
+    ) -> impl Future<Item=CommandResponse, Error=Error> + 'static {
+        let sort = sort.clone();
+
+        if let Some(task_id) = opt_task_id {
+            futures::future::Either::A(endpoint.as_golem_comp().get_task(task_id.clone())
+                .from_err()
+                .and_then(|task| {
+                    CommandResponse::object(task)
+                }))
+        }
+        else {
+            // TODO: filter for current
+            futures::future::Either::B(endpoint.as_golem_comp().get_tasks()
+                .from_err()
+                .and_then(move |tasks : Vec<TaskInfo>| {
+                let columns = vec!["id".into(), "ETA".into(),"subtasks_count".into(), "status".into(), "completion".into()];
+                let values = tasks.into_iter().map(|task| {
+                    serde_json::json!([
+                        task.id,
+                        task.time_remaining,
+                        task.subtasks_count,
+                        task.status,
+                        task.progress
+                    ])
+                }).collect();
+                Ok(ResponseTable {
+                    columns,
+                    values
+                }.sort_by(&sort).into())
+            }))
+        }
+
+    }
+
+
 }

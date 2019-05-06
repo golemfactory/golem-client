@@ -131,7 +131,12 @@ impl CliCtx {
                 if self.json_output {
                     println!("{}", serde_json::to_string_pretty(&v).unwrap())
                 } else {
-                    println!("{}", serde_yaml::to_string(&v).unwrap())
+                    match v {
+                        serde_json::Value::String(s) => {
+                            println!("{}", s);
+                        }
+                        v => println!("{}", serde_yaml::to_string(&v).unwrap()),
+                    }
                 }
             }
         }
@@ -147,9 +152,16 @@ fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
     table.set_titles(Row::new(
         columns
             .iter()
-            .map(|c| Cell::new(c).with_style(Attr::Bold))
+            .map(|c| {
+                Cell::new(c)
+                    .with_style(Attr::Bold)
+                    .with_style(Attr::ForegroundColor(color::GREEN))
+            })
             .collect(),
     ));
+    if values.is_empty() {
+        let _ = table.add_row(columns.iter().map(|_| Cell::new("")).collect());
+    }
     for row in values {
         if let Some(row_items) = row.as_array() {
             use serde_json::Value;
@@ -186,6 +198,6 @@ lazy_static::lazy_static! {
             &[format::LinePosition::Bottom],
             format::LineSeparator::new('─', '┴', '└', '┘')
         )
-        .padding(1, 1)
+        .padding(2, 2)
         .build();
 }

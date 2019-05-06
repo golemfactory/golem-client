@@ -12,10 +12,15 @@ pub(crate) mod commands;
 pub(crate) mod context;
 pub(crate) mod eth;
 
+#[cfg(feature = "interactive_cli")]
+mod interactive;
+
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::VersionlessSubcommands"))]
+#[structopt(raw(global_setting = "structopt::clap::AppSettings::DisableVersion"))]
 struct CliArgs {
+    #[cfg(feature = "interactive_cli")]
     /// Enter interactive mode
     #[structopt(short, long)]
     interactive: bool,
@@ -48,6 +53,7 @@ struct CliArgs {
 }
 
 impl CliArgs {
+    // TODO: implement
     pub fn get_data_dir(&self) -> PathBuf {
         match &self.data_dir {
             Some(data_dir) => data_dir.join("rinkeby"),
@@ -67,18 +73,40 @@ impl CliArgs {
         Ok((address.into(), self.port.unwrap_or(61000)))
     }
 
+    #[cfg(not(feature = "interactive_cli"))]
+    fn no_command(&self) {
+        <Self as StructOpt>::clap().print_help().unwrap();
+        eprintln!();
+    }
+
+    #[cfg(not(feature = "interactive_cli"))]
+    fn post_command(&self, _: &mut CliCtx) {}
+
+    #[cfg(feature = "interactive_cli")]
+    fn no_command(&self) {
+        if !self.interactive {
+            <Self as StructOpt>::clap().print_help().unwrap();
+            eprintln!();
+        }
+    }
+
+    #[cfg(feature = "interactive_cli")]
+    fn post_command(&self, ctx: &mut CliCtx) {
+        if self.interactive {
+            interactive::interactive_shell(ctx)
+        }
+    }
+
     fn run_command(&self) {
         let mut ctx: CliCtx = self.try_into().unwrap();
         match &self.command {
-            None => {
-                <Self as StructOpt>::clap().print_help().unwrap();
-                eprintln!();
-            }
+            None => self.no_command(),
             Some(command) => {
                 let resp = command.run_command(&mut ctx);
                 ctx.output(resp.unwrap());
             }
         }
+        self.post_command(&mut ctx);
     }
 }
 

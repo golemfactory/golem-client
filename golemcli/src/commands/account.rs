@@ -3,6 +3,7 @@ use crate::eth::Currency;
 use bigdecimal::BigDecimal;
 use failure::Fallible;
 use futures::{future, prelude::*};
+use golem_rpc_api::core::AsGolemCore;
 use golem_rpc_api::net::AsGolemNet;
 use golem_rpc_api::rpc::*;
 use serde::{Deserialize, Serialize};
@@ -56,11 +57,9 @@ impl AccountSection {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let unlocked = endpoint
-            .as_invoker()
-            .rpc_call("golem.password.unlocked", &());
-
-        unlocked
+        endpoint
+            .as_golem()
+            .is_account_unlocked()
             .and_then(move |unlocked| {
                 if unlocked {
                     return future::Either::B(future::ok(CommandResponse::Object(
@@ -76,12 +75,8 @@ impl AccountSection {
                     ))
                     .into_future()
                     .from_err()
-                    .and_then(move |password| {
-                        endpoint
-                            .as_invoker()
-                            .rpc_call("golem.password.set", &(password,))
-                    })
-                    .and_then(|result: bool| {
+                    .and_then(move |password| endpoint.as_golem().set_password(password))
+                    .and_then(|result| {
                         if result {
                             Ok(CommandResponse::Object(serde_json::json!(
                                 "Account unlock success"

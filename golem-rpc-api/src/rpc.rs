@@ -87,7 +87,7 @@ macro_rules! rpc_interface {
     }
 
      => {
-        pub struct $interface_name<'a, Inner: $crate::rpc::wamp::RpcEndpoint + ?Sized>(Invoker<'a, Inner>);
+        pub struct $interface_name<'a, Inner: $crate::rpc::wamp::RpcEndpoint + ?Sized>($crate::rpc::Invoker<'a, Inner>);
 
         impl<'a, Inner: $crate::rpc::wamp::RpcEndpoint + ?Sized + 'static> $interface_name<'a, Inner> {
             $(

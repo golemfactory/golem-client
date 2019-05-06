@@ -1,3 +1,5 @@
+use crate::context::*;
+use futures::prelude::*;
 use structopt::{clap::arg_enum, StructOpt};
 
 #[derive(StructOpt, Debug)]
@@ -13,5 +15,16 @@ arg_enum! {
         Payer,
         Status,
         Value
+    }
+}
+
+impl Section {
+    pub fn run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        match self {
+            _ => futures::future::err(unimplemented!()),
+        }
     }
 }

@@ -87,7 +87,7 @@ pub struct PeerInfo {
     pub node_name: String,
     pub node_info: NodeInfo,
     pub listen_port: u16,
-    pub conn_id: String,
+    pub conn_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

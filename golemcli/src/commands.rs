@@ -62,7 +62,7 @@ pub enum CommandSection {
     #[structopt(name = "res")]
     Res(res::Section),
 
-    /// Manage settings (unimplemented)
+    /// Manage settings
     #[structopt(name = "settings")]
     Settings(settings::Section),
 
@@ -74,7 +74,7 @@ pub enum CommandSection {
     #[structopt(name = "subtasks")]
     Subtasks(subtasks::Section),
 
-    /// Show and accept terms of use (unimplemented)
+    /// Show and accept terms of use
     #[structopt(name = "terms")]
     Terms(terms::Section),
 
@@ -88,27 +88,101 @@ pub enum CommandSection {
     Internal(InternalSection),
 }
 
+macro_rules! dispatch_subcommand {
+    {
+        on ($self:expr, $ctx:expr);
+        $(async {
+            $(
+            $(#[$async_meta:meta])*
+            $async_command:path,)*
+        })?
+        $(sync {
+            $($sync_command:path),*
+        })?
+    } => {{
+        match $self {
+            $(
+                $(
+                      $(#[$async_meta])*
+                      $async_command(command) => {
+                         let (mut sys, endpoint) = $ctx.connect_to_app()?;
+                         sys.block_on(command.run(endpoint))
+                      }
+                )*
+            )?,
+            $(
+                $(
+                    $sync_command(command) => command.run_command()
+                ),*
+            )?
+        }
+    }};
+}
+
 impl CommandSection {
     pub fn run_command(&self, ctx: &mut CliCtx) -> Result<CommandResponse, crate::context::Error> {
-        match &self {
+        dispatch_subcommand! {
+            on (self, ctx);
+            async {
+                CommandSection::Account,
+                #[cfg(feature = "concent_cli")]
+                CommandSection::Concent,
+                #[cfg(feature = "debug_cli")]
+                CommandSection::Debug,
+                CommandSection::Network,
+                CommandSection::Envs,
+                CommandSection::Incomes,
+                CommandSection::Payments,
+                #[cfg(feature = "concent_cli")]
+                CommandSection::DepositPayments,
+                CommandSection::Res,
+                CommandSection::Settings,
+                CommandSection::Tasks,
+                CommandSection::Subtasks,
+                CommandSection::Terms,
+                #[cfg(feature = "test_task_cli")]
+                CommandSection::TestTask,
+
+            }
+            sync {
+                CommandSection::Internal
+            }
+
+        }
+
+        /*match self {
             CommandSection::Internal(ref command) => command.run_command(),
             CommandSection::Account(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app().unwrap();
+                let (mut sys, endpoint) = ctx.connect_to_app()?;
                 sys.block_on(command.run(endpoint))
             }
+
+            CommandSection::Concent(command) => {
+                let (mut sys, endpoint) = ctx.connect_to_app()?;
+                sys.block_on(command.run(endpoint))
+            }
+
+            #[cfg(feature = "debug_cli")]
             CommandSection::Debug(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app().unwrap();
+                let (mut sys, endpoint) = ctx.connect_to_app()?;
                 sys.block_on(command.run(endpoint))
             }
+
             CommandSection::Network(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app().unwrap();
+                let (mut sys, endpoint) = ctx.connect_to_app()?;
                 sys.block_on(command.run(endpoint))
             }
-            &section => {
-                eprintln!("unimplemented command: {:?}", section);
-                Ok(CommandResponse::NoOutput)
+            CommandSection::Terms(ref command) => {
+                let (mut sys, endpoint) = ctx.connect_to_app()?;
+                sys.block_on(command.run(endpoint))
             }
-        }
+
+            CommandSection::TestTask(ref command) => {
+                let (mut sys, endpoint) = ctx.connect_to_app()?;
+                sys.block_on(command.run(endpoint))
+            }
+            _ => unimplemented!()
+        }*/
     }
 }
 

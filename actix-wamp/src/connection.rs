@@ -21,7 +21,7 @@ fn gen_id() -> u64 {
 
     let mut rng = rand::thread_rng();
 
-    rng.gen::<u64>() & 0x0f_ff_ff__ff_ff_ff_ffu64
+    rng.gen::<u64>() & 0x1f_ff_ff__ff_ff_ff_ffu64
 }
 
 pub struct OpenSession {

@@ -1,3 +1,5 @@
+use crate::context::*;
+use futures::{future, Future};
 use std::str::FromStr;
 use structopt::{clap::arg_enum, StructOpt};
 
@@ -39,5 +41,14 @@ arg_enum! {
     pub enum OnOff {
         On,
         Off
+    }
+}
+
+impl Section {
+    pub fn run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        futures::future::err(unimplemented!())
     }
 }
