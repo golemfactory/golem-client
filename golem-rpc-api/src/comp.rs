@@ -178,12 +178,12 @@ pub struct TaskInfo {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TaskStats {
-    pub in_network: u8,
+    pub in_network: u32,
     pub provider_state: Map<String, String>,
-    pub subtasks_accepted: Vec<u8>,
-    pub subtasks_computed: Vec<u8>,
-    pub subtasks_rejected: Vec<u8>,
-    pub subtasks_with_errors: Vec<u8>,
-    pub subtasks_with_timeout: Vec<u8>,
-    pub supported: u8,
+    pub subtasks_accepted: Vec<u32>,
+    pub subtasks_computed: Vec<u32>,
+    pub subtasks_rejected: Vec<u32>,
+    pub subtasks_with_errors: Vec<u32>,
+    pub subtasks_with_timeout: Vec<u32>,
+    pub supported: u32,
 }
