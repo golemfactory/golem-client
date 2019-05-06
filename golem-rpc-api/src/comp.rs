@@ -61,6 +61,9 @@ rpc_interface! {
         /// Returns true if there was task to cancel
         #[id = "comp.tasks.check.abort"]
         fn abort_test_task(&self) -> Result<bool>;
+
+        #[id = "comp.tasks.stats"]
+        fn get_tasks_stats(&self) -> Result<TaskStats>;
     }
 }
 
@@ -171,4 +174,16 @@ pub struct TaskInfo {
 
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TaskStats {
+    pub in_network: u8,
+    pub provider_state: Map<String, String>,
+    pub subtasks_accepted: Vec<u8>,
+    pub subtasks_computed: Vec<u8>,
+    pub subtasks_rejected: Vec<u8>,
+    pub subtasks_with_errors: Vec<u8>,
+    pub subtasks_with_timeout: Vec<u8>,
+    pub supported: u8,
 }

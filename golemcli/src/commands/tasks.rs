@@ -97,6 +97,7 @@ impl Section {
                 Box::new(self.show(endpoint, id, *current, sort))
             }
             Section::Template => Box::new(self.template()),
+            Section::Stats => Box::new(self.stats(endpoint)),
             _ => Box::new(futures::future::err(unimplemented!())),
         }
     }
@@ -272,5 +273,16 @@ impl Section {
     "concent_enabled": false
 }"#,
         ))
+    }
+
+    fn stats(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .get_tasks_stats()
+            .from_err()
+            .and_then(|stats| CommandResponse::object(stats))
     }
 }
