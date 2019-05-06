@@ -92,6 +92,7 @@ impl Section {
             Section::Restart { id } => Box::new(self.restart(endpoint, id)),
             Section::RestartSubtasks { id, subtask_ids} => Box::new(self.restart_subtasks(endpoint, id, subtask_ids)),
             Section::Show { id, current, sort } => Box::new(self.show(endpoint, id, *current, sort)),
+            Section::Template => Box::new(self.template()),
             _ => Box::new(futures::future::err(unimplemented!())),
 
         }
@@ -220,8 +221,26 @@ impl Section {
                 }.sort_by(&sort).into())
             }))
         }
-
     }
 
-
+    // TODO: read it though rpc; requires exposing such RPC from Brass
+    fn template(&self) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        futures::future::result(CommandResponse::object(
+            r#"{
+    "id": "",
+    "type": null,
+    "compute_on": "cpu",
+    "name": "",
+    "timeout": "4:00:00",
+    "subtask_timeout": "0:20:00",
+    "subtasks_count": 0,
+    "bid": 0.0,
+    "resources": [],
+    "options": {
+        "output_path": ""
+    },
+    "concent_enabled": false
+}"#,
+        ))
+    }
 }
