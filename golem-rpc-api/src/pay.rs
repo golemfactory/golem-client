@@ -1,5 +1,6 @@
 use super::Map;
 use crate::rpc::*;
+use crate::serde::ts_seconds;
 use bigdecimal::BigDecimal;
 use serde_derive::*;
 use serde_json::Value;
@@ -44,9 +45,11 @@ pub struct Income {
     pub value: BigDecimal,
     // status
     pub status: PaymentStatus,
-    pub transaction: String,
+    pub transaction: Option<String>,
+    #[serde(with = "ts_seconds")]
     pub created: chrono::DateTime<chrono::Utc>,
-    pub modified: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(with = "ts_seconds")]
+    pub modified: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -66,4 +69,27 @@ pub struct DepositPayment {
     pub transaction: String,
     pub created: chrono::DateTime<chrono::Utc>,
     pub modified: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_income() {
+        let str = r#"{
+            "subtask": "1e12a7e4-50a3-11e9-9521-1bac4bb5328e",
+            "payer": "1bac4bb5328ec9fc70b336e7c720dbb0c9cd23b8782c8bfc66f2a946ab036b8b6b71775cb04ad08d606f652ba476d9692c77cbd135f534d68f54c12e3edc039a",
+            "value": "33333333333333334",
+            "status": "awaiting",
+            "transaction": null,
+            "created": 1553699819.286437,
+            "modified": 1557242132.961853
+        }"#;
+
+        let income: Income = serde_json::from_str(str).unwrap();
+
+        eprintln!("income = {:?}", income);
+    }
+
 }
