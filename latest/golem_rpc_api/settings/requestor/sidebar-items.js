@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["list",""]],"static":[["SECTION_LIST",""]],"struct":[["ComputingTrust","Minimal provider trust"],["MaxPrice","Max GNT/h price (requestor)"]]});

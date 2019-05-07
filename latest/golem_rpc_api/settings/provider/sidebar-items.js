@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["list",""]],"static":[["SECTION_LIST",""]],"struct":[["MaxMemorySize","Max memory size"],["MaxResourceSize","Maximal resource size"],["MinPrice","Min GNT/h price (provider)"],["NumCores","Number of CPU cores to use"],["RequestingTrust","Minimal requestor trust"],["TaskRequestInterval","Interval between request task from network."]]});

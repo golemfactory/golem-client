@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["DepositStatus",""],["PaymentStatus","The status of a payment."]],"struct":[["Balance",""],["DepositBalance",""],["DepositPayment",""],["GolemPay",""],["Income",""],["Payment",""]],"trait":[["AsGolemPay",""]]});

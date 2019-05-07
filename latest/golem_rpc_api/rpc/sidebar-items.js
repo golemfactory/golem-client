@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["future","Futures"],["wamp",""]],"struct":[["Invoker",""]],"trait":[["AsInvoker",""],["Future","Trait for types which are a placeholder of a value that may become available at some later point in time."]]});

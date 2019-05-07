@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["DirType",""]],"struct":[["CachePaths",""],["CacheSizes",""],["GolemRes",""],["HwCaps",""],["HwPreset",""]],"trait":[["AsGolemRes",""]]});

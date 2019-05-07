@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["SubtaskStatus",""],["TaskStatus",""],["TaskTestStatus",""]],"struct":[["CompEnvStatus",""],["GolemComp",""],["ProviderState",""],["StatsCounters",""],["SubtaskInfo",""],["SubtaskStats",""],["SubtasksInfo",""],["TaskInfo",""],["TaskTestResult",""],["UnsupportInfo",""]],"trait":[["AsGolemComp",""]]});

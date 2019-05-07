@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error",""],["Net",""]],"fn":[["connect_to_app","Connects to golemapp"]],"macro":[["rpc_interface",""]],"mod":[["apps",""],["comp",""],["concent",""],["core",""],["net",""],["pay",""],["res",""],["rpc",""],["settings",""],["terms",""]],"type":[["Map",""]]});

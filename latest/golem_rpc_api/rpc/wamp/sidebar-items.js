@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error",""]],"struct":[["RpcCallRequest",""],["RpcCallResponse",""]],"trait":[["Future","Trait for types which are a placeholder of a value that may become available at some later point in time."],["RpcEndpoint",""],["ToArgs",""]]});
