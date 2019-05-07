@@ -56,18 +56,22 @@ impl Error {
         })
     }
 
-    pub fn from_abort(uri : &str, extra : &Vec<(rmpv::Value, rmpv::Value)>) -> Self {
+    pub fn from_abort(uri: &str, extra: &Vec<(rmpv::Value, rmpv::Value)>) -> Self {
         let code = ErrorKind::from_uri(uri);
-        let extra : Dict = extra.into_iter().filter_map(|(k,v)| {
-            let key = match k {
-                rmpv::Value::String(key) => key.clone().into_str()?,
-                _ => return None
-            };
-            let value = serde_json::to_value(v).ok()?;
+        let extra: Dict = extra
+            .into_iter()
+            .filter_map(|(k, v)| {
+                let key = match k {
+                    rmpv::Value::String(key) => key.clone().into_str()?,
+                    _ => return None,
+                };
+                let value = serde_json::to_value(v).ok()?;
 
-            Some((key, value))
-        }).collect();
-        let message = extra.get("message")
+                Some((key, value))
+            })
+            .collect();
+        let message = extra
+            .get("message")
             .and_then(|v| v.as_str())
             .unwrap_or_else(|| code.uri())
             .to_string();
@@ -79,25 +83,29 @@ impl Error {
         })
     }
 
-    pub fn from_wamp_error_message(uri : &str, args : &rmpv::Value, kwargs : &rmpv::Value) -> Self {
+    pub fn from_wamp_error_message(uri: &str, args: &rmpv::Value, kwargs: &rmpv::Value) -> Self {
         let code = ErrorKind::from_uri(uri);
-        let extra : Dict = kwargs.as_map().map(|v| v.into_iter().filter_map(|(k,v)| {
-            let key = match k {
-                rmpv::Value::String(key) => key.clone().into_str()?,
-                _ => return None
-            };
-            let value = serde_json::to_value(v).ok()?;
+        let extra: Dict = kwargs
+            .as_map()
+            .map(|v| {
+                v.into_iter()
+                    .filter_map(|(k, v)| {
+                        let key = match k {
+                            rmpv::Value::String(key) => key.clone().into_str()?,
+                            _ => return None,
+                        };
+                        let value = serde_json::to_value(v).ok()?;
 
-            Some((key, value))
-        }).collect()).unwrap_or_else(|| Dict::new());
-        let message = extra.get("message")
+                        Some((key, value))
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| Dict::new());
+        let message = extra
+            .get("message")
             .and_then(|v| v.as_str())
-            .or_else(||
-                args[0].as_str()
-            )
-            .unwrap_or_else(||
-                code.uri()
-            )
+            .or_else(|| args[0].as_str())
+            .unwrap_or_else(|| code.uri())
             .to_string();
 
         Error::WampError(WampError {

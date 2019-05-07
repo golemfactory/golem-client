@@ -1,6 +1,6 @@
 use crate::context::*;
 use futures::prelude::*;
-use golem_rpc_api::comp::{AsGolemComp, TaskInfo};
+use golem_rpc_api::comp::{AsGolemComp, StatsCounters, SubtaskStats, TaskInfo};
 use openssl::rsa::Padding;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -258,17 +258,27 @@ impl Section {
     fn template(&self) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         futures::future::result(CommandResponse::object(
             r#"{
-    "id": "",
-    "type": null,
+    "type": "Blender",
     "compute_on": "cpu",
-    "name": "",
-    "timeout": "4:00:00",
-    "subtask_timeout": "0:20:00",
-    "subtasks_count": 0,
-    "bid": 0.0,
-    "resources": [],
+    "name": "Horse 3s",
+    "timeout": "00:15:00",
+    "subtask_timeout": "00:10:00",
+    "subtasks_count": 3,
+    "bid": 3.3,
+    "resources": [
+        "/Users/tworec/git/golem/gu-gateway/golem/gugateway/horse.blend"
+    ],
     "options": {
-        "output_path": ""
+        "frame_count": 1,
+        "output_path": "/Users/tworec/tmp/",
+
+        "format": "PNG",
+        "resolution": [
+            1000,
+            600
+        ],
+        "frames": "1",
+        "compositing": false
     },
     "concent_enabled": false
 }"#,
@@ -283,6 +293,50 @@ impl Section {
             .as_golem_comp()
             .get_tasks_stats()
             .from_err()
-            .and_then(|stats| CommandResponse::object(stats))
+            .and_then(|stats: SubtaskStats| {
+                let columns: Vec<String> = vec![
+                    "".into(),
+                    "global".into(),
+                    "session".into(),
+                    "config".into(),
+                ];
+                let values = vec![
+                    serde_json::json!(["provider state", "", "", stats.provider_state,]),
+                    serde_json::json!(["in network", stats.in_network, "", "",]),
+                    serde_json::json!(["supported", stats.supported, "", "",]),
+                    serde_json::json!([
+                        "accepted",
+                        stats.subtasks_accepted.global,
+                        stats.subtasks_accepted.session,
+                        "",
+                    ]),
+                    serde_json::json!([
+                        "computed",
+                        stats.subtasks_computed.global,
+                        stats.subtasks_computed.session,
+                        "",
+                    ]),
+                    serde_json::json!([
+                        "rejected",
+                        stats.subtasks_rejected.global,
+                        stats.subtasks_rejected.session,
+                        "",
+                    ]),
+                    serde_json::json!([
+                        "failed",
+                        stats.subtasks_with_errors.global,
+                        stats.subtasks_with_errors.session,
+                        "",
+                    ]),
+                    serde_json::json!([
+                        "timedout",
+                        stats.subtasks_with_timeout.global,
+                        stats.subtasks_with_timeout.session,
+                        "",
+                    ]),
+                ];
+                // CommandResponse::object(stats)
+                Ok(ResponseTable { columns, values }.into())
+            })
     }
 }

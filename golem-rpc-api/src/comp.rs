@@ -63,7 +63,7 @@ rpc_interface! {
         fn abort_test_task(&self) -> Result<bool>;
 
         #[id = "comp.tasks.stats"]
-        fn get_tasks_stats(&self) -> Result<TaskStats>;
+        fn get_tasks_stats(&self) -> Result<SubtaskStats>;
     }
 }
 
@@ -177,13 +177,21 @@ pub struct TaskInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct TaskStats {
-    pub in_network: u32,
+pub struct StatsCounters {
+    pub session: u32,
+    pub global: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubtaskStats {
     pub provider_state: Map<String, String>,
-    pub subtasks_accepted: Vec<u32>,
-    pub subtasks_computed: Vec<u32>,
-    pub subtasks_rejected: Vec<u32>,
-    pub subtasks_with_errors: Vec<u32>,
-    pub subtasks_with_timeout: Vec<u32>,
+    #[serde(rename(serialize = "subtasks_in_network"))]
+    pub in_network: u32,
+    #[serde(rename(serialize = "subtasks_supported"))]
     pub supported: u32,
+    pub subtasks_accepted: StatsCounters,
+    pub subtasks_computed: StatsCounters,
+    pub subtasks_rejected: StatsCounters,
+    pub subtasks_with_errors: StatsCounters,
+    pub subtasks_with_timeout: StatsCounters,
 }

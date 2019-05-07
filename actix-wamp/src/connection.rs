@@ -191,7 +191,11 @@ where
         Ok(())
     }
 
-    fn handle_abort(&mut self, error_uri : &str, extra : &Vec<(rmpv::Value, rmpv::Value)>) -> Result<(), Error> {
+    fn handle_abort(
+        &mut self,
+        error_uri: &str,
+        extra: &Vec<(rmpv::Value, rmpv::Value)>,
+    ) -> Result<(), Error> {
         match std::mem::replace(&mut self.state, ConnectionState::Failed) {
             ConnectionState::Authenticating { tx } => {
                 // TODO: log error
@@ -203,7 +207,7 @@ where
                     let _ = desc.tx.send(Err(Error::from_abort(error_uri, extra)));
                 }
             }
-            _ => ()
+            _ => (),
         }
 
         Ok(())
@@ -216,31 +220,43 @@ where
     //      Error|uri,
     //      Arguments|list,
     // ArgumentsKw|dict]
-    fn handle_error(&mut self, request_type : u64, request_id : u64, details : &rmpv::Value, error_uri : &str, args : &rmpv::Value, kwargs : &rmpv::Value) -> Result<(), Error> {
-
-       match request_type.try_into()? {
-           CALL => self.handle_error_call(request_id, details, error_uri, args, kwargs),
-           _ => Ok(())
-       }
+    fn handle_error(
+        &mut self,
+        request_type: u64,
+        request_id: u64,
+        details: &rmpv::Value,
+        error_uri: &str,
+        args: &rmpv::Value,
+        kwargs: &rmpv::Value,
+    ) -> Result<(), Error> {
+        match request_type.try_into()? {
+            CALL => self.handle_error_call(request_id, details, error_uri, args, kwargs),
+            _ => Ok(()),
+        }
     }
 
-    fn handle_error_call(&mut self, request_id : u64, details : &rmpv::Value, error_uri : &str, args : &rmpv::Value, kwargs : &rmpv::Value) -> Result<(), Error> {
+    fn handle_error_call(
+        &mut self,
+        request_id: u64,
+        details: &rmpv::Value,
+        error_uri: &str,
+        args: &rmpv::Value,
+        kwargs: &rmpv::Value,
+    ) -> Result<(), Error> {
         log::info!("handle call: {}", request_id);
         let calls = match &mut self.state {
-            ConnectionState::Established { pending_calls , ..} => {
-                pending_calls
-            },
-            _ => return Ok(())
+            ConnectionState::Established { pending_calls, .. } => pending_calls,
+            _ => return Ok(()),
         };
         if let Some(desc) = calls.remove(&request_id) {
-            let _ = desc.tx.send(Err(Error::from_wamp_error_message(error_uri, args, kwargs)));
-        }
-        else {
+            let _ = desc
+                .tx
+                .send(Err(Error::from_wamp_error_message(error_uri, args, kwargs)));
+        } else {
             log::error!("invalid id");
         }
         Ok(())
     }
-
 }
 
 impl<W: 'static> Actor for Connection<W>
@@ -306,13 +322,16 @@ where
                         //      Arguments|list,
                         // ArgumentsKw|dict]
                         log::trace!("got error");
-                        self.handle_error(value[1].as_u64().unwrap(), value[2].as_u64().unwrap(), &value[3], value[4].as_str().unwrap(),
-                                          &value[5], &value[6]
+                        self.handle_error(
+                            value[1].as_u64().unwrap(),
+                            value[2].as_u64().unwrap(),
+                            &value[3],
+                            value[4].as_str().unwrap(),
+                            &value[5],
+                            &value[6],
                         );
-
                     }
-                    _ => {
-                    }
+                    _ => {}
                 }
             }
             _ => log::debug!("h={:?}", item),
