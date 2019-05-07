@@ -11,7 +11,7 @@ arg_enum! {
 }
 
 arg_enum! {
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     pub enum PaymentStatus {
         Awaiting,
         Confirmed

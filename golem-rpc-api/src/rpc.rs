@@ -84,6 +84,10 @@ macro_rules! rpc_interface {
                 fn $it:tt $args:tt -> Result<$ret:ty>;
             )*
         }
+
+        $(
+            converter $converter_name:ident $converter_method:ident;
+        )?
     }
 
      => {
@@ -100,6 +104,18 @@ macro_rules! rpc_interface {
 
             )*
         }
+
+        $(
+            pub trait $converter_name : $crate::rpc::wamp::RpcEndpoint {
+                fn $converter_method<'a>(&'a self ) -> $interface_name<'a, Self>;
+            }
+
+            impl<Endpoint: $crate::rpc::wamp::RpcEndpoint> $converter_name for Endpoint {
+                fn $converter_method<'a>(&'a self) -> $interface_name<'a, Endpoint> {
+                    $interface_name(self.as_invoker())
+                }
+            }
+        )?
 
      };
 }
