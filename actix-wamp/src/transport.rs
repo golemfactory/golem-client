@@ -3,6 +3,7 @@ use actix_web::client::*;
 use futures::prelude::*;
 use openssl::ssl;
 
+/// Websocket over https transport.
 pub fn wss(
     host: &str,
     port: u16,

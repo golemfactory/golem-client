@@ -49,7 +49,7 @@ pub enum Role {
 
 */
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WampError {
     pub code: ErrorKind,
     pub message: String,
@@ -71,7 +71,7 @@ macro_rules! error_kinds {
         ///
         /// WAMP peers MUST use only the defined error messages.
         ///
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, PartialEq, Clone)]
         pub enum ErrorKind {
             $(
                 $(#[$outer])*

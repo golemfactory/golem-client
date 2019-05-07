@@ -97,16 +97,16 @@ impl CliArgs {
         }
     }
 
-    fn run_command(&self) {
-        let mut ctx: CliCtx = self.try_into().unwrap();
+    fn run_command(&self) -> failure::Fallible<()> {
+        let mut ctx: CliCtx = self.try_into()?;
         match &self.command {
             None => self.no_command(),
             Some(command) => {
                 let resp = command.run_command(&mut ctx);
-                ctx.output(resp.unwrap());
+                ctx.output(resp?);
             }
         }
-        self.post_command(&mut ctx);
+        Ok(self.post_command(&mut ctx))
     }
 }
 
@@ -117,6 +117,9 @@ fn main() -> failure::Fallible<()> {
         .start()
         .unwrap();
 
-    args.run_command();
+    match args.run_command() {
+        Ok(()) => (),
+        Err(e) => log::error!("{}", e),
+    }
     Ok(())
 }
