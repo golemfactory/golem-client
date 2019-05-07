@@ -4,9 +4,9 @@
 
 ## Subprojects
 
-* actix-wamp - Web Application Messaging Protocol implementation. 
-* golem-rpc-api - Typesafe binding for golemapp rpc services.
-* wamp-derive - procedural macros for WAMP rpc binding generator.
+* actix-wamp ([api docs](https://golemfactory.github.io/golem-client/latest/actix_wamp/index.html)) - Web Application Messaging Protocol implementation. 
+* golem-rpc-api ([api docs](https://golemfactory.github.io/golem-client/latest/golem_rpc_api/index.html)) - Typesafe binding for golemapp rpc services. 
+* golemcli - command line interface for golem. reimplementation.
 
 ## Prerequisites (Windows)
 
