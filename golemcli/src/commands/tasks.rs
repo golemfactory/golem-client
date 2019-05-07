@@ -68,7 +68,10 @@ pub enum Section {
     Stats,
     /// Show sub-tasks (unimplemented)
     #[structopt(name = "subtasks")]
-    Subtasks,
+    Subtasks{
+        /// Task identifier
+        task_id: String,
+    },
     /// Dump a task template (unimplemented)
     #[structopt(name = "template")]
     Template,
@@ -98,6 +101,7 @@ impl Section {
             }
             Section::Template => Box::new(self.template()),
             Section::Stats => Box::new(self.stats(endpoint)),
+            Section::Subtasks{ task_id } => Box::new(self.subtasks(endpoint, task_id)),
             _ => Box::new(futures::future::err(unimplemented!())),
         }
     }
@@ -338,5 +342,17 @@ impl Section {
                 // CommandResponse::object(stats)
                 Ok(ResponseTable { columns, values }.into())
             })
+    }
+
+    fn subtasks(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        task_id: &str,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .get_subtasks(task_id.into())
+            .from_err()
+            .and_then(|stats| CommandResponse::object(stats))
     }
 }

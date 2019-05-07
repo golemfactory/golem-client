@@ -35,6 +35,10 @@ rpc_interface! {
         #[id = "comp.task.subtask.restart"]
         fn restart_subtask(&self, subtask_id : String) -> Result<()>;
 
+
+        #[id = "comp.task.subtasks"]
+        fn get_subtasks(&self, task_id : String) -> Result<Vec<SubtaskInfo>>;
+
         #[id = "comp.task.purge"]
         fn purge_tasks(&self) -> Result<()>;
 
@@ -171,6 +175,37 @@ pub struct TaskInfo {
     pub fee: Option<BigDecimal>,
     pub estimated_cost: Option<BigDecimal>,
     pub estimated_fee: Option<BigDecimal>,
+
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum SubtaskStatus {
+    Starting,
+    Downloading,
+    Verifying,
+    #[serde(rename = "Failed - Resent")]
+    FailedResent,
+    Finished,
+    Failure,
+    Restart,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubtaskInfo {
+    pub subtask_id: String,
+    pub node_id: String,
+    pub node_name: String,
+    pub status: SubtaskStatus,
+    pub progress: Option<f64>,
+    pub time_started: Option<f64>,
+    /// Remaining time in seconds
+    pub time_remaining: Option<f64>,
+
+    pub results: Vec<String>,
+    pub stderr: Option<String>,
+    pub stdout: Option<String>,
 
     #[serde(flatten)]
     pub extra: Map<String, Value>,
