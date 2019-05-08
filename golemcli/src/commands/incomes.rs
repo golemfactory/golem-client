@@ -8,6 +8,10 @@ pub struct Section {
     filter_by: Option<crate::eth::PaymentStatus>,
     #[structopt(long = "sort")]
     sort_by: Option<String>,
+
+    /// Show full table contents
+    #[structopt(long)]
+    full: bool,
 }
 
 arg_enum! {
@@ -26,6 +30,7 @@ impl Section {
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         let sort_by = self.sort_by.clone();
         let filter_by = self.filter_by.clone();
+        let full = self.full.clone();
 
         endpoint
             .as_golem_pay()
@@ -36,7 +41,10 @@ impl Section {
                 let values = incomes
                     .into_iter()
                     .map(|income: Income| {
-                        let payer = income.payer;
+                        let payer = match full {
+                            false => crate::eth::public_to_addres(income.payer),
+                            true => income.payer,
+                        };
                         let status = income.status;
                         let value = crate::eth::Currency::GNT.format_decimal(&income.value);
 

@@ -1,4 +1,6 @@
 use bigdecimal::BigDecimal;
+use ethkey::{Address, PublicKey};
+use rustc_hex::FromHex;
 use serde::Serialize;
 use structopt::clap::arg_enum;
 
@@ -36,6 +38,12 @@ impl Currency {
     }
 }
 
+pub fn public_to_addres(pubkey_hex: String) -> String {
+    let pubkey_bytes: Vec<u8> = pubkey_hex.from_hex().unwrap();
+    let pubkey = PublicKey::from_slice(&pubkey_bytes).unwrap();
+    format!("{}", Address::from(pubkey.address().as_ref()))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -49,6 +57,13 @@ mod test {
             "1899.9999999999999999 GNT",
             Currency::GNT.format_decimal(&p2)
         );
+    }
+
+    #[test]
+    fn test_public_to_addres() {
+        let public = "782cc7dd72426893ae0d71477e41c41b03249a2b72e78eefcfe0baa9df604a8f979ab94cd23d872dac7bfa8d07d8b76b26efcbede7079f1c5cacd88fe9858f6e".into();
+        let address = public_to_addres(public);
+        assert_eq!("0x005b3bcf82085eededd551f50de7892471ffb272", address);
     }
 
 }
