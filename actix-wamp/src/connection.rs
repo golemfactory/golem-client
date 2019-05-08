@@ -108,8 +108,7 @@ where
             log::debug!("send message {}", out_value);
         }
 
-        self.writer.write(ws::Message::Binary(bytes.into()));
-        Ok(())
+        self.writer.write(ws::Message::Binary(bytes.into())).map(|_|()).map_err(|e| Error::ActixProtocolErorr(e))
     }
 
     fn handle_challenge(&mut self, auth_method: &str, extra: &Dict) -> Result<(), Error> {
@@ -183,7 +182,7 @@ where
                 .and_then(|args| args.as_array().cloned())
                 .unwrap_or_default();
 
-            tx.send(Ok(RpcCallResponse {
+            let _ = tx.send(Ok(RpcCallResponse {
                 args,
                 kw_args: None,
             }));
@@ -286,14 +285,14 @@ where
 
                 match value[0].as_i64().unwrap() as u8 {
                     WELCOME => {
-                        self.handle_welcome(
+                        let _ = self.handle_welcome(
                             value[1].as_u64().unwrap(),
                             &serde_json::to_value(&value[2].as_map()).unwrap(),
                         );
                     }
                     ABORT => {
                         // [3, {"message": "WAMP-CRA signature is invalid"}, "wamp.error.not_authorized"]
-                        self.handle_abort(value[2].as_str().unwrap(), value[1].as_map().unwrap());
+                        let _ = self.handle_abort(value[2].as_str().unwrap(), value[1].as_map().unwrap());
                     }
 
                     CHALLENGE => {
@@ -309,7 +308,7 @@ where
                         });
                     }
                     RESULT => {
-                        self.handle_result(value[1].as_u64().unwrap(), Some(value[3].clone()));
+                        let _ = self.handle_result(value[1].as_u64().unwrap(), Some(value[3].clone()));
                     }
                     ERROR => {
                         // There are 2 formats
@@ -322,7 +321,7 @@ where
                         //      Arguments|list,
                         // ArgumentsKw|dict]
                         log::trace!("got error");
-                        self.handle_error(
+                        let _ = self.handle_error(
                             value[1].as_u64().unwrap(),
                             value[2].as_u64().unwrap(),
                             &value[3],
@@ -389,7 +388,7 @@ where
             None => None,
         };
 
-        self.send_message(&(
+        let _ = self.send_message(&(
             HELLO,
             realm_id,
             HelloSpec {

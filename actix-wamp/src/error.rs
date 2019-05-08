@@ -38,6 +38,9 @@ pub enum Error {
 
     #[fail(display = "{}", _0)]
     WsClientError(String),
+
+    #[fail(display = "{}", _0)]
+    ActixProtocolErorr(actix_http::ws::ProtocolError),
 }
 
 impl Error {

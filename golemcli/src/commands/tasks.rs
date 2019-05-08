@@ -88,7 +88,6 @@ impl Section {
         match self {
             Section::Abort { id } => Box::new(self.abort(endpoint, id)),
             Section::Create { file_name } => Box::new(self.create(endpoint, file_name)),
-            Section::Abort { id } => Box::new(self.abort(endpoint, id)),
             Section::Delete { id } => Box::new(self.delete(endpoint, id)),
             Section::Dump { id, out_file } => Box::new(self.dump(endpoint, id, out_file)),
             Section::Purge => Box::new(self.purge(endpoint)),
