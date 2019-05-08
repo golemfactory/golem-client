@@ -8,36 +8,36 @@ edition = "2018"
 default=['interactive_cli', 'debug_cli', 'concent_cli', 'test_task_cli']
 concent_cli=[]
 debug_cli=[]
-test_task_cli=[]
 interactive_cli=["rustyline"]
+test_task_cli=[]
 
 [dependencies]
 actix = "0.8.1"
 actix-http = "0.1.4"
-rmp-serde = "0.13.7"
-rmp = "0.8.7"
-rmpv = "0.4.0"
-futures="0.1"
-hmac = "0.7.0"
-sha2 = "0.8.0"
-serde_json = "1.0.39"
-serde="1.0"
-serde_derive="1.0"
-base64 = "0.10.1"
-rand = "0.6.5"
 appdirs="0.2"
-structopt="0.2.15"
-log="0.4"
-rpassword = "3.0.2"
+base64 = "0.10.1"
 bigdecimal = {version = "0.1.0", features=["serde"]}
-serde_yaml = "0.8"
 crossbeam-channel = "0.3.8"
-futures-cpupool="0.1"
-prettytable-rs = "0.8"
-lazy_static="1.1"
 failure="0.1"
 flexi_logger = "0.11.4"
+futures-cpupool="0.1"
+futures="0.1"
+hmac = "0.7.0"
+lazy_static="1.1"
+log="0.4"
+prettytable-rs = "0.8"
 promptly = "0.1.5"
+rand = "0.6.5"
+rmp = "0.8.7"
+rmp-serde = "0.13.7"
+rmpv = "0.4.0"
+rpassword = "3.0.2"
+serde="1.0"
+serde_derive="1.0"
+serde_json = "1.0.39"
+serde_yaml = "0.8"
+sha2 = "0.8.0"
+structopt="0.2.15"
 
 # Needed for terams show
 html2text = "0.1.8"
