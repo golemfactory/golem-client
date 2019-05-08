@@ -21,7 +21,7 @@ pub enum Section {
 impl Section {
     pub fn run(
         &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        _endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         match self {
             _ => futures::future::err(unimplemented!()),

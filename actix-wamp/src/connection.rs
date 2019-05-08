@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 
 use crate::args::RpcEndpoint;
-use actix::fut::err;
+
 use std::convert::TryInto;
 //use crate::messages::types as msg_type;
 
@@ -202,7 +202,7 @@ where
                 let _ = tx.send(Err(Error::from_abort(error_uri, extra)));
             }
             ConnectionState::Established { pending_calls, .. } => {
-                for (call_id, desc) in pending_calls {
+                for (_call_id, desc) in pending_calls {
                     // TODO: log error
                     let _ = desc.tx.send(Err(Error::from_abort(error_uri, extra)));
                 }
@@ -238,7 +238,7 @@ where
     fn handle_error_call(
         &mut self,
         request_id: u64,
-        details: &rmpv::Value,
+        _details: &rmpv::Value,
         error_uri: &str,
         args: &rmpv::Value,
         kwargs: &rmpv::Value,

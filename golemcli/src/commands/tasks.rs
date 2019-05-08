@@ -216,7 +216,7 @@ impl Section {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + 'static,
         opt_task_id: &Option<String>,
-        current: bool,
+        _current: bool,
         sort: &Option<String>,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         let sort = sort.clone();

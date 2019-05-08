@@ -1,9 +1,9 @@
-use super::Map;
+
 use crate::rpc::*;
 use crate::serde::ts_seconds;
 use bigdecimal::BigDecimal;
 use serde_derive::*;
-use serde_json::Value;
+
 
 rpc_interface! {
     trait GolemPay {
@@ -12,12 +12,12 @@ rpc_interface! {
 
         //
         #[id = "pay.payments"]
-        fn get_payments_list(&self, #[kwarg] num: Option<u32>, #[kwarg] last_seconds: Option<u32>) -> Result<Vec<Payment>>;
+        fn get_payments_list(&self, #[kwarg] _num: Option<u32>, #[kwarg] _last_seconds: Option<u32>) -> Result<Vec<Payment>>;
 
         //
         // TODO: kwargs limit=1000, offset=0
         #[id = "pay.deposit_payments"]
-        fn get_deposit_payments_list(&self, #[kwarg] limit : Option<usize>, #[kwarg] offset : Option<usize>) -> Result<Option<Vec<DepositPayment>>>;
+        fn get_deposit_payments_list(&self, #[kwarg] _limit : Option<usize>, #[kwarg] _offset : Option<usize>) -> Result<Option<Vec<DepositPayment>>>;
     }
 
     converter AsGolemPay as_golem_pay;

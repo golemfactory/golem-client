@@ -63,7 +63,7 @@ pub fn interactive_shell(ctx: &mut CliCtx) {
     while let Ok(line) = editor.readline(">> ") {
         match LineArgs::from_iter_safe(line.split_ascii_whitespace()) {
             Ok(LineArgs {
-                json,
+                json: _,
                 command: Some(command),
             }) => match command.run_command(ctx) {
                 Ok(resp) => ctx.output(resp),
@@ -72,8 +72,8 @@ pub fn interactive_shell(ctx: &mut CliCtx) {
             Ok(_) => (),
             Err(clap::Error {
                 message,
-                kind,
-                info,
+                kind: _,
+                info: _,
             }) => {
                 eprintln!("{}", message);
             }

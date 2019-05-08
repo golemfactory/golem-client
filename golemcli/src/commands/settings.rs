@@ -59,9 +59,9 @@ impl Section {
     pub fn show(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        basic: bool,
-        provider: bool,
-        requestor: bool,
+        _basic: bool,
+        _provider: bool,
+        _requestor: bool,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         Box::new(
             endpoint

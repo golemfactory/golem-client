@@ -1,7 +1,7 @@
 #![allow(clippy::needless_lifetimes)]
 
 use crate::rpc::*;
-use serde_derive::*;
+
 
 rpc_interface! {
     trait GolemTerms {

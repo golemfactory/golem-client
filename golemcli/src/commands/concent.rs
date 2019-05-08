@@ -47,7 +47,7 @@ arg_enum! {
 impl Section {
     pub fn run(
         &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        _endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         futures::future::err(unimplemented!())
     }
