@@ -121,20 +121,8 @@ macro_rules! rpc_interface {
 }
 
 #[macro_export]
+#[doc(hidden)]
 macro_rules! impl_async_rpc_item {
-    {
-                $(#[doc = $doc:expr])*
-                #[id = $rpc_uri:expr]
-                fn $name:ident(&self, $($arg_id:ident : $t:ty),*) -> Result<$ret:ty, Error>;
-
-    }=> {
-                $(#[doc = $doc])*
-                #[doc = "RPC uri="]
-                #[doc = $rpc_uri]
-                pub fn $name(&self, $($arg_id : $t,)*) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> {
-                    self.0.rpc_call($rpc_uri, &($($arg_id,)*))
-                }
-    };
     {
                 $(#[doc = $doc:expr])*
                 #[id = $rpc_uri:expr]
@@ -145,6 +133,35 @@ macro_rules! impl_async_rpc_item {
                 #[doc = "RPC uri="]
                 #[doc = $rpc_uri]
                 pub fn $name<'b>(&'b self) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> + 'static {
+                    self.0.rpc_call($rpc_uri, &())
+                }
+    };
+
+    {
+                $(#[doc = $doc:expr])*
+                #[id = $rpc_uri:expr]
+                fn $name:ident(&self $(, $arg_id:ident : $t:ty)* $(, #[kwarg] $kw_arg_id:ident : $kw_t:ty)*) -> Result<$ret:ty, Error>;
+
+    }=> {
+                $(#[doc = $doc])*
+                #[doc = "RPC uri="]
+                #[doc = $rpc_uri]
+                pub fn $name(&self $(, $arg_id : $t)* $(, $kw_arg_id : $kw_t)*) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> {
+                    self.0.rpc_call($rpc_uri, &($($arg_id,)*))
+                }
+    };
+
+
+    {
+                $(#[doc = $doc:expr])*
+                #[id = $rpc_uri:expr]
+                fn $name:ident(&self $(, #[kwarg] $kw_arg_id:ident : $kw_t:ty)+) -> Result<$ret:ty, Error>;
+
+    } => {
+                $(#[doc = $doc])*
+                #[doc = "RPC uri="]
+                #[doc = $rpc_uri]
+                pub fn $name<'b>(&'b self $(, $kw_arg_id : $kw_t)+) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> + 'static {
                     self.0.rpc_call($rpc_uri, &())
                 }
     };

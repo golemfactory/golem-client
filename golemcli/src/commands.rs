@@ -45,15 +45,15 @@ pub enum CommandSection {
     #[structopt(name = "network")]
     Network(network::NetworkSection),
 
-    /// Display incomes (unimplemented)
+    /// Display incomes
     #[structopt(name = "incomes")]
     Incomes(incomes::Section),
 
-    /// Display payments (unimplemented)
+    /// Display payments
     #[structopt(name = "payments")]
     Payments(payments::Section),
 
-    /// Display deposit payments (unimplemented)
+    /// Display deposit payments
     #[cfg(feature = "concent_cli")]
     #[structopt(name = "deposit_payments")]
     DepositPayments(deposit_payments::Section),
@@ -66,7 +66,7 @@ pub enum CommandSection {
     #[structopt(name = "settings")]
     Settings(settings::Section),
 
-    /// Manage tasks (unimplemented)
+    /// Manage tasks
     #[structopt(name = "tasks")]
     Tasks(tasks::Section),
 

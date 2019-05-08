@@ -20,6 +20,23 @@ arg_enum! {
     }
 }
 
+impl PaymentStatus {
+    pub fn is_match_with(&self, status: &golem_rpc_api::pay::PaymentStatus) -> bool {
+        use golem_rpc_api::pay::PaymentStatus as RpcPaymentStatus;
+
+        match self {
+            PaymentStatus::Awaiting => match status {
+                RpcPaymentStatus::Awaiting | RpcPaymentStatus::Sent => true,
+                _ => false,
+            },
+            PaymentStatus::Confirmed => match status {
+                RpcPaymentStatus::Confirmed => true,
+                _ => false,
+            },
+        }
+    }
+}
+
 #[inline]
 fn eth_denoms() -> BigDecimal {
     BigDecimal::from(1000000000000000000u64)

@@ -3,10 +3,29 @@ use futures::prelude::*;
 use golem_rpc_api::pay::{AsGolemPay, Income};
 use structopt::{clap::arg_enum, StructOpt};
 
+const INCOMES_COLUMNS : &[&str] = &["payer", "status", "value" ];
+
 #[derive(StructOpt, Debug)]
 pub struct Section {
+    /// Filter by status
+    #[structopt(
+    parse(try_from_str),
+    raw(
+    possible_values = "&[\"awaiting\",\"confirmed\"]",
+    case_insensitive = "true"
+    )
+    )]
     filter_by: Option<crate::eth::PaymentStatus>,
+
     #[structopt(long = "sort")]
+    #[structopt(
+        parse(try_from_str),
+        raw(
+            possible_values = "INCOMES_COLUMNS",
+            case_insensitive = "true"
+        )
+    )]
+    /// Sort incomes
     sort_by: Option<String>,
 
     /// Show full table contents
@@ -37,9 +56,14 @@ impl Section {
             .get_incomes_list()
             .from_err()
             .and_then(move |incomes| {
-                let columns = vec!["payer".into(), "status".into(), "value".into()];
+                let columns = INCOMES_COLUMNS.iter().map(|&name| name.into()).collect();
                 let values = incomes
                     .into_iter()
+                    .filter(|income| {
+                        filter_by
+                            .map(|f| f.is_match_with(&income.status))
+                            .unwrap_or(true)
+                    })
                     .map(|income: Income| {
                         let payer = match full {
                             false => crate::eth::public_to_addres(income.payer),
