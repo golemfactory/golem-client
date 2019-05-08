@@ -68,7 +68,7 @@ pub enum Section {
     Stats,
     /// Show sub-tasks (unimplemented)
     #[structopt(name = "subtasks")]
-    Subtasks{
+    Subtasks {
         /// Task identifier
         task_id: String,
     },
@@ -101,7 +101,7 @@ impl Section {
             }
             Section::Template => Box::new(self.template()),
             Section::Stats => Box::new(self.stats(endpoint)),
-            Section::Subtasks{ task_id } => Box::new(self.subtasks(endpoint, task_id)),
+            Section::Subtasks { task_id } => Box::new(self.subtasks(endpoint, task_id)),
             _ => Box::new(futures::future::err(unimplemented!())),
         }
     }

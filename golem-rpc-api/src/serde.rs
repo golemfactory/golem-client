@@ -1,3 +1,6 @@
+// Modified code from
+// https://github.com/chronotope/chrono/blob/master/src/datetime.rs#L1261
+//
 pub mod ts_seconds {
     use serde::{de, ser};
     use std::fmt;

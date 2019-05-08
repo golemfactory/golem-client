@@ -30,8 +30,8 @@ trait GolemNet {
     ///
     /// Returns:
     ///
-    ///    (true, None) - if node is successively blocked.
-    ///    (false, reason) - on error
+    /// * `(true, None)` - if node is successively blocked.
+    /// * `(false, reason)` - on error
     ///
     #[id = "net.peer.block"]
     fn block_node(&self, node_id: String) -> Result<(bool, String)>;
