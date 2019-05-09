@@ -37,7 +37,7 @@ rpc_interface! {
 
 
         #[id = "comp.task.subtasks"]
-        fn get_subtasks(&self, task_id : String) -> Result<Vec<SubtaskInfo>>;
+        fn get_subtasks(&self, task_id : String) -> Result<Option<Vec<SubtaskInfo>>>;
 
         #[id = "comp.task.purge"]
         fn purge_tasks(&self) -> Result<()>;
@@ -160,16 +160,7 @@ pub struct TaskInfo {
     /// Remaining time in seconds
     pub time_remaining: Option<f64>,
     pub subtasks_count: Option<u32>,
-
-    // Note: golemcli.py code is strange here. it allows:
-    //
-    //  * string value if it ends with '%' char.
-    //  * float in range [0.0 ... 1.0].
-    //  * null.
-    //
-    // I believe that Option<f64> should be valid type here.
-    //
-    pub progress: Value,
+    pub progress: Option<f64>,
 
     pub cost: Option<BigDecimal>,
     pub fee: Option<BigDecimal>,
