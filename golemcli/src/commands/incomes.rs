@@ -3,27 +3,24 @@ use futures::prelude::*;
 use golem_rpc_api::pay::{AsGolemPay, Income};
 use structopt::{clap::arg_enum, StructOpt};
 
-const INCOMES_COLUMNS : &[&str] = &["payer", "status", "value" ];
+const INCOMES_COLUMNS: &[&str] = &["payer", "status", "value"];
 
 #[derive(StructOpt, Debug)]
 pub struct Section {
     /// Filter by status
     #[structopt(
-    parse(try_from_str),
-    raw(
-    possible_values = "&[\"awaiting\",\"confirmed\"]",
-    case_insensitive = "true"
-    )
+        parse(try_from_str),
+        raw(
+            possible_values = "&[\"awaiting\",\"confirmed\"]",
+            case_insensitive = "true"
+        )
     )]
     filter_by: Option<crate::eth::PaymentStatus>,
 
     #[structopt(long = "sort")]
     #[structopt(
         parse(try_from_str),
-        raw(
-            possible_values = "INCOMES_COLUMNS",
-            case_insensitive = "true"
-        )
+        raw(possible_values = "INCOMES_COLUMNS", case_insensitive = "true")
     )]
     /// Sort incomes
     sort_by: Option<String>,

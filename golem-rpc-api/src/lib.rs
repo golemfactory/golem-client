@@ -5,6 +5,7 @@ pub mod comp;
 pub mod core;
 pub mod net;
 pub mod pay;
+pub mod settings;
 pub mod terms;
 
 pub(crate) mod serde;

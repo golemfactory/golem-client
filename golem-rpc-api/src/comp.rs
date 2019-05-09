@@ -37,7 +37,7 @@ rpc_interface! {
 
 
         #[id = "comp.task.subtasks"]
-        fn get_subtasks(&self, task_id : String) -> Result<Vec<SubtaskInfo>>;
+        fn get_subtasks(&self, task_id : String) -> Result<Option<Vec<SubtaskInfo>>>;
 
         #[id = "comp.task.purge"]
         fn purge_tasks(&self) -> Result<()>;

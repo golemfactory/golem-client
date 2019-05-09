@@ -2,7 +2,6 @@
 
 use crate::rpc::*;
 
-
 rpc_interface! {
     trait GolemTerms {
         #[id = "golem.terms"]

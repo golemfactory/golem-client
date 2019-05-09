@@ -3,7 +3,7 @@ use futures::prelude::*;
 use golem_rpc_api::pay::{AsGolemPay, Payment};
 use structopt::StructOpt;
 
-const PAYMENTS_COLUMNS : &[&str] = &["subtask", "payee", "status", "value",  "fee"];
+const PAYMENTS_COLUMNS: &[&str] = &["subtask", "payee", "status", "value", "fee"];
 
 #[derive(StructOpt, Debug)]
 pub struct Section {
@@ -20,10 +20,7 @@ pub struct Section {
     #[structopt(long = "sort")]
     #[structopt(
         parse(try_from_str),
-        raw(
-            possible_values = "PAYMENTS_COLUMNS",
-            case_insensitive = "true"
-        )
+        raw(possible_values = "PAYMENTS_COLUMNS", case_insensitive = "true")
     )]
     sort_by: Option<String>,
     #[structopt(long)]
