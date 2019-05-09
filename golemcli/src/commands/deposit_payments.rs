@@ -1,31 +1,28 @@
 use crate::context::*;
 use futures::prelude::*;
-use structopt::StructOpt;
 use golem_rpc_api::pay::{AsGolemPay, DepositPayment};
+use structopt::StructOpt;
 
-const DEPOSIT_COLUMNS : &[&str] = &["tx", "status", "value", "fee"];
+const DEPOSIT_COLUMNS: &[&str] = &["tx", "status", "value", "fee"];
 
 #[derive(StructOpt, Debug)]
 pub struct Section {
     /// Filter by status
     #[structopt(
-    parse(try_from_str),
-    raw(
-    possible_values = "&[\"awaiting\",\"confirmed\"]",
-    case_insensitive = "true"
-    )
+        parse(try_from_str),
+        raw(
+            possible_values = "&[\"awaiting\",\"confirmed\"]",
+            case_insensitive = "true"
+        )
     )]
     filter_by: Option<crate::eth::PaymentStatus>,
     #[structopt(long = "sort")]
     #[structopt(
         parse(try_from_str),
-        raw(
-            possible_values = "DEPOSIT_COLUMNS",
-            case_insensitive = "true"
-        )
+        raw(possible_values = "DEPOSIT_COLUMNS", case_insensitive = "true")
     )]
     /// Sort incomes
-    sort_by : Option<String>
+    sort_by: Option<String>,
 }
 
 impl Section {
@@ -42,7 +39,8 @@ impl Section {
             .from_err()
             .and_then(move |payments| {
                 let columns = DEPOSIT_COLUMNS.iter().map(|&name| name.into()).collect();
-                let values = payments.unwrap_or_default()
+                let values = payments
+                    .unwrap_or_default()
                     .into_iter()
                     .filter(|payment| {
                         filter_by
@@ -51,7 +49,9 @@ impl Section {
                     })
                     .map(|payment: DepositPayment| {
                         let value = crate::eth::Currency::GNT.format_decimal(&payment.value);
-                        let fee = payment.fee.map(|fee| crate::eth::Currency::ETH.format_decimal(&fee));
+                        let fee = payment
+                            .fee
+                            .map(|fee| crate::eth::Currency::ETH.format_decimal(&fee));
 
                         serde_json::json!([payment.transaction, payment.status, value, fee])
                     })
@@ -59,6 +59,5 @@ impl Section {
 
                 Ok(ResponseTable { columns, values }.sort_by(&sort_by).into())
             })
-
     }
 }

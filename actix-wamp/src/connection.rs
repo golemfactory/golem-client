@@ -108,7 +108,10 @@ where
             log::debug!("send message {}", out_value);
         }
 
-        self.writer.write(ws::Message::Binary(bytes.into())).map(|_|()).map_err(|e| Error::ActixProtocolErorr(e))
+        self.writer
+            .write(ws::Message::Binary(bytes.into()))
+            .map(|_| ())
+            .map_err(|e| Error::ActixProtocolErorr(e))
     }
 
     fn handle_challenge(&mut self, auth_method: &str, extra: &Dict) -> Result<(), Error> {
@@ -292,7 +295,8 @@ where
                     }
                     ABORT => {
                         // [3, {"message": "WAMP-CRA signature is invalid"}, "wamp.error.not_authorized"]
-                        let _ = self.handle_abort(value[2].as_str().unwrap(), value[1].as_map().unwrap());
+                        let _ = self
+                            .handle_abort(value[2].as_str().unwrap(), value[1].as_map().unwrap());
                     }
 
                     CHALLENGE => {
@@ -308,7 +312,8 @@ where
                         });
                     }
                     RESULT => {
-                        let _ = self.handle_result(value[1].as_u64().unwrap(), Some(value[3].clone()));
+                        let _ =
+                            self.handle_result(value[1].as_u64().unwrap(), Some(value[3].clone()));
                     }
                     ERROR => {
                         // There are 2 formats
