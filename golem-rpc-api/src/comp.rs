@@ -26,6 +26,9 @@ rpc_interface! {
         #[id = "comp.tasks"]
         fn get_tasks(&self) -> Result<Vec<TaskInfo>>;
 
+        #[id = "comp.tasks.unsupport"]
+        fn get_tasks_unsupported(&self, last_days: i32) -> Result<Vec<UnsupportInfo>>;
+
         #[id = "comp.task.abort"]
         fn abort_task(&self, task_id : String) -> Result<()>;
 
@@ -220,4 +223,13 @@ pub struct SubtaskStats {
     pub subtasks_rejected: StatsCounters,
     pub subtasks_with_errors: StatsCounters,
     pub subtasks_with_timeout: StatsCounters,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UnsupportInfo {
+    pub reason: String,
+    #[serde(rename(serialize = "no_of_tasks"))]
+    pub ntasks: u32,
+    #[serde(rename(serialize = "avg_for_all_tasks"))]
+    pub avg: Option<f32>,
 }

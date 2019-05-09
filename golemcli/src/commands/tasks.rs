@@ -82,7 +82,7 @@ pub enum Section {
     Template,
     /// Show statistics for unsupported tasks (unimplemented)
     #[structopt(name = "unsupport")]
-    Unsupport,
+    Unsupport { last_days: Option<i32> },
 }
 
 impl Section {
@@ -106,6 +106,7 @@ impl Section {
             Section::Template => Box::new(self.template()),
             Section::Stats => Box::new(self.stats(endpoint)),
             Section::Subtasks { task_id } => Box::new(self.subtasks(endpoint, task_id)),
+            Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
             _ => Box::new(futures::future::err(unimplemented!())),
         }
     }
@@ -383,6 +384,29 @@ impl Section {
                 Ok(ResponseTable { columns, values }.into())
             })
     }
+
+    fn unsupport(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        last_days: &Option<i32>,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .get_tasks_unsupported(last_days.unwrap_or(0).clone())
+            .from_err()
+            .and_then(|unsupported| {
+                let columns = vec![
+                    "reason".into(),
+                    "no of tasks".into(),
+                    "avg for all tasks".into(),
+                ];
+                let values = unsupported
+                    .into_iter()
+                    .map(|stat| serde_json::json!([stat.reason, stat.ntasks, stat.avg,]))
+                    .collect();
+                Ok(ResponseTable { columns, values }.into())
+            })
+    }
 }
 
 fn seconds_to_human(time_remaining: f64) -> String {
@@ -390,7 +414,7 @@ fn seconds_to_human(time_remaining: f64) -> String {
         time_remaining as u64,
         /*(time_remaining.fract() * 1_000_000_000.0) as u32*/ 0,
     ))
-        .to_string()
+    .to_string()
 }
 
 fn fraction_to_percent(progress: f64) -> String {
