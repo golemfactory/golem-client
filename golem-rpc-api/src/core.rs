@@ -1,9 +1,9 @@
 use super::Map;
 use crate::rpc::*;
+#[cfg(feature = "settings")]
+use crate::settings::{DynamicSetting, Setting};
 use serde_derive::*;
 use serde_json::Value;
-#[cfg(feature="settings")]
-use crate::settings::{Setting, DynamicSetting};
 
 rpc_interface! {
 
@@ -12,7 +12,7 @@ rpc_interface! {
         fn get_settings(&self) -> Result<Map<String, Value>>;
 
         #[id = "env.opt"]
-        fn get_setting(&self, key : String) -> Result<Value>;
+        fn raw_get_setting(&self, key : String) -> Result<Value>;
 
         #[id = "env.opt.update"]
         fn raw_update_setting(&self, key : String, value : Value) -> Result<()>;
@@ -41,22 +41,33 @@ rpc_interface! {
     }
 }
 
-#[cfg(feature="settings")]
-impl<'a, Endpoint : wamp::RpcEndpoint + 'static> GolemCore<'a, Endpoint> {
-
-    pub fn update_setting<S : Setting>(&self, _setting : &S, value : impl AsRef<S::Item>) -> impl Future<Item=(), Error=wamp::Error> {
-
+#[cfg(feature = "settings")]
+impl<'a, Endpoint: wamp::RpcEndpoint + 'static> GolemCore<'a, Endpoint> {
+    pub fn update_setting<S: Setting>(
+        &self,
+        value: impl AsRef<S::Item>,
+    ) -> impl Future<Item = (), Error = wamp::Error> {
         self.raw_update_setting(S::NAME.to_string(), S::to_value(value.as_ref()))
     }
 
-    pub fn update_setting_dyn(&self, setting : &dyn DynamicSetting, value : &str) -> impl Future<Item=(), Error=wamp::Error> + 'static {
+    pub fn update_setting_dyn(
+        &self,
+        setting: &dyn DynamicSetting,
+        value: &str,
+    ) -> impl Future<Item = (), Error = wamp::Error> + 'static {
         let key = setting.name().into();
         let value = setting.parse_from_str(value).unwrap();
 
         self.raw_update_setting(key, value)
     }
 
-
+    pub fn get_setting<S: Setting>(&self) -> impl Future<Item = S::Item, Error = wamp::Error> {
+        self.raw_get_setting(S::NAME.to_string()).and_then(|value| {
+            Ok(S::from_value(&value).map_err(|e| {
+                wamp::Error::ProtocolError(std::borrow::Cow::Owned(format!("{}", e)))
+            })?)
+        })
+    }
 }
 
 pub trait AsGolemCore: wamp::RpcEndpoint {

@@ -1,6 +1,9 @@
 use crate::context::*;
 use futures::prelude::*;
-use golem_rpc_api::{core::AsGolemCore, settings};
+use golem_rpc_api::settings::DynamicSetting;
+use golem_rpc_api::{core::AsGolemCore, settings, Map};
+use std::collections::btree_map::BTreeMap;
+use std::collections::HashMap;
 use structopt::{clap, StructOpt};
 
 #[derive(StructOpt, Debug)]
@@ -9,6 +12,7 @@ pub enum Section {
     #[structopt(name = "set")]
     Set {
         /// Setting name
+        #[structopt(raw(possible_values = "settings::NAMES",))]
         key: String,
         /// Setting value
         value: String,
@@ -59,16 +63,35 @@ impl Section {
     pub fn show(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        _basic: bool,
-        _provider: bool,
-        _requestor: bool,
+        basic: bool,
+        provider: bool,
+        requestor: bool,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         Box::new(
             endpoint
                 .as_golem()
                 .get_settings()
                 .from_err()
-                .and_then(|settings| CommandResponse::object(settings)),
+                .and_then(move |settings| {
+                    CommandResponse::object({
+                        if basic || provider || requestor {
+                            let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
+                            if basic {
+                                for setting in settings::general::list() {
+                                    if let Some(value) = settings.get(setting.name()) {
+                                        filtered_settings.insert(
+                                            setting.name().into(),
+                                            serde_json::json!(setting.display_value(&value)?),
+                                        );
+                                    }
+                                }
+                            }
+                            filtered_settings
+                        } else {
+                            settings
+                        }
+                    })
+                }),
         )
     }
 
@@ -86,7 +109,7 @@ impl Section {
                 .as_golem()
                 .update_setting_dyn(key, value)
                 .from_err()
-                .and_then(|()| CommandResponse::object("Updated"))
+                .and_then(|()| CommandResponse::object("Updated")),
         )
     }
 }

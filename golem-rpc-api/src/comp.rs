@@ -3,13 +3,14 @@ use crate::rpc::*;
 use bigdecimal::BigDecimal;
 use serde_derive::*;
 use serde_json::Value;
+use std::path::PathBuf;
 
 rpc_interface! {
 
     trait GolemComp {
         //
         // map kwarg force
-        // Resturns:
+        // Returns:
         //   Some(task_id), None,
         //   None, Some(error_message)
         #[id = "comp.task.create"]
@@ -230,3 +231,4 @@ pub struct SubtaskStats {
     pub subtasks_with_errors: StatsCounters,
     pub subtasks_with_timeout: StatsCounters,
 }
+

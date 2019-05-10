@@ -17,19 +17,19 @@ gen_settings! {
 
         /// Interval between task requests
         #[unit = "s"]
-        getting_tasks_interval: usize,
+        getting_tasks_interval: f64,
 
         /// Interval between peer requests
         #[unit = "s"]
-        getting_peers_interval: usize,
+        getting_peers_interval: f64,
 
         /// Task session timeout
         #[unit = "s"]
-        task_session_timeout: usize,
+        task_session_timeout: f64,
 
         /// P2P session timeout
         #[unit = "s"]
-        p2p_session_timeout: usize,
+        p2p_session_timeout: f64,
 
         /// Use IPv6
         #[flag]
@@ -130,7 +130,27 @@ where
     }
 }
 
+fn bool_from_value(value: &Value) -> Result<bool, Error> {
+    (match value {
+        Value::Bool(b) => Ok(*b),
+        Value::Number(n) => match n.as_u64() {
+            Some(1) => Ok(true),
+            Some(0) => Ok(false),
+            _ => Err(()),
+        },
+        Value::String(s) => match s.as_str() {
+            "true" | "1" | "True" => Ok(true),
+            "false" | "0" | "False" => Ok(false),
+            _ => Err(()),
+        },
+        _ => Err(()),
+    })
+    .map_err(|()| Error::Other(format!("invalid bool: '{:?}'", value)))
+}
 
+fn bool_to_value(b: bool) -> Value {
+    serde_json::json!(if b { 1 } else { 0 })
+}
 
 #[cfg(test)]
 mod test {
@@ -139,12 +159,14 @@ mod test {
 
     #[test]
     fn test_node_name() {
-
         eprintln!("name: {}", general::NodeName::NAME);
         eprintln!("desc: {}", general::NodeName::DESC);
         eprintln!("name: {}", general::GettingPeersInterval::NAME);
         eprintln!("desc: {}", general::GettingPeersInterval::DESC);
-        eprintln!("desc: {}", from_name("computing_trust").unwrap().description());
+        eprintln!(
+            "desc: {}",
+            from_name("computing_trust").unwrap().description()
+        );
 
         eprintln!("GENERAL");
         for it in general::list() {
@@ -158,8 +180,6 @@ mod test {
         for it in requestor::list() {
             eprintln!("{}: {}", it.name(), it.description());
         }
-
-
     }
 
 }

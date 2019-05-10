@@ -23,5 +23,5 @@ path="../golem-rpc-macros"
 
 
 [features]
-default=[]
+default=["settings"]
 settings=[]

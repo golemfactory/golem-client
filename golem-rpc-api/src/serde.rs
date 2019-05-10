@@ -75,3 +75,52 @@ pub mod ts_seconds {
         }
     }
 }
+
+pub mod duration {
+    use serde::{ser, de};
+    use std::time::Duration;
+
+
+    pub fn serialize<S>(d: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: ser::Serializer,
+    {
+        let secs = d.as_secs();
+        let minutes = secs / 60;
+        let hours = minutes / 60;
+        serializer.serialize_str(&format!("{}:{:02}:{:02}", hours, minutes % 60, secs % 60))
+    }
+
+    pub fn deserialize<'de, D>(d: D) -> Result<Duration, D::Error>
+        where
+            D: de::Deserializer<'de>,
+    {
+        unimplemented!()
+    }
+
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::time::Duration;
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct A {
+        #[serde(with = "duration")]
+        timeout : Duration
+    }
+
+
+    #[test]
+    fn test_duration_serialize() {
+        assert_eq!(
+            r#"{"timeout":"1:00:00"}"#,
+            serde_json::to_string(&A { timeout: Duration::from_secs(3600) }).unwrap());
+        assert_eq!(
+            r#"{"timeout":"1:00:00"}"#,
+            serde_json::to_string(&A { timeout: Duration::from_secs(3601) }).unwrap())
+
+    }
+}

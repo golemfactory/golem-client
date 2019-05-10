@@ -1,11 +1,11 @@
-#![recursion_limit="128"]
+#![recursion_limit = "128"]
 
 extern crate proc_macro;
-use heck::{CamelCase, SnakeCase, ShoutySnakeCase};
+use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, File, Type};
 use std::convert::{TryFrom, TryInto};
+use syn::{parse_macro_input, File, Type};
 
 struct SettingSection {
     name: syn::Ident,
@@ -30,34 +30,34 @@ impl TryFrom<&syn::Type> for ConversionType {
         match value {
             syn::Type::Path(p) => {
                 if p.path.is_ident("usize") {
-                    return Ok(ConversionType::Nat)
+                    return Ok(ConversionType::Nat);
                 }
                 if p.path.is_ident("bool") {
-                    return Ok(ConversionType::Bool)
+                    return Ok(ConversionType::Bool);
                 }
                 if p.path.is_ident("String") {
-                    return Ok(ConversionType::String)
+                    return Ok(ConversionType::String);
                 }
                 if p.path.is_ident("BigDecimal") {
-                    return Ok(ConversionType::Decimal)
+                    return Ok(ConversionType::Decimal);
                 }
                 if p.path.is_ident("f64") {
-                    return Ok(ConversionType::Float)
+                    return Ok(ConversionType::Float);
                 }
                 Err(failure::err_msg(format!("Unsupported type: {:?}", p)))
             }
-            v => Err(failure::err_msg(format!("Unsupported type: {:?}", v)))
+            v => Err(failure::err_msg(format!("Unsupported type: {:?}", v))),
         }
     }
 }
 
 struct SettingDef {
     type_name: syn::Ident,
-    kw_name : syn::Ident,
+    kw_name: syn::Ident,
     ty: syn::Type,
     desc: String,
     name: String,
-    conversion_type : ConversionType,
+    conversion_type: ConversionType,
 }
 
 #[proc_macro]
@@ -82,10 +82,32 @@ pub fn gen_settings(input: TokenStream) -> TokenStream {
                 ty,
                 desc,
                 name,
-                ..
+                conversion_type,
             } = setting;
 
+            let val = quote!(val);
+
+            let from_value = match conversion_type {
+                ConversionType::Bool => quote! {
+                    bool_from_value(#val)
+                },
+                _ => quote! {
+                    Ok(serde_json::from_value(#val.clone())?)
+                }
+            };
+
+            let to_value = match conversion_type {
+                ConversionType::Bool => quote! {
+                    bool_to_value(*item)
+                },
+                _ => quote! {
+                    serde_json::json!(item)
+                }
+            };
+
+
             quote! {
+                #[doc = #desc]
                 pub struct #type_name;
 
                 impl Setting for #type_name {
@@ -96,12 +118,12 @@ pub fn gen_settings(input: TokenStream) -> TokenStream {
                     // TODO: Add conversion
                     #[inline]
                     fn to_value(item : &#ty) -> Value {
-                        serde_json::json!(item)
+                        #to_value
                     }
 
                     #[inline]
                     fn from_value(val :&Value) -> Result<#ty, Error> {
-                        Ok(serde_json::from_value(val.clone())?)
+                        #from_value
                     }
 
                 }
@@ -149,20 +171,28 @@ pub fn gen_settings(input: TokenStream) -> TokenStream {
         }
     });
 
-    let from_name_rules = sections.iter().map(|section| {
-        let group_name = &section.name;
+    let from_name_rules = sections
+        .iter()
+        .map(|section| {
+            let group_name = &section.name;
 
-        section.items.iter().map(move |item| {
-            let name = &item.name;
-            let kw_name = &item.kw_name;
+            section.items.iter().map(move |item| {
+                let name = &item.name;
+                let kw_name = &item.kw_name;
 
-            quote! {
-                #name => {
-                    Some(&#group_name::#kw_name)
+                quote! {
+                    #name => {
+                        Some(&#group_name::#kw_name)
+                    }
                 }
-            }
+            })
         })
-    }).flatten();
+        .flatten();
+
+    let key_names = sections
+        .iter()
+        .map(|section| section.items.iter().map(move |item| item.name.clone()))
+        .flatten();
 
     (quote! {
         #(#sections_q )*
@@ -173,7 +203,10 @@ pub fn gen_settings(input: TokenStream) -> TokenStream {
                 _ => None
             }
         }
-    }).into()
+
+        pub const NAMES : &[&str] = &[ #( #key_names ),* ];
+    })
+    .into()
 }
 
 fn parse_section(s: &syn::ItemStruct) -> SettingSection {
@@ -212,6 +245,6 @@ fn parse_section_field(f: &syn::Field) -> SettingDef {
         name,
         ty,
         desc,
-        conversion_type
+        conversion_type,
     }
 }
