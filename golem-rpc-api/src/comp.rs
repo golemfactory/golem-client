@@ -27,6 +27,9 @@ rpc_interface! {
         #[id = "comp.tasks"]
         fn get_tasks(&self) -> Result<Vec<TaskInfo>>;
 
+        #[id = "comp.tasks.unsupport"]
+        fn get_tasks_unsupported(&self, last_days: i32) -> Result<Vec<UnsupportInfo>>;
+
         #[id = "comp.task.abort"]
         fn abort_task(&self, task_id : String) -> Result<()>;
 
@@ -161,16 +164,7 @@ pub struct TaskInfo {
     /// Remaining time in seconds
     pub time_remaining: Option<f64>,
     pub subtasks_count: Option<u32>,
-
-    // Note: golemcli.py code is strange here. it allows:
-    //
-    //  * string value if it ends with '%' char.
-    //  * float in range [0.0 ... 1.0].
-    //  * null.
-    //
-    // I believe that Option<f64> should be valid type here.
-    //
-    pub progress: Value,
+    pub progress: Option<f64>,
 
     pub cost: Option<BigDecimal>,
     pub fee: Option<BigDecimal>,
@@ -230,5 +224,14 @@ pub struct SubtaskStats {
     pub subtasks_rejected: StatsCounters,
     pub subtasks_with_errors: StatsCounters,
     pub subtasks_with_timeout: StatsCounters,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UnsupportInfo {
+    pub reason: String,
+    #[serde(rename(serialize = "no_of_tasks"))]
+    pub ntasks: u32,
+    #[serde(rename(serialize = "avg_for_all_tasks"))]
+    pub avg: Option<f32>,
 }
 

@@ -1,11 +1,16 @@
-use crate::context::*;
-use futures::prelude::*;
-use golem_rpc_api::comp::{AsGolemComp, StatsCounters, SubtaskStats, TaskInfo};
-use openssl::rsa::Padding;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use futures::prelude::*;
+use humantime::format_duration;
+use openssl::rsa::Padding;
 use structopt::StructOpt;
 use futures::future::Err;
+
+use golem_rpc_api::comp::{AsGolemComp, StatsCounters, SubtaskStats, TaskInfo};
+
+use crate::context::*;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -81,7 +86,7 @@ pub enum Section {
     },
     /// Show statistics for unsupported tasks (unimplemented)
     #[structopt(name = "unsupport")]
-    Unsupport,
+    Unsupport { last_days: Option<i32> },
 }
 
 const TASK_TYPES : &[&str] = &["blender", "wasm", "glambda" ];
@@ -107,6 +112,7 @@ impl Section {
             Section::Template { task_type } => Box::new(self.template(task_type)),
             Section::Stats => Box::new(self.stats(endpoint)),
             Section::Subtasks { task_id } => Box::new(self.subtasks(endpoint, task_id)),
+            Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
             _ => Box::new(futures::future::err(unimplemented!())),
         }
     }
@@ -250,10 +256,10 @@ impl Section {
                         .map(|task| {
                             serde_json::json!([
                                 task.id,
-                                task.time_remaining,
+                                task.time_remaining.map(seconds_to_human),
                                 task.subtasks_count,
                                 task.status,
-                                task.progress
+                                task.progress.map(fraction_to_percent),
                             ])
                         })
                         .collect();
@@ -340,6 +346,65 @@ impl Section {
             .as_golem_comp()
             .get_subtasks(task_id.into())
             .from_err()
-            .and_then(|stats| CommandResponse::object(stats))
+            .and_then(|subtasks| {
+                let columns = vec![
+                    "node".into(),
+                    "subtask id".into(),
+                    "ETA".into(),
+                    "status".into(),
+                    "progress".into(),
+                ];
+                let values = match subtasks {
+                    Some(subtasks) => subtasks
+                        .into_iter()
+                        .map(|subtask| {
+                            serde_json::json!([
+                                subtask.node_name,
+                                subtask.subtask_id,
+                                subtask.time_remaining.map(seconds_to_human),
+                                subtask.status,
+                                subtask.progress.map(fraction_to_percent),
+                            ])
+                        })
+                        .collect(),
+                    None => vec![],
+                };
+                Ok(ResponseTable { columns, values }.into())
+            })
     }
+
+    fn unsupport(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        last_days: &Option<i32>,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .get_tasks_unsupported(last_days.unwrap_or(0).clone())
+            .from_err()
+            .and_then(|unsupported| {
+                let columns = vec![
+                    "reason".into(),
+                    "no of tasks".into(),
+                    "avg for all tasks".into(),
+                ];
+                let values = unsupported
+                    .into_iter()
+                    .map(|stat| serde_json::json!([stat.reason, stat.ntasks, stat.avg,]))
+                    .collect();
+                Ok(ResponseTable { columns, values }.into())
+            })
+    }
+}
+
+fn seconds_to_human(time_remaining: f64) -> String {
+    format_duration(Duration::new(
+        time_remaining as u64,
+        /*(time_remaining.fract() * 1_000_000_000.0) as u32*/ 0,
+    ))
+    .to_string()
+}
+
+fn fraction_to_percent(progress: f64) -> String {
+    format!("{:.1} %", (progress * 100.0))
 }
