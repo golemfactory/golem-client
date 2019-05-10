@@ -59,6 +59,7 @@ path="../actix-wamp"
 
 [dependencies.golem-rpc-api]
 path="../golem-rpc-api"
+features=['settings']
 
 [dependencies.rustyline]
 version="4.0.0"

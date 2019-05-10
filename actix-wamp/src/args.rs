@@ -68,6 +68,17 @@ impl RpcCallRequest {
             kw_args: None,
         })
     }
+
+    /// Adds named arguments.
+    ///
+    /// Panics if kw_args is not valid json object.
+    ///
+    pub fn with_kwargs(mut self, kw_args: Value) -> Self {
+        assert!(kw_args.is_object());
+
+        self.kw_args = Some(kw_args);
+        self
+    }
 }
 
 #[derive(Debug, Default)]

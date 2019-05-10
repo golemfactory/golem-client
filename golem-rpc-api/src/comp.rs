@@ -3,13 +3,14 @@ use crate::rpc::*;
 use bigdecimal::BigDecimal;
 use serde_derive::*;
 use serde_json::Value;
+use std::path::PathBuf;
 
 rpc_interface! {
 
     trait GolemComp {
         //
         // map kwarg force
-        // Resturns:
+        // Returns:
         //   Some(task_id), None,
         //   None, Some(error_message)
         #[id = "comp.task.create"]
@@ -233,3 +234,4 @@ pub struct UnsupportInfo {
     #[serde(rename(serialize = "avg_for_all_tasks"))]
     pub avg: Option<f32>,
 }
+

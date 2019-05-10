@@ -6,6 +6,7 @@ use futures::prelude::*;
 use humantime::format_duration;
 use openssl::rsa::Padding;
 use structopt::StructOpt;
+use futures::future::Err;
 
 use golem_rpc_api::comp::{AsGolemComp, StatsCounters, SubtaskStats, TaskInfo};
 
@@ -79,11 +80,16 @@ pub enum Section {
     },
     /// Dump a task template (unimplemented)
     #[structopt(name = "template")]
-    Template,
+    Template {
+        #[structopt(raw(possible_values = "TASK_TYPES",))]
+        task_type : String,
+    },
     /// Show statistics for unsupported tasks (unimplemented)
     #[structopt(name = "unsupport")]
     Unsupport { last_days: Option<i32> },
 }
+
+const TASK_TYPES : &[&str] = &["blender", "wasm", "glambda" ];
 
 impl Section {
     pub fn run(
@@ -103,7 +109,7 @@ impl Section {
             Section::Show { id, current, sort } => {
                 Box::new(self.show(endpoint, id, *current, sort))
             }
-            Section::Template => Box::new(self.template()),
+            Section::Template { task_type } => Box::new(self.template(task_type)),
             Section::Stats => Box::new(self.stats(endpoint)),
             Section::Subtasks { task_id } => Box::new(self.subtasks(endpoint, task_id)),
             Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
@@ -264,35 +270,17 @@ impl Section {
     }
 
     // TODO: read it though rpc; requires exposing such RPC from Brass
-    fn template(&self) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        futures::future::result(CommandResponse::object(
-            r#"{
-    "type": "Blender",
-    "compute_on": "cpu",
-    "name": "Horse 3s",
-    "timeout": "00:15:00",
-    "subtask_timeout": "00:10:00",
-    "subtasks_count": 3,
-    "bid": 3.3,
-    "resources": [
-        "/Users/tworec/git/golem/gu-gateway/golem/gugateway/horse.blend"
-    ],
-    "options": {
-        "frame_count": 1,
-        "output_path": "/Users/tworec/tmp/",
-
-        "format": "PNG",
-        "resolution": [
-            1000,
-            600
-        ],
-        "frames": "1",
-        "compositing": false
-    },
-    "concent_enabled": false
-}"#,
-        ))
-    }
+    fn template(&self, task_type : &str) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        (|| -> Result<CommandResponse, Error> {
+            let template = match task_type {
+                "blender" => serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?,
+                "wasm" => serde_json::to_string_pretty(&golem_rpc_api::apps::wasm::template())?,
+                "glambda" => serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?,
+                _ => failure::bail!("Invalid Option")
+            };
+            CommandResponse::object(template)
+        })().into_future()
+     }
 
     fn stats(
         &self,

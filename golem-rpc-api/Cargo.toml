@@ -10,8 +10,18 @@ serde_derive = "1.0"
 serde_json = "1.0"
 futures="0.1"
 log="0.4"
+failure="0.1"
+
 bigdecimal = {version = "0.1.0", features=["serde"]}
 chrono = {version = "0.4.6", features=["serde"]}
 
 [dependencies.actix-wamp]
 path="../actix-wamp"
+
+[dependencies.golem-rpc-macros]
+path="../golem-rpc-macros"
+
+
+[features]
+default=["settings"]
+settings=[]
