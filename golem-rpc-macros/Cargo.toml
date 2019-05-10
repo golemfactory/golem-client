@@ -1,5 +1,5 @@
 [package]
-name = "wamp-derive"
+name = "golem-rpc-macros"
 version = "0.1.0"
 authors = ["Przemysław K. Rekucki <przemyslaw.rekucki@golem.network>"]
 edition = "2018"
@@ -8,3 +8,7 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
+syn = "0.15"
+quote = "0.6"
+heck = "0.3.1"
+failure="0.1"

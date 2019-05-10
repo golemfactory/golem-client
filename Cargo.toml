@@ -1,7 +1,7 @@
 [workspace]
 members= [
     'golem-rpc-api',
-    'wamp-derive',
+    'golem-rpc-macros',
     'golemcli',
     'actix-wamp'
 ]

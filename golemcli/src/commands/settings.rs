@@ -1,6 +1,6 @@
 use crate::context::*;
 use futures::prelude::*;
-use golem_rpc_api::core::AsGolemCore;
+use golem_rpc_api::{core::AsGolemCore, settings};
 use structopt::{clap, StructOpt};
 
 #[derive(StructOpt, Debug)]
@@ -79,12 +79,14 @@ impl Section {
         key: &str,
         value: &str,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+        let key = settings::from_name(key).unwrap();
+
         Box::new(
             endpoint
                 .as_golem()
-                .update_setting(key.into(), serde_json::json!(value))
+                .update_setting_dyn(key, value)
                 .from_err()
-                .and_then(|()| CommandResponse::object("Updated")),
+                .and_then(|()| CommandResponse::object("Updated"))
         )
     }
 }

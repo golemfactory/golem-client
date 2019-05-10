@@ -2,6 +2,8 @@ use super::Map;
 use crate::rpc::*;
 use serde_derive::*;
 use serde_json::Value;
+#[cfg(feature="settings")]
+use crate::settings::{Setting, DynamicSetting};
 
 rpc_interface! {
 
@@ -13,7 +15,7 @@ rpc_interface! {
         fn get_setting(&self, key : String) -> Result<Value>;
 
         #[id = "env.opt.update"]
-        fn update_setting(&self, key : String, value : Value) -> Result<()>;
+        fn raw_update_setting(&self, key : String, value : Value) -> Result<()>;
 
         #[id = "env.opts.update"]
         fn update_settings(&self, settings_dict : Map<String, Value>) -> Result<()>;
@@ -37,6 +39,24 @@ rpc_interface! {
         fn status(&self) -> Result<ServerStatus>;
 
     }
+}
+
+#[cfg(feature="settings")]
+impl<'a, Endpoint : wamp::RpcEndpoint + 'static> GolemCore<'a, Endpoint> {
+
+    pub fn update_setting<S : Setting>(&self, _setting : &S, value : impl AsRef<S::Item>) -> impl Future<Item=(), Error=wamp::Error> {
+
+        self.raw_update_setting(S::NAME.to_string(), S::to_value(value.as_ref()))
+    }
+
+    pub fn update_setting_dyn(&self, setting : &dyn DynamicSetting, value : &str) -> impl Future<Item=(), Error=wamp::Error> + 'static {
+        let key = setting.name().into();
+        let value = setting.parse_from_str(value).unwrap();
+
+        self.raw_update_setting(key, value)
+    }
+
+
 }
 
 pub trait AsGolemCore: wamp::RpcEndpoint {
