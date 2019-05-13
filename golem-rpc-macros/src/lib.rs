@@ -5,7 +5,7 @@ use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
 use proc_macro::TokenStream;
 use quote::quote;
 use std::convert::{TryFrom, TryInto};
-use syn::{parse_macro_input, File, Type};
+use syn::{parse_macro_input, File};
 
 struct SettingSection {
     name: syn::Ident,

@@ -3,7 +3,6 @@
 //!
 
 use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
 use super::{TaskDef, ComputeOn, TaskDefOptions};
 use std::time::Duration;
 

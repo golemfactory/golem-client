@@ -2,11 +2,11 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use futures::future::Err;
 use futures::prelude::*;
 use humantime::format_duration;
 use openssl::rsa::Padding;
 use structopt::StructOpt;
-use futures::future::Err;
 
 use golem_rpc_api::comp::{AsGolemComp, StatsCounters, SubtaskStats, TaskInfo};
 
@@ -82,14 +82,14 @@ pub enum Section {
     #[structopt(name = "template")]
     Template {
         #[structopt(raw(possible_values = "TASK_TYPES",))]
-        task_type : String,
+        task_type: String,
     },
     /// Show statistics for unsupported tasks (unimplemented)
     #[structopt(name = "unsupport")]
     Unsupport { last_days: Option<i32> },
 }
 
-const TASK_TYPES : &[&str] = &["blender", "wasm", "glambda" ];
+const TASK_TYPES: &[&str] = &["blender", "wasm", "glambda"];
 
 impl Section {
     pub fn run(
@@ -113,7 +113,6 @@ impl Section {
             Section::Stats => Box::new(self.stats(endpoint)),
             Section::Subtasks { task_id } => Box::new(self.subtasks(endpoint, task_id)),
             Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
-            _ => Box::new(futures::future::err(unimplemented!())),
         }
     }
 
@@ -270,17 +269,25 @@ impl Section {
     }
 
     // TODO: read it though rpc; requires exposing such RPC from Brass
-    fn template(&self, task_type : &str) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    fn template(
+        &self,
+        task_type: &str,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         (|| -> Result<CommandResponse, Error> {
             let template = match task_type {
-                "blender" => serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?,
+                "blender" => {
+                    serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?
+                }
                 "wasm" => serde_json::to_string_pretty(&golem_rpc_api::apps::wasm::template())?,
-                "glambda" => serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?,
-                _ => failure::bail!("Invalid Option")
+                "glambda" => {
+                    serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?
+                }
+                _ => failure::bail!("Invalid Option"),
             };
             CommandResponse::object(template)
-        })().into_future()
-     }
+        })()
+        .into_future()
+    }
 
     fn stats(
         &self,

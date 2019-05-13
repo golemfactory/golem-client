@@ -129,6 +129,7 @@ pub mod duration {
             Ok(Duration::from_secs(value as u64))
         }
 
+        // TODO: Better error message. Using serde::de::Unexpected::Str
         fn visit_str<E>(self, value: &str) -> Result<Duration, E>
             where
                 E: de::Error,
