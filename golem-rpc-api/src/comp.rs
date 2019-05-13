@@ -218,9 +218,6 @@ pub struct SubtaskInfo {
     pub status: SubtaskStatus,
     pub progress: Option<f64>,
     pub time_started: Option<f64>,
-    /// Remaining time in seconds
-    pub time_remaining: Option<f64>,
-
     pub results: Vec<String>,
     pub stderr: Option<String>,
     pub stdout: Option<String>,
@@ -267,3 +264,4 @@ pub struct CompEnvStatus {
     pub min_accepted: f64,
     pub description: String,
 }
+
