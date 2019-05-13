@@ -37,7 +37,7 @@ pub enum CommandSection {
     #[structopt(name = "debug")]
     Debug(debug::Section),
 
-    /// Manage environments (unimplemented)
+    /// Manage environments
     #[structopt(name = "envs")]
     Envs(envs::Section),
 
@@ -70,15 +70,11 @@ pub enum CommandSection {
     #[structopt(name = "tasks")]
     Tasks(tasks::Section),
 
-    /// Manage subtasks (unimplemented)
-    #[structopt(name = "subtasks")]
-    Subtasks(subtasks::Section),
-
     /// Show and accept terms of use
     #[structopt(name = "terms")]
     Terms(terms::Section),
 
-    /// Manage testing tasks (unimplemented)
+    /// Manage testing tasks
     #[cfg(feature = "test_task_cli")]
     #[structopt(name = "test_task")]
     TestTask(test_task::Section),
@@ -138,7 +134,6 @@ impl CommandSection {
                 CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,
-                CommandSection::Subtasks,
                 CommandSection::Terms,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
