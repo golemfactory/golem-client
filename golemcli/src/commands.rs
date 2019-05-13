@@ -134,7 +134,6 @@ impl CommandSection {
                 CommandSection::Res,
                 CommandSection::Settings,
                 CommandSection::Tasks,
-                CommandSection::Subtasks,
                 CommandSection::Terms,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
