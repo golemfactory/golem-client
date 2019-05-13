@@ -46,7 +46,7 @@ structopt="0.2.15"
 html2text = "0.1.8"
 
 [dependencies.actix-web]
-version = "1.0.0-beta.2"
+version = "1.0.0-beta.5"
 default-features=false
 features = ['ssl', 'client']
 

@@ -2,9 +2,8 @@
 //!
 //!
 
-use serde::{Deserialize, Serialize};
-
 use super::{ComputeOn, TaskDef, TaskDefOptions};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

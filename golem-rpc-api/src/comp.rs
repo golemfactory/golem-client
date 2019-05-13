@@ -71,6 +71,30 @@ rpc_interface! {
 
         #[id = "comp.tasks.stats"]
         fn get_tasks_stats(&self) -> Result<SubtaskStats>;
+
+        #[id = "comp.environments"]
+        fn get_environments(&self) -> Result<Vec<CompEnvStatus>>;
+
+        /// Enables enviroment
+        /// Returns None or Error message.
+        #[id = "comp.environment.enable"]
+        fn enable_environment(&self, env_id : String) -> Result<Option<String>>;
+
+        /// Enables enviroment
+        /// Returns None or Error message.
+        #[id = "comp.environment.disable"]
+        fn disable_environment(&self, env_id : String) -> Result<Option<String>>;
+
+        #[id = "comp.environment.benchmark"]
+        fn run_benchmark(&self, env_id : String) -> Result<Value>;
+
+        // timeout=3s
+        #[id = "performance.multiplier.update"]
+        fn perf_mult_set(&self, multiplier : f64) -> Result<()>;
+
+        #[id = "performance.multiplier"]
+        fn perf_mult(&self) -> Result<f64>;
+
     }
 }
 
@@ -230,3 +254,14 @@ pub struct UnsupportInfo {
     #[serde(rename(serialize = "avg_for_all_tasks"))]
     pub avg: Option<f32>,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CompEnvStatus {
+    pub id: String,
+    pub supported: bool,
+    pub accepted: bool,
+    pub performance: Option<f64>,
+    pub min_accepted: f64,
+    pub description: String,
+}
+

@@ -113,7 +113,6 @@ impl Section {
             Section::Stats => Box::new(self.stats(endpoint)),
             Section::Subtasks { task_id } => Box::new(self.subtasks(endpoint, task_id)),
             Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
-            _ => Box::new(futures::future::err(unimplemented!())),
         }
     }
 

@@ -2,9 +2,9 @@
 //!
 //!
 
-use serde::{Deserialize, Serialize};
 
 use super::{ComputeOn, TaskDef, TaskDefOptions};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 type GLambdaTaskDef = TaskDef<GLambdaOptions>;
