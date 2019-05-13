@@ -358,7 +358,6 @@ impl Section {
                 let columns = vec![
                     "node".into(),
                     "subtask id".into(),
-                    "ETA".into(),
                     "status".into(),
                     "progress".into(),
                 ];
@@ -369,7 +368,6 @@ impl Section {
                             serde_json::json!([
                                 subtask.node_name,
                                 subtask.subtask_id,
-                                subtask.time_remaining.map(seconds_to_human),
                                 subtask.status,
                                 subtask.progress.map(fraction_to_percent),
                             ])
