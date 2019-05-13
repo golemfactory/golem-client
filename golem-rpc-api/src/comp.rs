@@ -3,7 +3,6 @@ use crate::rpc::*;
 use bigdecimal::BigDecimal;
 use serde_derive::*;
 use serde_json::Value;
-use std::path::PathBuf;
 
 rpc_interface! {
 
@@ -234,4 +233,3 @@ pub struct UnsupportInfo {
     #[serde(rename(serialize = "avg_for_all_tasks"))]
     pub avg: Option<f32>,
 }
-

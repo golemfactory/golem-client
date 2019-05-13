@@ -77,14 +77,13 @@ pub mod ts_seconds {
 }
 
 pub mod duration {
-    use serde::{ser, de};
-    use std::time::Duration;
+    use serde::{de, ser};
     use std::fmt;
-
+    use std::time::Duration;
 
     pub fn serialize<S>(d: &Duration, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: ser::Serializer,
+    where
+        S: ser::Serializer,
     {
         let secs = d.as_secs();
         let minutes = secs / 60;
@@ -93,8 +92,8 @@ pub mod duration {
     }
 
     pub fn deserialize<'de, D>(d: D) -> Result<Duration, D::Error>
-        where
-            D: de::Deserializer<'de>,
+    where
+        D: de::Deserializer<'de>,
     {
         Ok(d.deserialize_str(DurationVisitor)?)
     }
@@ -109,29 +108,29 @@ pub mod duration {
         }
 
         fn visit_f64<E>(self, value: f64) -> Result<Duration, E>
-            where
-                E: de::Error,
+        where
+            E: de::Error,
         {
             Ok(Duration::from_secs(value as u64))
         }
 
         fn visit_u64<E>(self, value: u64) -> Result<Duration, E>
-            where
-                E: de::Error,
+        where
+            E: de::Error,
         {
             Ok(Duration::from_secs(value))
         }
 
         fn visit_i64<E>(self, value: i64) -> Result<Duration, E>
-            where
-                E: de::Error,
+        where
+            E: de::Error,
         {
             Ok(Duration::from_secs(value as u64))
         }
 
         fn visit_str<E>(self, value: &str) -> Result<Duration, E>
-            where
-                E: de::Error,
+        where
+            E: de::Error,
         {
             let mut it = value.split(":").fuse();
             match (it.next(), it.next(), it.next(), it.next()) {
@@ -140,42 +139,46 @@ pub mod duration {
                         let (h, m, s): (u64, u64, u64) = (h.parse()?, m.parse()?, s.parse()?);
 
                         Ok(Duration::from_secs(h * 3600 + m * 60 + s))
-                    })().map_err(|e| de::Error::custom(e))
+                    })()
+                    .map_err(|e| de::Error::custom(e))
                 }
-                _ => Err(de::Error::custom("invalid duration format"))
+                _ => Err(de::Error::custom("invalid duration format")),
             }
         }
-
-
-
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde::{Deserialize, Serialize};
     use std::time::Duration;
-    use serde::{Serialize, Deserialize};
 
-    #[derive(Serialize,Deserialize)]
+    #[derive(Serialize, Deserialize)]
     struct A {
         #[serde(with = "duration")]
-        timeout : Duration
+        timeout: Duration,
     }
-
 
     #[test]
     fn test_duration_serialize() {
         assert_eq!(
             r#"{"timeout":"1:00:00"}"#,
-            serde_json::to_string(&A { timeout: Duration::from_secs(3600) }).unwrap());
+            serde_json::to_string(&A {
+                timeout: Duration::from_secs(3600)
+            })
+            .unwrap()
+        );
         assert_eq!(
             r#"{"timeout":"1:00:01"}"#,
-            serde_json::to_string(&A { timeout: Duration::from_secs(3601) }).unwrap());
+            serde_json::to_string(&A {
+                timeout: Duration::from_secs(3601)
+            })
+            .unwrap()
+        );
 
-        let a : A = serde_json::from_str(r#"{"timeout":"1:00:02"}"#).unwrap();
+        let a: A = serde_json::from_str(r#"{"timeout":"1:00:02"}"#).unwrap();
 
         assert_eq!(a.timeout, Duration::from_secs(3602))
-
     }
 }

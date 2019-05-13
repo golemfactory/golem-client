@@ -2,18 +2,18 @@
 //!
 //!
 
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
-use super::{TaskDef, ComputeOn, TaskDefOptions};
+use serde::{Deserialize, Serialize};
+
+use super::{ComputeOn, TaskDef, TaskDefOptions};
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WasmOptions {
-    pub js_name : String,
-    pub wasm_name : String,
-    pub input_dir : String,
-    pub output_dir : String,
-    pub subtasks : Vec<SubtaskDef>
+    pub js_name: String,
+    pub wasm_name: String,
+    pub input_dir: String,
+    pub output_dir: String,
+    pub subtasks: Vec<SubtaskDef>,
 }
 
 impl TaskDefOptions for WasmOptions {
@@ -22,11 +22,10 @@ impl TaskDefOptions for WasmOptions {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubtaskDef {
-    pub name : String,
-    pub exec_args : Vec<String>,
-    pub output_file_paths : Vec<String>
+    pub name: String,
+    pub exec_args: Vec<String>,
+    pub output_file_paths: Vec<String>,
 }
-
 
 pub type WasmTaskDef = TaskDef<WasmOptions>;
 
@@ -45,11 +44,11 @@ pub fn template() -> WasmTaskDef {
             wasm_name: "".to_string(),
             input_dir: "".to_string(),
             output_dir: "".to_string(),
-            subtasks: vec![ SubtaskDef {
+            subtasks: vec![SubtaskDef {
                 name: "".into(),
                 exec_args: vec![],
-                output_file_paths: vec![]
-            }]
-        }
+                output_file_paths: vec![],
+            }],
+        },
     }
 }

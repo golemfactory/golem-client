@@ -3,6 +3,7 @@ use failure::Fail;
 #[macro_use]
 pub mod rpc;
 
+pub mod apps;
 pub mod comp;
 pub mod core;
 pub mod net;
@@ -10,7 +11,6 @@ pub mod pay;
 #[cfg(feature = "settings")]
 pub mod settings;
 pub mod terms;
-pub mod apps;
 
 pub(crate) mod serde;
 
