@@ -3,6 +3,7 @@ use std::fmt::{self, Debug};
 use structopt::*;
 
 mod account;
+mod cache;
 #[cfg(feature = "concent_cli")]
 mod concent;
 #[cfg(feature = "debug_cli")]
@@ -13,7 +14,6 @@ mod envs;
 mod incomes;
 mod network;
 mod payments;
-mod res;
 mod settings;
 mod subtasks;
 mod tasks;
@@ -59,8 +59,8 @@ pub enum CommandSection {
     DepositPayments(deposit_payments::Section),
 
     /// Manage resources (unimplemented)
-    #[structopt(name = "res")]
-    Res(res::Section),
+    #[structopt(name = "cache")]
+    Cache(cache::Section),
 
     /// Manage settings
     #[structopt(name = "settings")]
@@ -135,7 +135,7 @@ impl CommandSection {
                 CommandSection::Payments,
                 #[cfg(feature = "concent_cli")]
                 CommandSection::DepositPayments,
-                CommandSection::Res,
+                CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,
                 CommandSection::Subtasks,
