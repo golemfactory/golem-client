@@ -11,6 +11,7 @@ pub mod pay;
 #[cfg(feature = "settings")]
 pub mod settings;
 pub mod terms;
+pub mod res;
 
 pub(crate) mod serde;
 
