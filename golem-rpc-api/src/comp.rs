@@ -260,10 +260,10 @@ pub struct UnsupportInfo {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CompEnvStatus {
-    pub id : String,
-    pub supported : bool,
-    pub accepted : bool,
-    pub performance : Option<f64>,
-    pub min_accepted : f64,
-    pub description : String,
+    pub id: String,
+    pub supported: bool,
+    pub accepted: bool,
+    pub performance: Option<f64>,
+    pub min_accepted: f64,
+    pub description: String,
 }
