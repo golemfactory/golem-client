@@ -10,10 +10,36 @@ use std::iter::Enumerate;
 use std::str::Chars;
 use structopt::{clap, StructOpt};
 
+#[cfg(not(windows))]
+fn after_help() -> String {
+    if atty::is(atty::Stream::Stdout) {
+        format!(
+            "    {:12}{:16}{}",
+            ansi_term::Colour::Green.paint("exit"),
+            "",
+            "Exit the interactive shell\n"
+        )
+    } else {
+        "\texit                Exit the interactive shell".into()
+    }
+}
+
+#[cfg(windows)]
+fn after_help() -> String {
+    format!("    {:12}{:16}{}", "exit", "", "Exit the interactive shell\n")
+}
+
+
+lazy_static::lazy_static! {
+    /// This is an example for using doc comment attributes
+    static ref AFTER_HELP: String = after_help();
+}
+
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::VersionlessSubcommands"))]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::NoBinaryName"))]
+#[structopt(raw(after_help = "AFTER_HELP.as_ref()"))]
 struct LineArgs {
     /// Return results in JSON format
     #[structopt(long)]
@@ -61,6 +87,9 @@ pub fn interactive_shell(ctx: &mut CliCtx) {
     }));
 
     while let Ok(line) = editor.readline(">> ") {
+        if line.split_ascii_whitespace().next() == Some("exit") {
+            return;
+        }
         match LineArgs::from_iter_safe(line.split_ascii_whitespace()) {
             Ok(LineArgs {
                 json: _,

@@ -8,12 +8,12 @@ edition = "2018"
 default=['interactive_cli', 'debug_cli', 'concent_cli', 'test_task_cli']
 concent_cli=[]
 debug_cli=[]
-interactive_cli=["rustyline"]
+interactive_cli=["rustyline", "atty", "ansi_term"]
 test_task_cli=[]
 
 [dependencies]
 actix = "0.8.1"
-actix-http = "0.1.4"
+actix-http = "0.2"
 appdirs="0.2"
 base64 = "0.10.1"
 bigdecimal = {version = "0.1.0", features=["serde"]}
@@ -64,3 +64,11 @@ features=['settings']
 [dependencies.rustyline]
 version="4.0.0"
 optional=true
+
+[dependencies.atty]
+version = "0.2.2"
+optional=true
+
+[target."cfg(not(windows))".dependencies.ansi_term]
+version = "0.11"
+optional = true

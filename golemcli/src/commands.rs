@@ -58,7 +58,7 @@ pub enum CommandSection {
     #[structopt(name = "deposit_payments")]
     DepositPayments(deposit_payments::Section),
 
-    /// Manage resources (unimplemented)
+    /// Manage resources
     #[structopt(name = "cache")]
     Cache(cache::Section),
 
