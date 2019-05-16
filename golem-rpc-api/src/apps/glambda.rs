@@ -2,38 +2,36 @@
 //!
 //!
 
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
-use super::{TaskDef, ComputeOn, TaskDefOptions};
+use super::{ComputeOn, TaskDef, TaskDefOptions};
+use serde::{Deserialize, Serialize};
+
 use std::time::Duration;
 
 type GLambdaTaskDef = TaskDef<GLambdaOptions>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GLambdaOptions {
-    pub method : String,
-    pub args : String,
-    pub verification : String,
-    pub outputs : Vec<String>,
+    pub method: String,
+    pub args: String,
+    pub verification: String,
+    pub outputs: Vec<String>,
 }
 
 impl TaskDefOptions for GLambdaOptions {
-    const TASK_TYPE :&'static str = "GLambda";
+    const TASK_TYPE: &'static str = "GLambda";
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GLambdaVerification {
-    #[serde(rename="type")]
-    verification_type : GLambdaVerificationType
+    #[serde(rename = "type")]
+    verification_type: GLambdaVerificationType,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum GLambdaVerificationType {
-    #[serde(rename="None")]
+    #[serde(rename = "None")]
     NoVerification,
-    #[serde(rename="External")]
+    #[serde(rename = "External")]
     ExternallyVerified,
 }
 
@@ -51,7 +49,7 @@ pub fn template() -> GLambdaTaskDef {
             method: "".to_string(),
             args: "".to_string(),
             verification: "".to_string(),
-            outputs: vec![]
-        }
+            outputs: vec![],
+        },
     }
 }

@@ -89,6 +89,7 @@ pub trait Setting {
     type Item;
     const NAME: &'static str;
     const DESC: &'static str;
+    const VALIDATION_DESC : &'static str;
 
     fn to_value(item: &Self::Item) -> Value;
 
@@ -99,6 +100,8 @@ pub trait DynamicSetting {
     fn name(&self) -> &str;
 
     fn description(&self) -> &str;
+
+    fn validation_desc(&self) -> &str;
 
     fn parse_from_str(&self, value: &str) -> Result<Value, Error>;
 
@@ -119,6 +122,11 @@ where
         S::DESC
     }
 
+    fn validation_desc(&self) -> &str {
+        S::VALIDATION_DESC
+    }
+
+
     fn parse_from_str(&self, value: &str) -> Result<Value, Error> {
         Ok(S::to_value(
             &(value.parse().map_err(|e| Error::Other(format!("{}", e))))?,
@@ -128,6 +136,8 @@ where
     fn display_value(&self, value: &Value) -> Result<String, Error> {
         Ok(format!("{}", S::from_value(value)?))
     }
+
+
 }
 
 fn bool_from_value(value: &Value) -> Result<bool, Error> {
@@ -163,6 +173,7 @@ mod test {
         eprintln!("desc: {}", general::NodeName::DESC);
         eprintln!("name: {}", general::GettingPeersInterval::NAME);
         eprintln!("desc: {}", general::GettingPeersInterval::DESC);
+        eprintln!("vdesc {}", general::GettingPeersInterval::VALIDATION_DESC);
         eprintln!(
             "desc: {}",
             from_name("computing_trust").unwrap().description()
@@ -170,15 +181,15 @@ mod test {
 
         eprintln!("GENERAL");
         for it in general::list() {
-            eprintln!("{}: {}", it.name(), it.description());
+            eprintln!("{:30}: {:40} {:20}", it.name(), it.description(), it.validation_desc());
         }
         eprintln!("PROVIDER");
         for it in provider::list() {
-            eprintln!("{}: {}", it.name(), it.description());
+            eprintln!("{:30}: {:40} {:20}", it.name(), it.description(), it.validation_desc());
         }
         eprintln!("REQUESTOR");
         for it in requestor::list() {
-            eprintln!("{}: {}", it.name(), it.description());
+            eprintln!("{:30}: {:40} {:20}", it.name(), it.description(), it.validation_desc());
         }
     }
 
