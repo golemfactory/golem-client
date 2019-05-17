@@ -3,11 +3,12 @@ extern crate proc_macro;
 use failure::{bail, Fallible};
 use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
 use proc_macro::TokenStream;
-use quote::quote;
+use proc_macro2::Span;
+use quote::{quote, quote_spanned};
 use regex::Regex;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
-use syn::{parse_macro_input, File, Lit, Type, Expr};
+use syn::{Attribute, Expr, Lit};
 
 // Model
 struct SettingSection {
@@ -17,6 +18,7 @@ struct SettingSection {
 }
 
 struct SettingDef {
+    span: Span,
     // Setting as type name (eg. NodeName for node_name setting).
     type_name: syn::Ident,
     // Setting name as const name (eg. NODE_NAME for node_name setting).
@@ -30,6 +32,7 @@ struct SettingDef {
     //
     conversion_type: ConversionType,
     validation: Option<Range<Expr>>,
+    unit: Units,
 }
 
 enum ConversionType {
@@ -44,8 +47,41 @@ enum ConversionType {
 }
 
 enum Units {
+    None,
     Gnt,
     Other(String),
+}
+
+impl Units {
+    fn from_attrs<'a>(attrs: impl IntoIterator<Item = &'a Attribute>) -> Self {
+        attrs
+            .into_iter()
+            .filter_map(|attr| match attr.parse_meta() {
+                Ok(syn::Meta::NameValue(nv)) => {
+                    if nv.ident == "unit" {
+                        Self::from_lit(nv.lit)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .next()
+            .unwrap_or(Units::None)
+    }
+
+    fn from_lit(lit: syn::Lit) -> Option<Self> {
+        match lit {
+            syn::Lit::Str(s) => {
+                if s.value() == "GNT" {
+                    Some(Units::Gnt)
+                } else {
+                    Some(Units::Other(s.value()))
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -55,28 +91,26 @@ enum RangeEnd<T> {
 }
 
 impl<T> RangeEnd<T> {
-
     fn as_gt_str(&self) -> &str {
         match self {
             RangeEnd::Inclusive(_) => ">=",
-            RangeEnd::Exclusive(_) => ">"
+            RangeEnd::Exclusive(_) => ">",
         }
     }
 
     fn as_lt_str(&self) -> &str {
         match self {
             RangeEnd::Inclusive(_) => "<=",
-            RangeEnd::Exclusive(_) => "<"
+            RangeEnd::Exclusive(_) => "<",
         }
     }
 
     fn as_val(&self) -> &T {
         match self {
             RangeEnd::Inclusive(v) => v,
-            RangeEnd::Exclusive(v) => v
+            RangeEnd::Exclusive(v) => v,
         }
     }
-
 }
 
 #[derive(Debug)]
@@ -89,13 +123,12 @@ impl FromStr for Range<Expr> {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let re_both = Regex::new(r"([-0-9.]+)\s*(<|<=)\s*v\s*(<|<=)\s*([0-9.]+)").unwrap();
-        let re_one = Regex::new(r"\s*v\s*(<|<=|>|>=)\s*([-0-9.]+)").unwrap();
         lazy_static::lazy_static! {
-            static ref EXAMPLE: u8 = 42;
+            static ref RE_RANGE : Regex= Regex::new(r"([-0-9.]+)\s*(<|<=)\s*v\s*(<|<=)\s*([0-9.]+)").unwrap();
+            static ref RE_CMP : Regex = Regex::new(r"\s*v\s*(<|<=|>|>=)\s*([-0-9.]+)").unwrap();
         }
 
-        if let Some(m) = re_both.captures(s) {
+        if let Some(m) = RE_RANGE.captures(s) {
             let left: Expr = syn::parse_str(m.get(1).unwrap().as_str())?;
             let from = Some(if m.get(2).unwrap().as_str() == "<=" {
                 RangeEnd::Inclusive(left)
@@ -109,7 +142,7 @@ impl FromStr for Range<Expr> {
                 RangeEnd::Exclusive(right)
             });
             return Ok(Range { from, to });
-        } else if let Some(m) = re_one.captures(s) {
+        } else if let Some(m) = RE_CMP.captures(s) {
             let end_val: Expr = syn::parse_str(m.get(2).unwrap().as_str())?;
             return Ok(match m.get(1).unwrap().as_str() {
                 "<" => Range {
@@ -177,6 +210,7 @@ fn parse_section(s: &syn::ItemStruct) -> Fallible<SettingSection> {
 
 fn parse_section_field(f: &syn::Field) -> Fallible<SettingDef> {
     let ident = f.ident.clone().unwrap();
+    let span = ident.span();
     let name = ident.to_string();
     let ty = f.ty.clone();
     let type_name = syn::Ident::new(&name.to_camel_case(), ident.span());
@@ -232,7 +266,10 @@ fn parse_section_field(f: &syn::Field) -> Fallible<SettingDef> {
 
     let conversion_type = (&ty).try_into().unwrap();
 
+    let unit = Units::from_attrs(&f.attrs);
+
     Ok(SettingDef {
+        span,
         type_name,
         kw_name,
         name,
@@ -240,6 +277,7 @@ fn parse_section_field(f: &syn::Field) -> Fallible<SettingDef> {
         desc,
         conversion_type,
         validation,
+        unit,
     })
 }
 
@@ -257,21 +295,27 @@ pub fn gen_settings(mut f: syn::File) -> Fallible<TokenStream> {
         let name = &section.name;
         let fields = section.items.iter().map(|setting| {
             let SettingDef {
+                span,
                 type_name,
                 kw_name,
                 ty,
                 desc,
                 name,
                 conversion_type,
-                validation
+                unit,
+                ..
             } = setting;
 
             let validation_desc = setting.validation_desc();
 
             let val = quote!(val);
 
-            let from_value = match conversion_type {
-                ConversionType::Bool => quote! {
+            let from_value = match (conversion_type, unit) {
+                (ConversionType::Decimal, Units::Gnt) => quote! {
+                    gnt_from_value(#val)
+                },
+
+                (ConversionType::Bool, _) => quote! {
                     bool_from_value(#val)
                 },
                 _ => quote! {
@@ -279,17 +323,23 @@ pub fn gen_settings(mut f: syn::File) -> Fallible<TokenStream> {
                 }
             };
 
-            let to_value = match conversion_type {
-                ConversionType::Bool => quote! {
-                    bool_to_value(*item)
+            let to_value = match (conversion_type, unit) {
+                (ConversionType::Decimal, Units::Gnt) => quote! {
+                    gnt_to_value(item)
+                },
+                (ConversionType::Bool, _) => quote! {
+                    Ok(bool_to_value(*item))
                 },
                 _ => quote! {
-                    serde_json::json!(item)
+                    Ok(serde_json::json!(item))
                 }
             };
 
+            let span = span.clone();
 
-            quote! {
+
+            quote_spanned! {
+            span =>
                 #[doc = #desc]
                 pub struct #type_name;
 
@@ -301,7 +351,7 @@ pub fn gen_settings(mut f: syn::File) -> Fallible<TokenStream> {
 
                     // TODO: Add conversion
                     #[inline]
-                    fn to_value(item : &#ty) -> Value {
+                    fn to_value(item : &#ty) -> Result<Value, Error> {
                         #to_value
                     }
 
@@ -393,28 +443,55 @@ pub fn gen_settings(mut f: syn::File) -> Fallible<TokenStream> {
     .into())
 }
 
-fn lit_to_str(lit : &Expr) -> String {
+fn lit_to_str(lit: &Expr) -> String {
     use quote::ToTokens;
 
     lit.clone().into_token_stream().to_string()
 }
 
-
 impl SettingDef {
-
     fn validation_desc(&self) -> String {
-        match &self.validation {
-            None => format!("{}", self.type_desc()),
-            Some(Range { from: None, to: Some(to)}) => {
-                format!("{} {} {}",self.type_desc(), to.as_lt_str(), lit_to_str(to.as_val()))
-            }
-            Some(Range { from: Some(from), to: None}) => {
-                format!("{} {} {}",self.type_desc(), from.as_gt_str(), lit_to_str(from.as_val()))
-            }
+        let unit_desc = match &self.unit {
+            Units::None => "".into(),
+            Units::Gnt => " [GNT]".into(),
+            Units::Other(unit_name) => format!(" [{}]", unit_name),
+        };
 
-            Some(Range { from: Some(from), to: Some(to)}) => {
-                format!("{} {} {} {} {}",lit_to_str(from.as_val()), from.as_lt_str(), self.type_desc(),  to.as_lt_str(), lit_to_str(to.as_val()))
-            }
+        match &self.validation {
+            None => format!("{}{}", self.type_desc(), unit_desc),
+            Some(Range {
+                from: None,
+                to: Some(to),
+            }) => format!(
+                "{} {} {}{}",
+                self.type_desc(),
+                to.as_lt_str(),
+                lit_to_str(to.as_val()),
+                unit_desc
+            ),
+            Some(Range {
+                from: Some(from),
+                to: None,
+            }) => format!(
+                "{} {} {}{}",
+                self.type_desc(),
+                from.as_gt_str(),
+                lit_to_str(from.as_val()),
+                unit_desc
+            ),
+
+            Some(Range {
+                from: Some(from),
+                to: Some(to),
+            }) => format!(
+                "{} {} {} {} {}{}",
+                lit_to_str(from.as_val()),
+                from.as_lt_str(),
+                self.type_desc(),
+                to.as_lt_str(),
+                lit_to_str(to.as_val()),
+                unit_desc
+            ),
             _ => {
                 eprintln!("range: {:?}", self.validation);
                 unimplemented!()
@@ -428,9 +505,7 @@ impl SettingDef {
             ConversionType::Decimal => "decimal",
             ConversionType::String => "str",
             ConversionType::Bool => "bool",
-            ConversionType::Nat => "int"
+            ConversionType::Nat => "int",
         }
     }
-
 }
-

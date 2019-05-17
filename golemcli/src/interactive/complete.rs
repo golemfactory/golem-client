@@ -26,12 +26,18 @@ fn find_matching_sub_commands(app: &clap::App, prefix: &str) -> Vec<String> {
                 None
             }
         })
+        .chain(if "help".starts_with(prefix) {
+            Some("help".to_string())
+        } else {
+            None
+        })
         .collect()
 }
 
 impl<'a, 'b> ClapCompleter<'a, 'b> {
     fn for_struct<S: StructOpt>() -> Self {
-        ClapCompleter { app: S::clap() }
+        let app = S::clap().subcommand(clap::SubCommand::with_name("exit"));
+        ClapCompleter { app }
     }
 
     fn find_completions(&self, cursor_pos: usize, line: &str) -> Option<(usize, Vec<String>)> {

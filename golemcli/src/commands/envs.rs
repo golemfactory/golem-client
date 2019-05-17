@@ -1,15 +1,22 @@
 use crate::context::*;
 use futures::prelude::*;
+use golem_rpc_api::comp::{AsGolemComp, CompEnvStatus};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
     /// Disable environment
     #[structopt(name = "disable")]
-    Disable,
+    Disable {
+        // Environment name
+        name: String,
+    },
     /// Enable environment
     #[structopt(name = "enable")]
-    Enable,
+    Enable {
+        // Environment name
+        name: String,
+    },
 
     /// Gets accepted performance multiplier
     #[structopt(name = "perf_mult")]
@@ -17,11 +24,17 @@ pub enum Section {
 
     /// Sets accepted performance multiplier
     #[structopt(name = "perf_mult_set")]
-    PerfMultSet,
+    PerfMultSet {
+        /// Multiplier; float value within range [0, 100]
+        multiplier: f64,
+    },
 
     /// Recount performance for an environment
     #[structopt(name = "recount")]
-    Recount,
+    Recount {
+        /// Environment name
+        name: String,
+    },
     /// Show environments
     #[structopt(name = "show")]
     Show,
@@ -30,10 +43,127 @@ pub enum Section {
 impl Section {
     pub fn run(
         &self,
-        _endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
-            _ => futures::future::err(unimplemented!()),
+            Section::Enable { name } => Box::new(self.enable(endpoint, name)),
+            Section::Disable { name } => Box::new(self.disable(endpoint, name)),
+            Section::Show => Box::new(self.show(endpoint)),
+            Section::PerfMult => Box::new(self.perf_mult(endpoint)),
+            Section::PerfMultSet { multiplier } => {
+                Box::new(self.perf_mult_set(endpoint, *multiplier))
+            }
+            Section::Recount { name } => Box::new(self.recount(endpoint, name)),
         }
+    }
+
+    fn enable(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        name: &str,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .enable_environment(name.into())
+            .from_err()
+            .and_then(|msg: Option<String>| {
+                if let Some(msg) = msg {
+                    CommandResponse::object(msg)
+                } else {
+                    CommandResponse::object("Command Sent")
+                }
+            })
+    }
+
+    fn disable(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        name: &str,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .disable_environment(name.into())
+            .from_err()
+            .and_then(|msg: Option<String>| {
+                if let Some(msg) = msg {
+                    CommandResponse::object(msg)
+                } else {
+                    CommandResponse::object("Command Sent")
+                }
+            })
+    }
+
+    fn recount(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        name: &str,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .run_benchmark(name.into())
+            .from_err()
+            .and_then(|v| CommandResponse::object(v))
+    }
+
+    fn show(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .get_environments()
+            .from_err()
+            .and_then(|envs: Vec<CompEnvStatus>| {
+                let columns = vec![
+                    "name".into(),
+                    "supported".into(),
+                    "active".into(),
+                    "performance".into(),
+                    "min accept. perf.".into(),
+                    "description".into(),
+                ];
+                let values = envs
+                    .into_iter()
+                    .map(|e| {
+                        serde_json::json!([
+                            e.id,
+                            e.supported,
+                            e.accepted,
+                            e.performance,
+                            e.min_accepted,
+                            e.description
+                        ])
+                    })
+                    .collect();
+                Ok(ResponseTable { columns, values }.into())
+            })
+    }
+
+    fn perf_mult(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .perf_mult()
+            .from_err()
+            .and_then(|multiplier| {
+                CommandResponse::object(format!(
+                    "minimal performance multiplier is: {}",
+                    multiplier
+                ))
+            })
+    }
+
+    fn perf_mult_set(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        multiplier: f64,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        endpoint
+            .as_golem_comp()
+            .perf_mult_set(multiplier)
+            .from_err()
+            .and_then(|()| CommandResponse::object("Command Sent"))
     }
 }

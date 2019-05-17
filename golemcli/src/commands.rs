@@ -3,6 +3,7 @@ use std::fmt::{self, Debug};
 use structopt::*;
 
 mod account;
+mod cache;
 #[cfg(feature = "concent_cli")]
 mod concent;
 #[cfg(feature = "debug_cli")]
@@ -13,9 +14,7 @@ mod envs;
 mod incomes;
 mod network;
 mod payments;
-mod res;
 mod settings;
-mod subtasks;
 mod tasks;
 mod terms;
 #[cfg(feature = "test_task_cli")]
@@ -37,7 +36,7 @@ pub enum CommandSection {
     #[structopt(name = "debug")]
     Debug(debug::Section),
 
-    /// Manage environments (unimplemented)
+    /// Manage environments
     #[structopt(name = "envs")]
     Envs(envs::Section),
 
@@ -58,9 +57,9 @@ pub enum CommandSection {
     #[structopt(name = "deposit_payments")]
     DepositPayments(deposit_payments::Section),
 
-    /// Manage resources (unimplemented)
-    #[structopt(name = "res")]
-    Res(res::Section),
+    /// Manage resources
+    #[structopt(name = "cache")]
+    Cache(cache::Section),
 
     /// Manage settings
     #[structopt(name = "settings")]
@@ -70,15 +69,11 @@ pub enum CommandSection {
     #[structopt(name = "tasks")]
     Tasks(tasks::Section),
 
-    /// Manage subtasks (unimplemented)
-    #[structopt(name = "subtasks")]
-    Subtasks(subtasks::Section),
-
     /// Show and accept terms of use
     #[structopt(name = "terms")]
     Terms(terms::Section),
 
-    /// Manage testing tasks (unimplemented)
+    /// Manage testing tasks
     #[cfg(feature = "test_task_cli")]
     #[structopt(name = "test_task")]
     TestTask(test_task::Section),
@@ -135,10 +130,9 @@ impl CommandSection {
                 CommandSection::Payments,
                 #[cfg(feature = "concent_cli")]
                 CommandSection::DepositPayments,
-                CommandSection::Res,
+                CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,
-                CommandSection::Subtasks,
                 CommandSection::Terms,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,

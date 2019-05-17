@@ -146,6 +146,7 @@ macro_rules! impl_async_rpc_item {
                 $(#[doc = $doc])*
                 #[doc = "RPC uri="]
                 #[doc = $rpc_uri]
+                #[allow(unused)]
                 pub fn $name(&self $(, $arg_id : $t)* $(, $kw_arg_id : $kw_t)*) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> {
                     self.0.rpc_call($rpc_uri, &($($arg_id,)*))
                 }

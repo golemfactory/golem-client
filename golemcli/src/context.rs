@@ -34,7 +34,12 @@ impl ResponseTable {
     }
 }
 
-#[derive(Debug)]
+pub trait FormattedObject {
+    fn to_json(&self) -> Result<serde_json::Value, Error>;
+
+    fn print(&self) -> Result<(), Error>;
+}
+
 pub enum CommandResponse {
     NoOutput,
     Object(serde_json::Value),
@@ -42,6 +47,7 @@ pub enum CommandResponse {
         columns: Vec<String>,
         values: Vec<serde_json::Value>,
     },
+    FormattedObject(Box<dyn FormattedObject>),
 }
 
 impl CommandResponse {
@@ -139,8 +145,38 @@ impl CliCtx {
                     }
                 }
             }
+            CommandResponse::FormattedObject(formatted_object) => {
+                if self.json_output {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&formatted_object.to_json().unwrap()).unwrap()
+                    )
+                } else {
+                    formatted_object.print().unwrap()
+                }
+            }
         }
     }
+}
+
+pub fn create_table<'a>(columns: impl IntoIterator<Item = &'a str>) -> prettytable::Table {
+    use prettytable::*;
+    let mut table = Table::new();
+    //table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+    table.set_format(*FORMAT_BASIC);
+
+    table.set_titles(Row::new(
+        columns
+            .into_iter()
+            .map(|c| {
+                Cell::new(c)
+                    .with_style(Attr::Bold)
+                    .with_style(Attr::ForegroundColor(color::GREEN))
+            })
+            .collect(),
+    ));
+
+    table
 }
 
 fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
@@ -180,7 +216,7 @@ fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
     let _ = table.printstd();
 }
 
-use prettytable::{format, format::TableFormat};
+use prettytable::{format, format::TableFormat, Table};
 lazy_static::lazy_static! {
 
     pub static ref FORMAT_BASIC: TableFormat = format::FormatBuilder::new()

@@ -9,7 +9,7 @@ default=["crypto-mac/std"]
 
 [dependencies]
 actix = "0.8.1"
-actix-http = "0.1.4"
+actix-http = { version = "0.2.0", features=["fail"] }
 failure="0.1"
 log = "0.4.6"
 rmp-serde = "0.13.7"
@@ -26,7 +26,7 @@ base64 = "0.10.1"
 rand = "0.6.5"
 
 [dependencies.actix-web]
-version = "1.0.0-beta.2"
+version = "1.0.0-beta.5"
 features = ['ssl']
 
 [dependencies.openssl]
