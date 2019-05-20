@@ -8,6 +8,7 @@ use serde_json::Value;
 rpc_interface! {
 
     trait GolemCore {
+        /// Get Golem node settings described in appconfig.ini file
         #[id = "env.opts"]
         fn get_settings(&self) -> Result<Map<String, Value>>;
 
