@@ -131,14 +131,14 @@ impl FormattedSettings {
                 if !header {
                     table.add_empty_row();
                     table.add_row(Row::new(vec![Cell::new(section_name)
-                        .with_style(Attr::Bold)
-                        .with_style(Attr::ForegroundColor(color::BRIGHT_YELLOW))]));
+//                        .with_style(Attr::Dim)
+                        .with_style(Attr::Underline(true))
+                        .with_style(Attr::ForegroundColor(color::YELLOW))]));
                     table.add_empty_row();
                     header = true;
                 }
                 table.add_row(row![
-                    setting.description(),
-                    setting.name(),
+                    format!("{} [{}]", setting.description(), setting.name()),
                     setting.display_value(v)?,
                     setting.validation_desc()
                 ]);
@@ -158,7 +158,7 @@ impl FormattedObject for FormattedSettings {
     fn print(&self) -> Result<(), Error> {
         use prettytable::*;
 
-        let mut table = create_table(vec!["description", "name", "value", "type"]);
+        let mut table = create_table(vec!["description [name]", "value", "type"]);
         let mut keys = HashSet::new();
 
         self.dump_section(&mut table, &mut keys, "General", settings::general::list())?;
@@ -177,21 +177,20 @@ impl FormattedObject for FormattedSettings {
 
         table.add_empty_row();
         table.add_row(Row::new(vec![Cell::new("Other")
-            .with_style(Attr::Bold)
-            .with_style(Attr::ForegroundColor(color::BRIGHT_YELLOW))]));
+            .with_style(Attr::Underline(true))
+            .with_style(Attr::ForegroundColor(color::YELLOW))]));
         table.add_empty_row();
         table.add_empty_row();
         for (name, value) in &self.0 {
             if !keys.contains(name.as_str()) {
                 if let Some(setting) = settings::from_name(name) {
                     table.add_row(row![
-                        setting.description(),
-                        setting.name(),
+                        format!("{} [{}]", setting.description(), setting.name()),
                         setting.display_value(value)?,
                         setting.validation_desc()
                     ]);
                 } else {
-                    table.add_row(row!["", name, value, ""]);
+                    table.add_row(row![name, value, ""]);
                 }
             }
         }
