@@ -8,6 +8,7 @@ use serde_json::Value;
 rpc_interface! {
 
     trait GolemCore {
+        /// Get Golem node settings described in appconfig.ini file
         #[id = "env.opts"]
         fn get_settings(&self) -> Result<Map<String, Value>>;
 
@@ -46,8 +47,16 @@ impl<'a, Endpoint: wamp::RpcEndpoint + 'static> GolemCore<'a, Endpoint> {
     pub fn update_setting<S: Setting>(
         &self,
         value: impl AsRef<S::Item>,
-    ) -> impl Future<Item = (), Error = wamp::Error> {
-        self.raw_update_setting(S::NAME.to_string(), S::to_value(value.as_ref()))
+    ) -> impl Future<Item = (), Error = super::Error> {
+        let value = match S::to_value(value.as_ref()) {
+            Ok(value) => value,
+            Err(e) => return future::Either::B(future::err(e)),
+        };
+
+        future::Either::A(
+            self.raw_update_setting(S::NAME.to_string(), value)
+                .from_err(),
+        )
     }
 
     pub fn update_setting_dyn(

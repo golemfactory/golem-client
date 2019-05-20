@@ -25,7 +25,12 @@ fn find_matching_sub_commands(app: &clap::App, prefix: &str) -> Vec<String> {
             } else {
                 None
             }
-        }).chain(if "help".starts_with(prefix) { Some("help".to_string())} else { None})
+        })
+        .chain(if "help".starts_with(prefix) {
+            Some("help".to_string())
+        } else {
+            None
+        })
         .collect()
 }
 

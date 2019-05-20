@@ -26,9 +26,25 @@ rpc_interface! {
         #[id = "comp.tasks"]
         fn get_tasks(&self) -> Result<Vec<TaskInfo>>;
 
+        /// Show statistics for unsupported tasks.
+        ///
+        /// # Arguments
+        ///
+        /// * `last_days` -  Number of last days to compute statistics on.
+        ///
+        /// # Returns
+        ///
+        /// Vec of UnsupportInfo. With stats for each reason.
+        ///
         #[id = "comp.tasks.unsupport"]
         fn get_tasks_unsupported(&self, last_days: i32) -> Result<Vec<UnsupportInfo>>;
 
+        /// Abort task with given id.
+        ///
+        /// # Arguments
+        ///
+        /// * `task_id` - Task id to abort.
+        ///
         #[id = "comp.task.abort"]
         fn abort_task(&self, task_id : String) -> Result<()>;
 
@@ -264,4 +280,3 @@ pub struct CompEnvStatus {
     pub min_accepted: f64,
     pub description: String,
 }
-

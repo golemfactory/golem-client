@@ -26,9 +26,11 @@ fn after_help() -> String {
 
 #[cfg(windows)]
 fn after_help() -> String {
-    format!("    {:12}{:16}{}", "exit", "", "Exit the interactive shell\n")
+    format!(
+        "    {:12}{:16}{}",
+        "exit", "", "Exit the interactive shell\n"
+    )
 }
-
 
 lazy_static::lazy_static! {
     /// This is an example for using doc comment attributes
@@ -90,6 +92,7 @@ pub fn interactive_shell(ctx: &mut CliCtx) {
         if line.split_ascii_whitespace().next() == Some("exit") {
             return;
         }
+
         match LineArgs::from_iter_safe(line.split_ascii_whitespace()) {
             Ok(LineArgs {
                 json: _,

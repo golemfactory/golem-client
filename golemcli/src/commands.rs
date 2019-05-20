@@ -15,7 +15,6 @@ mod incomes;
 mod network;
 mod payments;
 mod settings;
-mod subtasks;
 mod tasks;
 mod terms;
 #[cfg(feature = "test_task_cli")]

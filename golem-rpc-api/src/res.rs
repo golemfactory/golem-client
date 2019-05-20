@@ -1,8 +1,7 @@
-
 use crate::rpc::*;
 use serde_derive::*;
-use serde_repr::*;
 use serde_json::Value;
+use serde_repr::*;
 use std::path::PathBuf;
 
 rpc_interface! {
@@ -25,12 +24,11 @@ rpc_interface! {
     converter AsGolemRes as_golem_res;
 }
 
-
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
 pub enum DirType {
     Distributed = 1,
-    Received = 2
+    Received = 2,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -38,7 +36,7 @@ pub struct CachePaths {
     #[serde(rename = "total received data")]
     pub received_files: PathBuf,
     #[serde(rename = "total distributed data")]
-    pub distributed_files : PathBuf
+    pub distributed_files: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -46,5 +44,5 @@ pub struct CacheSizes {
     #[serde(rename = "total received data")]
     pub received_files: String,
     #[serde(rename = "total distributed data")]
-    pub distributed_files : String
+    pub distributed_files: String,
 }
