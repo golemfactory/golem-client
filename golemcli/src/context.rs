@@ -170,7 +170,7 @@ pub fn create_table<'a>(columns: impl IntoIterator<Item = &'a str>) -> prettytab
             .into_iter()
             .map(|c| {
                 Cell::new(c)
-                    .with_style(Attr::Bold)
+                    //.with_style(Attr::Bold)
                     .with_style(Attr::ForegroundColor(color::GREEN))
             })
             .collect(),
