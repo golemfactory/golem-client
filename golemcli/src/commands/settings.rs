@@ -131,7 +131,7 @@ impl FormattedSettings {
                 if !header {
                     table.add_empty_row();
                     table.add_row(Row::new(vec![Cell::new(section_name)
-//                        .with_style(Attr::Dim)
+                        //                        .with_style(Attr::Dim)
                         .with_style(Attr::Underline(true))
                         .with_style(Attr::ForegroundColor(color::YELLOW))]));
                     table.add_empty_row();
