@@ -3,8 +3,8 @@
 
 [build-status-travis]: https://travis-ci.org/golemfactory/golem-client.svg?branch=master
 [travis]: https://travis-ci.org/golemfactory/golem-client
-[build-status-appveyor]: https://ci.appveyor.com/api/projects/status/github/golemfactory/golem-client?svg=true
-[appveyor]: https://ci.appveyor.com/project/golemfactory/golem-client
+[build-status-appveyor]: https://ci.appveyor.com/api/projects/status/github/prekucki/golem-client?svg=true
+[appveyor]: https://ci.appveyor.com/project/prekucki/golem-client
 
 [Project roadmap](https://docs.google.com/document/d/1h1pUB-LT6YwozfqX9rAO7vrgzM5CaGGr9WsePeZ95C8) 
 
