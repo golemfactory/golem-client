@@ -57,16 +57,10 @@ impl CliArgs {
     pub fn get_data_dir(&self) -> PathBuf {
         match &self.data_dir {
             Some(data_dir) => data_dir.join("rinkeby"),
-            None => {
-                let data_dir = appdirs::user_data_dir(Some("golem"), None, false).unwrap();
-                if cfg!(windows) {
-                    data_dir.join("golem")
-                } else {
-                    data_dir
-                }
+            None => appdirs::user_data_dir(Some("golem"), Some("golem"), false)
+                .unwrap()
                 .join("default")
-                .join("rinkeby")
-            }
+                .join("rinkeby"),
         }
     }
 
