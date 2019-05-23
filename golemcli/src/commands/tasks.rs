@@ -9,6 +9,7 @@ use openssl::rsa::Padding;
 use structopt::StructOpt;
 
 use golem_rpc_api::comp::{AsGolemComp, StatsCounters, SubtaskStats, TaskInfo};
+use serde_json::json;
 
 use crate::context::*;
 
@@ -18,7 +19,7 @@ pub enum Section {
     #[structopt(name = "abort")]
     Abort {
         /// Task identifier
-        id: String,
+        task_id: String,
     },
     /// Create a task from file. Note: no client-side validation is performed yet.
     /// This will change in the future
@@ -31,13 +32,13 @@ pub enum Section {
     #[structopt(name = "delete")]
     Delete {
         /// Task identifier
-        id: String,
+        task_id: String,
     },
     /// Dump an existing task
     #[structopt(name = "dump")]
     Dump {
         /// Task identifier
-        id: String,
+        task_id: String,
         ///  Output file
         out_file: Option<PathBuf>,
     },
@@ -48,19 +49,19 @@ pub enum Section {
     #[structopt(name = "restart")]
     Restart {
         /// Task identifier
-        id: String,
+        task_id: String,
     },
     /// Restart given subtasks from a task
     #[structopt(name = "restart_subtasks")]
     RestartSubtasks {
-        id: String,
+        task_id: String,
         subtask_ids: Vec<String>,
     },
     /// Show task details
     #[structopt(name = "show")]
     Show {
         /// Task identifier
-        id: Option<String>,
+        task_id: Option<String>,
         /// Show only current tasks
         #[structopt(long)]
         current: bool,
@@ -75,8 +76,8 @@ pub enum Section {
     /// Show sub-tasks (unimplemented)
     #[structopt(name = "subtasks")]
     Subtasks {
-        /// Task identifier
-        task_id: String,
+        /// Task or subtask identifier
+        task_or_subtask_id: String,
     },
     /// Dump a task template (unimplemented)
     #[structopt(name = "template")]
@@ -97,21 +98,22 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
-            Section::Abort { id } => Box::new(self.abort(endpoint, id)),
+            Section::Abort { task_id } => Box::new(self.abort(endpoint, task_id)),
             Section::Create { file_name } => Box::new(self.create(endpoint, file_name)),
-            Section::Delete { id } => Box::new(self.delete(endpoint, id)),
-            Section::Dump { id, out_file } => Box::new(self.dump(endpoint, id, out_file)),
+            Section::Delete { task_id } => Box::new(self.delete(endpoint, task_id)),
+            Section::Dump { task_id, out_file } => Box::new(self.dump(endpoint, task_id, out_file)),
             Section::Purge => Box::new(self.purge(endpoint)),
-            Section::Restart { id } => Box::new(self.restart(endpoint, id)),
-            Section::RestartSubtasks { id, subtask_ids } => {
-                Box::new(self.restart_subtasks(endpoint, id, subtask_ids))
+            Section::Restart { task_id } => Box::new(self.restart(endpoint, task_id)),
+            Section::RestartSubtasks { task_id, subtask_ids } => {
+                Box::new(self.restart_subtasks(endpoint, task_id, subtask_ids))
             }
-            Section::Show { id, current, sort } => {
-                Box::new(self.show(endpoint, id, *current, sort))
+            Section::Show { task_id, current, sort } => {
+                Box::new(self.show(endpoint, task_id, *current, sort))
             }
             Section::Template { task_type } => Box::new(self.template(task_type)),
             Section::Stats => Box::new(self.stats(endpoint)),
-            Section::Subtasks { task_id } => Box::new(self.subtasks(endpoint, task_id)),
+            Section::Subtasks { task_or_subtask_id } =>
+                Box::new(self.subtasks(endpoint, task_or_subtask_id)),
             Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
         }
     }
@@ -347,21 +349,23 @@ impl Section {
     fn subtasks(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        task_id: &str,
+        task_or_subtask_id: &String,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        let task_id = task_or_subtask_id.clone();
+        let subtask_id = task_or_subtask_id.clone();
         endpoint
             .as_golem_comp()
-            .get_subtasks(task_id.into())
+            .get_subtasks(task_id)
             .from_err()
-            .and_then(|subtasks| {
-                let columns = vec![
-                    "node".into(),
-                    "subtask id".into(),
-                    "status".into(),
-                    "progress".into(),
-                ];
-                let values = match subtasks {
-                    Some(subtasks) => subtasks
+            .and_then(move |subtasks| {
+                if let Some(subtasks) = subtasks {
+                    let columns = vec![
+                        "node".into(),
+                        "subtask id".into(),
+                        "status".into(),
+                        "progress".into(),
+                    ];
+                    let values = subtasks
                         .into_iter()
                         .map(|subtask| {
                             serde_json::json!([
@@ -371,10 +375,15 @@ impl Section {
                                 subtask.progress.map(fraction_to_percent),
                             ])
                         })
-                        .collect(),
-                    None => vec![],
-                };
-                Ok(ResponseTable { columns, values }.into())
+                        .collect();
+                    futures::future::Either::A(futures::future::ok(ResponseTable { columns, values }.into()))
+                } else { // no task with given id, check for subtask
+                    futures::future::Either::B(endpoint
+                        .as_golem_comp()
+                        .get_subtask(subtask_id)
+                        .from_err()
+                        .and_then(|(subtask, err_msg)| subtask.map_or(CommandResponse::object(err_msg), CommandResponse::object)))
+                }
             })
     }
 

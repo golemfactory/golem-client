@@ -54,6 +54,8 @@ rpc_interface! {
         #[id = "comp.task.subtask.restart"]
         fn restart_subtask(&self, subtask_id : String) -> Result<()>;
 
+        #[id = "comp.task.subtask"]
+        fn get_subtask(&self, subtask_id : String) -> Result<(Option<SubtaskInfo>, Option<String>)>;
 
         #[id = "comp.task.subtasks"]
         fn get_subtasks(&self, task_id : String) -> Result<Option<Vec<SubtaskInfo>>>;
@@ -280,3 +282,4 @@ pub struct CompEnvStatus {
     pub min_accepted: f64,
     pub description: String,
 }
+
