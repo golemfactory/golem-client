@@ -97,7 +97,7 @@ mod test {
     }
 
     #[test]
-    fn test_1() {
+    fn test_all() {
         assert_eq!(
             vec![(0usize, "account".to_string()), (8, "info".to_string())],
             parse_to_vec("account info")
@@ -127,7 +127,11 @@ mod test {
             ],
             parse_to_vec("golemcli tasks Create 'ala ma smok-a' --test")
         );
+    }
 
+    #[cfg(unix)]
+    #[test]
+    fn test_unix() {
         assert_eq!(
             vec![
                 (0, "tasks".into()),
@@ -136,6 +140,20 @@ mod test {
                 (31, "--test".into())
             ],
             parse_to_vec("tasks create\\  \"ala ma smok-a\" --t\\est")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows() {
+        assert_eq!(
+            vec![
+                (0, "tasks".into()),
+                (6, "create ".into()),
+                (15, "ala ma smok-a".into()),
+                (31, "--test".into())
+            ],
+            parse_to_vec("tasks create`  \"ala ma smok-a\" --t`est")
         );
     }
 }
