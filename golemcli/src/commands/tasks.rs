@@ -104,16 +104,20 @@ impl Section {
             Section::Dump { task_id, out_file } => Box::new(self.dump(endpoint, task_id, out_file)),
             Section::Purge => Box::new(self.purge(endpoint)),
             Section::Restart { task_id } => Box::new(self.restart(endpoint, task_id)),
-            Section::RestartSubtasks { task_id, subtask_ids } => {
-                Box::new(self.restart_subtasks(endpoint, task_id, subtask_ids))
-            }
-            Section::Show { task_id, current, sort } => {
-                Box::new(self.show(endpoint, task_id, *current, sort))
-            }
+            Section::RestartSubtasks {
+                task_id,
+                subtask_ids,
+            } => Box::new(self.restart_subtasks(endpoint, task_id, subtask_ids)),
+            Section::Show {
+                task_id,
+                current,
+                sort,
+            } => Box::new(self.show(endpoint, task_id, *current, sort)),
             Section::Template { task_type } => Box::new(self.template(task_type)),
             Section::Stats => Box::new(self.stats(endpoint)),
-            Section::Subtasks { task_or_subtask_id } =>
-                Box::new(self.subtasks(endpoint, task_or_subtask_id)),
+            Section::Subtasks { task_or_subtask_id } => {
+                Box::new(self.subtasks(endpoint, task_or_subtask_id))
+            }
             Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
         }
     }
@@ -376,13 +380,23 @@ impl Section {
                             ])
                         })
                         .collect();
-                    futures::future::Either::A(futures::future::ok(ResponseTable { columns, values }.into()))
-                } else { // no task with given id, check for subtask
-                    futures::future::Either::B(endpoint
-                        .as_golem_comp()
-                        .get_subtask(subtask_id)
-                        .from_err()
-                        .and_then(|(subtask, err_msg)| subtask.map_or(CommandResponse::object(err_msg), CommandResponse::object)))
+                    futures::future::Either::A(futures::future::ok(
+                        ResponseTable { columns, values }.into(),
+                    ))
+                } else {
+                    // no task with given id, check for subtask
+                    futures::future::Either::B(
+                        endpoint
+                            .as_golem_comp()
+                            .get_subtask(subtask_id)
+                            .from_err()
+                            .and_then(|(subtask, err_msg)| {
+                                subtask.map_or(
+                                    CommandResponse::object(err_msg),
+                                    CommandResponse::object,
+                                )
+                            }),
+                    )
                 }
             })
     }

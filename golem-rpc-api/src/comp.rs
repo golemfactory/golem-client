@@ -282,4 +282,3 @@ pub struct CompEnvStatus {
     pub min_accepted: f64,
     pub description: String,
 }
-
