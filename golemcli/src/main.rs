@@ -3,6 +3,7 @@
 use crate::context::CliCtx;
 use actix::prelude::*;
 use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
+use golem_rpc_api::Net;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -48,19 +49,20 @@ struct CliArgs {
     #[structopt(raw(set = "structopt::clap::ArgSettings::Global"))]
     json: bool,
 
+    #[structopt(long, short)]
+    net: Option<Net>,
+
     #[structopt(subcommand)]
     command: Option<commands::CommandSection>,
 }
 
 impl CliArgs {
-    // TODO: implement
     pub fn get_data_dir(&self) -> PathBuf {
         match &self.data_dir {
-            Some(data_dir) => data_dir.join("rinkeby"),
+            Some(data_dir) => data_dir.to_owned(),
             None => appdirs::user_data_dir(Some("golem"), Some("golem"), false)
                 .unwrap()
-                .join("default")
-                .join("rinkeby"),
+                .join("default"),
         }
     }
 
