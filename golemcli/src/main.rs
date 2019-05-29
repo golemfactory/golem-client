@@ -3,6 +3,7 @@
 use crate::context::CliCtx;
 use actix::prelude::*;
 use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
+use golem_rpc_api::Net;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -47,6 +48,9 @@ struct CliArgs {
     #[structopt(raw(display_order = "500"))]
     #[structopt(raw(set = "structopt::clap::ArgSettings::Global"))]
     json: bool,
+
+    #[structopt(long,short)]
+    net : Option<Net>,
 
     #[structopt(subcommand)]
     command: Option<commands::CommandSection>,

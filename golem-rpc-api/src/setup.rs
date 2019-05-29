@@ -1,8 +1,9 @@
 use futures::{future, prelude::*};
 use std::fmt;
 use std::path::{Display, Path};
+use std::str::FromStr;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Net {
     TestNet,
     MainNet,
@@ -13,6 +14,18 @@ impl Net {
         match self {
             Net::MainNet => "mainnet",
             Net::TestNet => "rinkeby",
+        }
+    }
+}
+
+impl FromStr for Net {
+    type Err = super::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "mainnet" => Ok(Net::MainNet),
+            "testnet" => Ok(Net::TestNet),
+            _ => Err(super::Error::Other(format!("invalid net id: {}", s)))
         }
     }
 }
@@ -59,10 +72,10 @@ fn hash_to_net(data_dir: &Path, hash: Vec<u8>) -> Option<Net> {
 /// * `rpc_addr` - force other than default rpc_address
 ///
 
-pub fn connect_to_app<'a>(
+pub fn connect_to_app(
     data_dir: &Path,
     net: impl Into<Option<Net>>,
-    rpc_addr: Option<(&'a str, u16)>,
+    rpc_addr: Option<(&str, u16)>,
 ) -> impl Future<Item = impl actix_wamp::RpcEndpoint + Clone, Error = super::Error> {
     let (address, port) = rpc_addr.unwrap_or_else(|| ("127.0.0.1", 61000));
     let data_dir = data_dir.to_owned();

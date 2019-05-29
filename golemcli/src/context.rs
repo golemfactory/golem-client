@@ -69,6 +69,7 @@ pub struct CliCtx {
     rpc_addr: (String, u16),
     data_dir: PathBuf,
     json_output: bool,
+    net : Option<Net>,
 }
 
 impl TryFrom<&CliArgs> for CliCtx {
@@ -78,11 +79,13 @@ impl TryFrom<&CliArgs> for CliCtx {
         let data_dir = value.get_data_dir();
         let rpc_addr = value.get_rcp_address()?;
         let json_output = value.json;
+        let net = value.net.clone();
 
         Ok(CliCtx {
             rpc_addr,
             data_dir,
             json_output,
+            net
         })
     }
 }
@@ -96,7 +99,7 @@ impl CliCtx {
 
         let endpoint = sys.block_on(golem_rpc_api::connect_to_app(
             &self.data_dir,
-            None,
+            self.net.clone(),
             Some((address.as_str(), *port)),
         ))?;
 
@@ -208,6 +211,7 @@ fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
 }
 
 use prettytable::{format, format::TableFormat, Table};
+use golem_rpc_api::Net;
 lazy_static::lazy_static! {
 
     pub static ref FORMAT_BASIC: TableFormat = format::FormatBuilder::new()
