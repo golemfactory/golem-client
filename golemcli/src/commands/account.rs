@@ -38,6 +38,7 @@ pub enum AccountSection {
 impl AccountSection {
     pub fn run(
         &self,
+        ctx: &CliCtx,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
@@ -49,7 +50,9 @@ impl AccountSection {
                 amount,
                 currency,
                 gas_price,
-            } => Box::new(self.withdraw(destination, amount, currency, gas_price, endpoint)),
+            } => {
+                Box::new(self.withdraw(ctx, destination, amount, currency, gas_price, endpoint))
+            },
         }
     }
 
@@ -169,12 +172,18 @@ impl AccountSection {
 
     fn withdraw(
         &self,
+        ctx: &CliCtx,
         destination: &String,
         amount: &bigdecimal::BigDecimal,
         currency: &crate::eth::Currency,
         gas_price: &Option<bigdecimal::BigDecimal>,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        let ack = ctx.prompt_for_acceptance("Are you sure?", None, None);
+        if !ack {
+           return future::Either::A(future::ok(CommandResponse::NoOutput));
+        }
+        future::Either::B(
         endpoint
             .as_invoker()
             .rpc_call(
@@ -187,7 +196,7 @@ impl AccountSection {
                 ),
             )
             .from_err()
-            .and_then(|transactions: Vec<String>| CommandResponse::object(transactions))
+            .and_then(|transactions: Vec<String>| CommandResponse::object(transactions)))
     }
 }
 

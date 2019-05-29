@@ -48,6 +48,13 @@ struct CliArgs {
     #[structopt(raw(set = "structopt::clap::ArgSettings::Global"))]
     json: bool,
 
+
+    /// Answer `YES` to any prompt without an user action
+    #[structopt(short = "y")]
+    #[structopt(raw(display_order = "500"))]
+    #[structopt(raw(set = "structopt::clap::ArgSettings::Global"))]
+    accept_any_prompt: bool,
+
     #[structopt(subcommand)]
     command: Option<commands::CommandSection>,
 }

@@ -91,6 +91,11 @@ macro_rules! dispatch_subcommand {
             $(#[$async_meta:meta])*
             $async_command:path,)*
         })?
+        $(async_with_cxt {
+            $(
+            $(#[$async_with_context_meta:meta])*
+            $async_with_context_command:path,)*
+        })?
         $(sync {
             $($sync_command:path),*
         })?
@@ -109,6 +114,15 @@ macro_rules! dispatch_subcommand {
                 $(
                     $sync_command(command) => command.run_command()
                 ),*
+            )?,
+            $(
+                $(
+                    $(#[$async_with_context_meta])*
+                    $async_with_context_command(command) => {
+                         let (mut sys, endpoint) = $ctx.connect_to_app()?;
+                         sys.block_on(command.run($ctx, endpoint))
+                    }
+                )*
             )?
         }
     }};
@@ -119,7 +133,6 @@ impl CommandSection {
         dispatch_subcommand! {
             on (self, ctx);
             async {
-                CommandSection::Account,
                 #[cfg(feature = "concent_cli")]
                 CommandSection::Concent,
                 #[cfg(feature = "debug_cli")]
@@ -133,15 +146,17 @@ impl CommandSection {
                 CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,
-                CommandSection::Terms,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
 
             }
+            async_with_cxt {
+                CommandSection::Account,
+                CommandSection::Terms,
+            }
             sync {
                 CommandSection::Internal
             }
-
         }
 
         /*match self {
