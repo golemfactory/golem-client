@@ -40,7 +40,7 @@ impl SessionBuilder {
 
     pub fn create<Transport>(
         self,
-        transport: Transport,
+        transport: Transport
     ) -> impl Future<Item = impl RpcEndpoint + Clone, Error = Error>
     where
         Transport: futures::Sink<
@@ -71,6 +71,8 @@ impl SessionBuilder {
     ) -> impl Future<Item = impl RpcEndpoint + Clone, Error = Error> {
         wss(host, port)
             .map_err(|e| Error::WsClientError(format!("{}", e)))
-            .and_then(move |transport| self.create(transport))
+            .and_then(move |(transport, hash)|
+                self.create(transport))
+
     }
 }

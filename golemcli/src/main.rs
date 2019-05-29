@@ -52,15 +52,27 @@ struct CliArgs {
     command: Option<commands::CommandSection>,
 }
 
+enum Net {
+    TestNet,
+    MainNet,
+}
+
+impl Net {
+    fn data_dir(&self) -> &str {
+        match self {
+            Net::MainNet => "mainnet",
+            Net::TestNet => "rinkeby",
+        }
+    }
+}
+
 impl CliArgs {
-    // TODO: implement
     pub fn get_data_dir(&self) -> PathBuf {
         match &self.data_dir {
-            Some(data_dir) => data_dir.join("rinkeby"),
+            Some(data_dir) => data_dir.to_owned(),
             None => appdirs::user_data_dir(Some("golem"), Some("golem"), false)
                 .unwrap()
-                .join("default")
-                .join("rinkeby"),
+                .join("default"),
         }
     }
 
