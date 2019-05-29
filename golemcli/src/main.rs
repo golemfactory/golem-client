@@ -52,7 +52,6 @@ struct CliArgs {
     #[structopt(long, short)]
     net: Option<Net>,
 
-
     /// Answer `YES` to any prompt without an user action
     #[structopt(short = "y")]
     #[structopt(raw(display_order = "500"))]

@@ -30,9 +30,15 @@ impl Section {
             }
             Section::Accept => {
                 let enable_monitor = ctx.prompt_for_acceptance(
-                    "monitor", Some("monitor will be ENABLED"), Some("monitor will be DISABLED"));
+                    "monitor",
+                    Some("monitor will be ENABLED"),
+                    Some("monitor will be DISABLED"),
+                );
                 let enable_talkback = ctx.prompt_for_acceptance(
-                    "monitor", Some("talkback will be ENABLED"), Some("talkback will be DISABLED"));
+                    "monitor",
+                    Some("talkback will be ENABLED"),
+                    Some("talkback will be DISABLED"),
+                );
 
                 future::Either::B(
                     endpoint
@@ -45,4 +51,3 @@ impl Section {
         }
     }
 }
-

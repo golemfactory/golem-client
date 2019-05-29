@@ -155,12 +155,16 @@ impl CliCtx {
         }
     }
 
-    pub fn prompt_for_acceptance(&self, msg: &str, msg_on_accept: Option<&str>,
-                                 msg_on_reject: Option<&str>) -> bool {
+    pub fn prompt_for_acceptance(
+        &self,
+        msg: &str,
+        msg_on_accept: Option<&str>,
+        msg_on_reject: Option<&str>,
+    ) -> bool {
         if self.accept_any_prompt {
             return true;
         }
-        let enabled = promptly::prompt_default( msg, true);
+        let enabled = promptly::prompt_default(msg, true);
 
         if enabled && msg_on_accept.is_some() {
             eprintln!("\t {}", msg_on_accept.unwrap());
