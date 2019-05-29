@@ -52,20 +52,6 @@ struct CliArgs {
     command: Option<commands::CommandSection>,
 }
 
-enum Net {
-    TestNet,
-    MainNet,
-}
-
-impl Net {
-    fn data_dir(&self) -> &str {
-        match self {
-            Net::MainNet => "mainnet",
-            Net::TestNet => "rinkeby",
-        }
-    }
-}
-
 impl CliArgs {
     pub fn get_data_dir(&self) -> PathBuf {
         match &self.data_dir {

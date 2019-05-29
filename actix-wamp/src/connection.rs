@@ -369,7 +369,7 @@ where
         OpenSession {
             realm_id,
             auth_id,
-            auth_methods
+            auth_methods,
         }: OpenSession,
         _ctx: &mut Self::Context,
     ) -> Self::Result {

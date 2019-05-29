@@ -10,7 +10,7 @@ pub use messages::ErrorKind;
 pub use auth::wampcra::challenge_response_auth;
 pub use auth::AuthMethod;
 pub use error::Error;
-pub use transport::wss;
+pub use transport::{wss, ClientError};
 
 pub use args::{RpcCallRequest, RpcCallResponse, RpcEndpoint, ToArgs};
 use futures::Future;
@@ -40,7 +40,7 @@ impl SessionBuilder {
 
     pub fn create<Transport>(
         self,
-        transport: Transport
+        transport: Transport,
     ) -> impl Future<Item = impl RpcEndpoint + Clone, Error = Error>
     where
         Transport: futures::Sink<
@@ -71,8 +71,6 @@ impl SessionBuilder {
     ) -> impl Future<Item = impl RpcEndpoint + Clone, Error = Error> {
         wss(host, port)
             .map_err(|e| Error::WsClientError(format!("{}", e)))
-            .and_then(move |(transport, hash)|
-                self.create(transport))
-
+            .and_then(move |(transport, hash)| self.create(transport))
     }
 }

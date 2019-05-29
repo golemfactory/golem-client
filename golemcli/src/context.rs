@@ -92,35 +92,13 @@ impl CliCtx {
         &mut self,
     ) -> Result<(actix::SystemRunner, impl actix_wamp::RpcEndpoint + Clone), Error> {
         let mut sys = actix::System::new("golemcli");
-
         let (address, port) = &self.rpc_addr;
-        let (transport, cert_hash) = sys
-            .block_on(actix_wamp::wss(address, *port))
-            .map_err(|e| failure::format_err!("{}", e))?;
 
-        let data_dir = self.data_dir.clone();
-
-        let main_net_cert_path = data_dir.join("mainnet/crossbar/rpc_cert.pem");
-
-        let m = openssl::x509::X509::from_pem(std::fs::read(main_net_cert_path)?.as_ref())?;
-        let d = m
-            .digest(openssl::hash::MessageDigest::sha1())
-            .unwrap()
-            .to_vec();
-
-        eprintln!("is mainet: {:?}", Some(d) == cert_hash);
-
-        let auth_method =
-            actix_wamp::challenge_response_auth(move |auth_id| -> Result<_, std::io::Error> {
-                let secret_file_path = data_dir.join(format!("crossbar/secrets/{}.tck", auth_id));
-                log::debug!("reading secret from: {}", secret_file_path.display());
-                Ok(std::fs::read(secret_file_path)?)
-            });
-
-        let endpoint = sys.block_on(
-            actix_wamp::SessionBuilder::with_auth("golem", "golemcli", auth_method)
-                .create(transport),
-        )?;
+        let endpoint = sys.block_on(golem_rpc_api::connect_to_app(
+            &self.data_dir,
+            None,
+            Some((address.as_str(), *port)),
+        ))?;
 
         Ok((sys, endpoint))
     }

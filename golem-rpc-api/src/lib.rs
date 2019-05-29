@@ -13,9 +13,13 @@ pub mod res;
 pub mod settings;
 pub mod terms;
 
+mod setup;
+
 pub(crate) mod serde;
 
 pub type Map<K, V> = std::collections::HashMap<K, V>;
+
+pub use setup::{connect_to_app, Net};
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -36,6 +40,12 @@ pub enum Error {
 
     #[fail(display = "{}", _0)]
     WampError(#[cause] actix_wamp::Error),
+
+    #[fail(display = "{}", _0)]
+    IO(std::io::Error),
+
+    #[fail(display = "{}", _0)]
+    Ssl(openssl::error::ErrorStack),
 }
 
 impl From<serde_json::error::Error> for Error {
@@ -47,5 +57,17 @@ impl From<serde_json::error::Error> for Error {
 impl From<actix_wamp::Error> for Error {
     fn from(err: actix_wamp::Error) -> Self {
         Error::WampError(err)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Error::IO(err)
+    }
+}
+
+impl From<openssl::error::ErrorStack> for Error {
+    fn from(e: openssl::error::ErrorStack) -> Self {
+        Error::Ssl(e)
     }
 }
