@@ -25,7 +25,7 @@ impl FromStr for Net {
         match s {
             "mainnet" => Ok(Net::MainNet),
             "testnet" => Ok(Net::TestNet),
-            _ => Err(super::Error::Other(format!("invalid net id: {}", s)))
+            _ => Err(super::Error::Other(format!("invalid net id: {}", s))),
         }
     }
 }

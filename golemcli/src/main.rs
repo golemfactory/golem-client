@@ -49,8 +49,8 @@ struct CliArgs {
     #[structopt(raw(set = "structopt::clap::ArgSettings::Global"))]
     json: bool,
 
-    #[structopt(long,short)]
-    net : Option<Net>,
+    #[structopt(long, short)]
+    net: Option<Net>,
 
     #[structopt(subcommand)]
     command: Option<commands::CommandSection>,
