@@ -71,6 +71,7 @@ pub struct CliCtx {
     json_output: bool,
     accept_any_prompt: bool,
     net: Option<Net>,
+    interactive: bool,
 }
 
 impl TryFrom<&CliArgs> for CliCtx {
@@ -82,6 +83,7 @@ impl TryFrom<&CliArgs> for CliCtx {
         let json_output = value.json;
         let net = value.net.clone();
         let accept_any_prompt = value.accept_any_prompt;
+        let interactive = value.interactive;
 
         Ok(CliCtx {
             rpc_addr,
@@ -89,6 +91,7 @@ impl TryFrom<&CliArgs> for CliCtx {
             json_output,
             accept_any_prompt,
             net,
+            interactive,
         })
     }
 }
@@ -161,7 +164,7 @@ impl CliCtx {
         msg_on_accept: Option<&str>,
         msg_on_reject: Option<&str>,
     ) -> bool {
-        if self.accept_any_prompt {
+        if self.accept_any_prompt && !self.interactive {
             return true;
         }
         let enabled = promptly::prompt_default(msg, true);

@@ -177,7 +177,8 @@ impl AccountSection {
         gas_price: &Option<bigdecimal::BigDecimal>,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let ack = ctx.prompt_for_acceptance("Are you sure?", None, None);
+        let ack = ctx.prompt_for_acceptance("Are you sure?", None, Some("Withdraw cancelled"));
+
         if !ack {
             return future::Either::A(future::ok(CommandResponse::NoOutput));
         }

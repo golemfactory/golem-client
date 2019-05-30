@@ -53,8 +53,8 @@ struct CliArgs {
     net: Option<Net>,
 
     /// Answer `YES` to any prompt without an user action
-    #[structopt(short = "y")]
-    #[structopt(raw(display_order = "500"))]
+    #[structopt(short = "y", long = "assume-yes")]
+    #[structopt(raw(display_order = "1000"))]
     #[structopt(raw(set = "structopt::clap::ArgSettings::Global"))]
     accept_any_prompt: bool,
 
