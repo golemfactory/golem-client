@@ -16,6 +16,7 @@ pub enum Section {
 impl Section {
     pub fn run(
         &self,
+        ctx: &CliCtx,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         match self {
@@ -28,8 +29,16 @@ impl Section {
                 ))
             }
             Section::Accept => {
-                let enable_monitor = prompt_enable("monitor");
-                let enable_talkback = prompt_enable("talkback");
+                let enable_monitor = ctx.prompt_for_acceptance(
+                    "Enable monitor",
+                    Some("monitor will be ENABLED"),
+                    Some("monitor will be DISABLED"),
+                );
+                let enable_talkback = ctx.prompt_for_acceptance(
+                    "Enable talkback",
+                    Some("talkback will be ENABLED"),
+                    Some("talkback will be DISABLED"),
+                );
 
                 future::Either::B(
                     endpoint
@@ -41,15 +50,4 @@ impl Section {
             }
         }
     }
-}
-
-fn prompt_enable(func: &str) -> bool {
-    let enabled = promptly::prompt_default(format!("Enable {}", func), true);
-    eprintln!(
-        "\t{} will be {}",
-        func,
-        if enabled { "ENABLED" } else { "DISABLED" }
-    );
-
-    enabled
 }

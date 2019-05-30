@@ -69,7 +69,9 @@ pub struct CliCtx {
     rpc_addr: (String, u16),
     data_dir: PathBuf,
     json_output: bool,
+    accept_any_prompt: bool,
     net: Option<Net>,
+    interactive: bool,
 }
 
 impl TryFrom<&CliArgs> for CliCtx {
@@ -80,12 +82,16 @@ impl TryFrom<&CliArgs> for CliCtx {
         let rpc_addr = value.get_rcp_address()?;
         let json_output = value.json;
         let net = value.net.clone();
+        let accept_any_prompt = value.accept_any_prompt;
+        let interactive = value.interactive;
 
         Ok(CliCtx {
             rpc_addr,
             data_dir,
             json_output,
+            accept_any_prompt,
             net,
+            interactive,
         })
     }
 }
@@ -150,6 +156,25 @@ impl CliCtx {
                 }
             }
         }
+    }
+
+    pub fn prompt_for_acceptance(
+        &self,
+        msg: &str,
+        msg_on_accept: Option<&str>,
+        msg_on_reject: Option<&str>,
+    ) -> bool {
+        if self.accept_any_prompt && !self.interactive {
+            return true;
+        }
+        let enabled = promptly::prompt_default(msg, true);
+
+        if enabled && msg_on_accept.is_some() {
+            eprintln!("\t {}", msg_on_accept.unwrap());
+        } else if !enabled && msg_on_reject.is_some() {
+            eprintln!("\t {}", msg_on_reject.unwrap());
+        }
+        enabled
     }
 }
 
