@@ -1,6 +1,6 @@
 use futures::{future, prelude::*};
 use std::fmt;
-use std::path::{Display, Path};
+use std::path::{Path};
 use std::str::FromStr;
 
 #[derive(Clone, Debug)]
