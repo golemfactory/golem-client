@@ -1,10 +1,10 @@
 use crate::error::Error;
 use crate::messages::{Dict, WampError};
-use serde_json::Value;
-use futures::prelude::*;
 use actix::Message;
-use std::borrow::Cow;
+use futures::prelude::*;
 use futures::sync::mpsc;
+use serde_json::Value;
+use std::borrow::Cow;
 
 pub struct WampMessage {
     pub args: Vec<Value>,
@@ -12,13 +12,13 @@ pub struct WampMessage {
 }
 
 pub trait PubSubEndpoint {
-    type Events : Stream<Item=WampMessage, Error=Error> + Clone;
+    type Events: Stream<Item = WampMessage, Error = Error> + Clone;
 
-    fn subscribe(uri : &str) -> Self::Events;
+    fn subscribe(uri: &str) -> Self::Events;
 }
 
 pub struct Unsubscribe {
-    pub subscription_id : u64
+    pub subscription_id: u64,
 }
 
 impl Message for Unsubscribe {
@@ -26,7 +26,7 @@ impl Message for Unsubscribe {
 }
 
 pub struct Subscribe {
-    topic : Cow<'static, str>
+    topic: Cow<'static, str>,
 }
 
 impl Message for Subscribe {
@@ -34,9 +34,9 @@ impl Message for Subscribe {
 }
 
 pub struct Subscription {
-    subscription_id : u64,
-    stream : mpsc::UnboundedReceiver<Result<WampMessage, WampError>>,
-    connection : actix::Recipient<Unsubscribe>
+    subscription_id: u64,
+    stream: mpsc::UnboundedReceiver<Result<WampMessage, WampError>>,
+    connection: actix::Recipient<Unsubscribe>,
 }
 
 impl Drop for Subscription {
@@ -56,7 +56,7 @@ impl Stream for Subscription {
             Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
             Ok(Async::Ready(Some(Err(e)))) => Err(Error::WampError(e)),
             Ok(Async::Ready(Some(Ok(message)))) => Ok(Async::Ready(Some(message))),
-            Err(_) => Err(Error::ConnectionClosed)
+            Err(_) => Err(Error::ConnectionClosed),
         }
     }
 }

@@ -96,4 +96,3 @@ pub trait RpcEndpoint {
 
     fn rpc_call(&self, request: RpcCallRequest) -> Self::Response;
 }
-

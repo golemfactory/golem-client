@@ -3,8 +3,8 @@ mod auth;
 pub(crate) mod connection;
 mod error;
 mod messages;
-mod transport;
 mod pubsub;
+mod transport;
 
 pub use messages::ErrorKind;
 
