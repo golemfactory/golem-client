@@ -96,6 +96,41 @@ impl TryFrom<&CliArgs> for CliCtx {
     }
 }
 
+fn wait_for_server(
+    rpc: impl actix_wamp::RpcEndpoint + Clone + 'static,
+) -> impl Future<Item = bool, Error = actix_wamp::Error> {
+    use actix_wamp::{Error, ErrorKind, WampError};
+    use futures::{future, prelude::*};
+
+    eprintln!("Waiting for server start");
+
+    future::loop_fn(rpc, |rpc| {
+        rpc.as_golem()
+            .is_account_unlocked()
+            .and_then(move |is_unlocked| {
+                if is_unlocked {
+                    future::Either::B(rpc.as_golem().status().then(|r| match r {
+                        Ok(status) => {
+                            sleep(Duration::from_secs(1));
+                            //Ok(future::Loop::Continue(rpc))
+                            Ok(future::Loop::Break(true))
+                        }
+                        Err(actix_wamp::Error::WampError(WampError {
+                            code: ErrorKind::NoSuchProcedure,
+                            ..
+                        })) => {
+                            sleep(Duration::from_secs(1));
+                            Ok(future::Loop::Continue(rpc))
+                        }
+                        Err(e) => Err(e),
+                    }))
+                } else {
+                    future::Either::A(future::ok(future::Loop::Break(false)))
+                }
+            })
+    })
+}
+
 impl CliCtx {
     pub fn connect_to_app(
         &mut self,
@@ -108,6 +143,51 @@ impl CliCtx {
             self.net.clone(),
             Some((address.as_str(), *port)),
         ))?;
+
+        let is_unlocked = sys.block_on(endpoint.as_golem().is_account_unlocked())?;
+        let mut wait_for_start = false;
+
+        if !is_unlocked {
+            eprintln!("account locked");
+            let password = rpassword::read_password_from_tty(Some(
+                "Unlock your account to start golem\n\
+                 This command will time out in 30 seconds.\n\
+                 Password: ",
+            ))?;
+            let is_valid_password = sys.block_on(endpoint.as_golem().set_password(password))?;
+            if !is_valid_password {
+                return Err(failure::err_msg("invalid password"));
+            }
+            wait_for_start = true;
+        }
+
+        let are_terms_accepted = sys.block_on(endpoint.as_golem_terms().are_terms_accepted())?;
+
+        if !are_terms_accepted {
+            use crate::terms::*;
+            use promptly::Promptable;
+            eprintln!("Terms is not accepted");
+
+            loop {
+                match TermsQuery::prompt("Accept terms ? [(s)how / (a)ccept / (r)eject]") {
+                    TermsQuery::Show => {
+                        eprintln!("{}", sys.block_on(get_terms_text(&endpoint))?);
+                    }
+                    TermsQuery::Reject => {
+                        return Err(failure::err_msg("terms not accepted"));
+                    }
+                    TermsQuery::Accept => {
+                        let _ = sys.block_on(endpoint.as_golem_terms().accept_terms(None, None))?;
+                        wait_for_start = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if wait_for_start {
+            let _ = sys.block_on(wait_for_server(endpoint.clone()))?;
+        }
 
         Ok((sys, endpoint))
     }
@@ -235,8 +315,12 @@ fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
     let _ = table.printstd();
 }
 
+use golem_rpc_api::core::AsGolemCore;
+use golem_rpc_api::terms::AsGolemTerms;
 use golem_rpc_api::Net;
 use prettytable::{format, format::TableFormat, Table};
+use std::thread::sleep;
+use std::time::Duration;
 lazy_static::lazy_static! {
 
     pub static ref FORMAT_BASIC: TableFormat = format::FormatBuilder::new()

@@ -10,6 +10,7 @@ pub use messages::ErrorKind;
 pub use auth::wampcra::challenge_response_auth;
 pub use auth::AuthMethod;
 pub use error::Error;
+pub use messages::WampError;
 pub use transport::{wss, ClientError};
 
 pub use args::{RpcCallRequest, RpcCallResponse, RpcEndpoint, ToArgs};
