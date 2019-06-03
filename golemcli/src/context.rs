@@ -110,7 +110,7 @@ fn wait_for_server(
             .and_then(move |is_unlocked| {
                 if is_unlocked {
                     future::Either::B(rpc.as_golem().status().then(|r| match r {
-                        Ok(status) => {
+                        Ok(_) => {
                             sleep(Duration::from_secs(1));
                             //Ok(future::Loop::Continue(rpc))
                             Ok(future::Loop::Break(true))
@@ -177,12 +177,27 @@ impl CliCtx {
                         return Err(failure::err_msg("terms not accepted"));
                     }
                     TermsQuery::Accept => {
-                        let _ = sys.block_on(endpoint.as_golem_terms().accept_terms(None, None))?;
-                        wait_for_start = true;
                         break;
                     }
                 }
             }
+            let enable_monitor = self.prompt_for_acceptance(
+                "Enable monitor",
+                Some("monitor will be ENABLED"),
+                Some("monitor will be DISABLED"),
+            );
+            let enable_talkback = self.prompt_for_acceptance(
+                "Enable talkback",
+                Some("talkback will be ENABLED"),
+                Some("talkback will be DISABLED"),
+            );
+
+            let _ = sys.block_on(
+                endpoint
+                    .as_golem_terms()
+                    .accept_terms(Some(enable_monitor), Some(enable_talkback)),
+            )?;
+            wait_for_start = true;
         }
 
         if wait_for_start {

@@ -4,6 +4,7 @@ pub(crate) mod connection;
 mod error;
 mod messages;
 mod transport;
+mod pubsub;
 
 pub use messages::ErrorKind;
 
