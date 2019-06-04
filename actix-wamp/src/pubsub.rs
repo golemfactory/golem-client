@@ -12,9 +12,9 @@ pub struct WampMessage {
 }
 
 pub trait PubSubEndpoint {
-    type Events: Stream<Item = WampMessage, Error = Error> + Clone;
+    type Events: Stream<Item = WampMessage, Error = Error>;
 
-    fn subscribe(uri: &str) -> Self::Events;
+    fn subscribe(&mut self, uri: &str) -> Self::Events;
 }
 
 pub struct Unsubscribe {
@@ -26,7 +26,7 @@ impl Message for Unsubscribe {
 }
 
 pub struct Subscribe {
-    topic: Cow<'static, str>,
+    pub topic: Cow<'static, str>,
 }
 
 impl Message for Subscribe {

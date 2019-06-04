@@ -3,7 +3,7 @@ mod auth;
 pub(crate) mod connection;
 mod error;
 mod messages;
-mod pubsub;
+pub(crate) mod pubsub;
 mod transport;
 
 pub use messages::ErrorKind;
@@ -12,6 +12,7 @@ pub use auth::wampcra::challenge_response_auth;
 pub use auth::AuthMethod;
 pub use error::Error;
 pub use messages::WampError;
+pub use pubsub::PubSubEndpoint;
 pub use transport::{wss, ClientError};
 
 pub use args::{RpcCallRequest, RpcCallResponse, RpcEndpoint, ToArgs};
@@ -43,7 +44,7 @@ impl SessionBuilder {
     pub fn create<Transport>(
         self,
         transport: Transport,
-    ) -> impl Future<Item = impl RpcEndpoint + Clone, Error = Error>
+    ) -> impl Future<Item = impl RpcEndpoint + PubSubEndpoint + Clone, Error = Error>
     where
         Transport: futures::Sink<
                 SinkItem = actix_http::ws::Message,
@@ -70,7 +71,7 @@ impl SessionBuilder {
         self,
         host: &str,
         port: u16,
-    ) -> impl Future<Item = impl RpcEndpoint + Clone, Error = Error> {
+    ) -> impl Future<Item = impl RpcEndpoint + PubSubEndpoint + Clone, Error = Error> {
         wss(host, port)
             .map_err(|e| Error::WsClientError(format!("{}", e)))
             .and_then(move |(transport, _hash)| self.create(transport))

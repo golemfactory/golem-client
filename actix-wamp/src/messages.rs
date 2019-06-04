@@ -18,6 +18,11 @@ pub mod types {
     pub const ERROR: u8 = 08;
     pub const PUBLISH: u8 = 16;
     pub const PUBLISHED: u8 = 17;
+    pub const SUBSCRIBE: u8 = 32;
+    pub const SUBSCRIBED: u8 = 33;
+    pub const UNSUBSCRIBE: u8 = 34;
+    pub const UNSUBSCRIBED: u8 = 35;
+    pub const EVENT: u8 = 36;
     pub const CALL: u8 = 48;
     pub const CANCEL: u8 = 49;
     pub const RESULT: u8 = 50;

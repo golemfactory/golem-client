@@ -1,20 +1,25 @@
 use super::messages::types::*;
 use crate::args::*;
 use crate::error::Error;
-use crate::messages::Dict;
+use crate::messages::{Dict, WampError};
+use crate::pubsub;
 use crate::{AuthMethod, ErrorKind};
 use actix::io::WriteHandler;
 use actix::prelude::*;
 use actix_http::ws;
 use futures::prelude::*;
 use futures::stream::SplitSink;
+use futures::sync::mpsc;
 use futures::unsync::oneshot;
 use serde::Serialize;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Cursor;
 
 use crate::args::RpcEndpoint;
 
+use crate::pubsub::WampMessage;
+use futures::{Flatten, FlattenStream, IntoStream};
 use std::convert::TryInto;
 //use crate::messages::types as msg_type;
 
@@ -44,6 +49,8 @@ where
     state: ConnectionState,
 }
 
+type SubSender = mpsc::UnboundedSender<Result<pubsub::WampMessage, WampError>>;
+
 enum ConnectionState {
     Closed,
     Establishing {
@@ -58,6 +65,8 @@ enum ConnectionState {
         #[allow(dead_code)]
         session_id: u64,
         pending_calls: HashMap<u64, CallDesc>,
+        subscribers: HashMap<u64, SubSender>,
+        pending_subscriptions: HashMap<u64, oneshot::Sender<Result<u64, Error>>>,
     },
     Failed,
 }
@@ -155,6 +164,8 @@ where
             ConnectionState::Established {
                 session_id,
                 pending_calls: HashMap::new(),
+                subscribers: HashMap::new(),
+                pending_subscriptions: HashMap::new(),
             },
         );
         match old_state {
@@ -188,6 +199,39 @@ where
                 args,
                 kw_args: None,
             }));
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn subscribers(&mut self) -> Result<&mut HashMap<u64, SubSender>, Error> {
+        match &mut self.state {
+            ConnectionState::Established { subscribers, .. } => Ok(subscribers),
+            _ => Err(Error::InvalidState("session is closed or pending")),
+        }
+    }
+
+    fn handle_event(
+        &mut self,
+        sub_id: u64,
+        pub_id: u64,
+        args: Option<&rmpv::Value>,
+        kwargs: Option<&rmpv::Value>,
+    ) -> Result<(), Error> {
+        if let Some(tx) = self.subscribers()?.get_mut(&sub_id) {
+            let args = args
+                .and_then(|args| serde_json::to_value(args).ok())
+                .and_then(|args| args.as_array().cloned())
+                .unwrap_or_default();
+
+            // TODO: catch kw_args
+
+            let _ = tx.send(Ok(WampMessage {
+                args,
+                kw_args: None,
+            }));
+        } else {
+            log::warn!("unhandled event: subscription_id={}", sub_id);
         }
         Ok(())
     }
@@ -313,6 +357,15 @@ where
                     RESULT => {
                         let _ =
                             self.handle_result(value[1].as_u64().unwrap(), Some(value[3].clone()));
+                    }
+                    EVENT => {
+                        //[EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]
+                        let subscription_id = value[1].as_u64().unwrap();
+                        let publication_id = value[1].as_u64().unwrap();
+                        let args = value.as_array().and_then(|a| a.get(4));
+                        let kwargs = value.as_array().and_then(|a| a.get(5));
+                        self.handle_event(subscription_id, publication_id, args, kwargs)
+                            .unwrap();
                     }
                     ERROR => {
                         // There are 2 formats
@@ -513,5 +566,38 @@ where
             Err(e) => Err(Error::MailboxError(e)),
             Ok(v) => v,
         }))
+    }
+}
+
+impl<Transport> super::PubSubEndpoint for Addr<Connection<SplitSink<Transport>>>
+where
+    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
+        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+        + 'static,
+{
+    type Events =
+        FlattenStream<Flatten<Request<Connection<SplitSink<Transport>>, crate::pubsub::Subscribe>>>;
+
+    fn subscribe(&mut self, uri: &str) -> Self::Events {
+        self.send(crate::pubsub::Subscribe {
+            topic: Cow::Owned(uri.into()),
+        })
+        .flatten()
+        .flatten_stream()
+    }
+}
+
+impl<Transport> Handler<crate::pubsub::Subscribe> for Connection<SplitSink<Transport>>
+where
+    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
+        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+        + 'static,
+{
+    type Result = Result<crate::pubsub::Subscription, Error>;
+
+    fn handle(&mut self, msg: crate::pubsub::Subscribe, ctx: &mut Self::Context) -> Self::Result {
+        //let (tx, rx) = mpsc::unbounded();
+
+        unimplemented!()
     }
 }
