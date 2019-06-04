@@ -73,6 +73,6 @@ impl SessionBuilder {
     ) -> impl Future<Item = impl RpcEndpoint + Clone, Error = Error> {
         wss(host, port)
             .map_err(|e| Error::WsClientError(format!("{}", e)))
-            .and_then(move |(transport, hash)| self.create(transport))
+            .and_then(move |(transport, _hash)| self.create(transport))
     }
 }

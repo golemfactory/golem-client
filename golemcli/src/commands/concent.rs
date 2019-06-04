@@ -49,6 +49,6 @@ impl Section {
         &self,
         _endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        futures::future::err(unimplemented!())
+        futures::future::err(failure::err_msg("unimplemented"))
     }
 }

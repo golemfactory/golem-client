@@ -115,7 +115,6 @@ where
     }
 
     fn handle_challenge(&mut self, auth_method: &str, extra: &Dict) -> Result<(), Error> {
-        use crate::messages::types::AUTHENTICATE;
         let (auth_methods, auth_id, tx) = match &mut self.state {
             ConnectionState::Establishing {
                 auth, auth_id, tx, ..
@@ -373,7 +372,7 @@ where
         }: OpenSession,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        use crate::messages::{types::HELLO, HelloSpec, Role, RoleDesc};
+        use crate::messages::{HelloSpec, Role, RoleDesc};
 
         // check state
         match self.state {
