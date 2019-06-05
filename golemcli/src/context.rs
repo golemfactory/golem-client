@@ -97,38 +97,18 @@ impl TryFrom<&CliArgs> for CliCtx {
 }
 
 fn wait_for_server(
-    rpc: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    endpoint: impl actix_wamp::PubSubEndpoint + Clone + 'static,
 ) -> impl Future<Item = bool, Error = actix_wamp::Error> {
-    use actix_wamp::{Error, ErrorKind, WampError};
-    use futures::{future, prelude::*};
+    use futures::stream::Stream;
 
     eprintln!("Waiting for server start");
-
-    future::loop_fn(rpc, |rpc| {
-        rpc.as_golem()
-            .is_account_unlocked()
-            .and_then(move |is_unlocked| {
-                if is_unlocked {
-                    future::Either::B(rpc.as_golem().status().then(|r| match r {
-                        Ok(_) => {
-                            sleep(Duration::from_secs(1));
-                            //Ok(future::Loop::Continue(rpc))
-                            Ok(future::Loop::Break(true))
-                        }
-                        Err(actix_wamp::Error::WampError(WampError {
-                            code: ErrorKind::NoSuchProcedure,
-                            ..
-                        })) => {
-                            sleep(Duration::from_secs(1));
-                            Ok(future::Loop::Continue(rpc))
-                        }
-                        Err(e) => Err(e),
-                    }))
-                } else {
-                    future::Either::A(future::ok(future::Loop::Break(false)))
-                }
-            })
-    })
+    endpoint
+        .subscribe("golem.rpc_ready")
+        .into_future()
+        .and_then(|(h, _)| {
+            Ok(true)
+        })
+        .map_err(|(e, _)| e)
 }
 
 impl CliCtx {

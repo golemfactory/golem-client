@@ -6,6 +6,7 @@ use futures::sync::mpsc;
 use serde_json::Value;
 use std::borrow::Cow;
 
+#[derive(Debug)]
 pub struct WampMessage {
     pub args: Vec<Value>,
     pub kw_args: Option<Dict>,
@@ -14,7 +15,7 @@ pub struct WampMessage {
 pub trait PubSubEndpoint {
     type Events: Stream<Item = WampMessage, Error = Error>;
 
-    fn subscribe(&mut self, uri: &str) -> Self::Events;
+    fn subscribe(&self, uri: &str) -> Self::Events;
 }
 
 pub struct Unsubscribe {
@@ -22,7 +23,7 @@ pub struct Unsubscribe {
 }
 
 impl Message for Unsubscribe {
-    type Result = Result<(), Error>;
+    type Result = ();
 }
 
 pub struct Subscribe {
@@ -34,9 +35,9 @@ impl Message for Subscribe {
 }
 
 pub struct Subscription {
-    subscription_id: u64,
-    stream: mpsc::UnboundedReceiver<Result<WampMessage, WampError>>,
-    connection: actix::Recipient<Unsubscribe>,
+    pub(crate) subscription_id: u64,
+    pub(crate) stream: mpsc::UnboundedReceiver<Result<WampMessage, WampError>>,
+    pub(crate) connection: actix::Recipient<Unsubscribe>,
 }
 
 impl Drop for Subscription {

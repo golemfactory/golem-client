@@ -76,7 +76,7 @@ pub fn connect_to_app(
     data_dir: &Path,
     net: impl Into<Option<Net>>,
     rpc_addr: Option<(&str, u16)>,
-) -> impl Future<Item = impl actix_wamp::RpcEndpoint + Clone, Error = super::Error> {
+) -> impl Future<Item = impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone, Error = super::Error> {
     let (address, port) = rpc_addr.unwrap_or_else(|| ("127.0.0.1", 61000));
     let data_dir = data_dir.to_owned();
     actix_wamp::wss(address, port)

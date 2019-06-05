@@ -188,6 +188,13 @@ where
         }
     }
 
+    fn handle_subscribed(&mut self, request_id: u64, subscription_id : u64) -> Result<(), Error> {
+        self.pending_subscriptions()?.remove(&request_id).and_then(|sender| {
+            sender.send(Ok(subscription_id)).ok()
+        });
+        Ok(())
+    }
+
     fn handle_result(&mut self, call_id: u64, args: Option<rmpv::Value>) -> Result<(), Error> {
         if let Some(CallDesc { tx }) = self.pending_calls()?.remove(&call_id) {
             let args = args
@@ -211,6 +218,19 @@ where
         }
     }
 
+    #[inline]
+    fn pending_subscriptions(
+        &mut self,
+    ) -> Result<&mut HashMap<u64, oneshot::Sender<Result<u64, Error>>>, Error> {
+        match &mut self.state {
+            ConnectionState::Established {
+                pending_subscriptions,
+                ..
+            } => Ok(pending_subscriptions),
+            _ => Err(Error::InvalidState("session is closed or pending")),
+        }
+    }
+
     fn handle_event(
         &mut self,
         sub_id: u64,
@@ -226,7 +246,7 @@ where
 
             // TODO: catch kw_args
 
-            let _ = tx.send(Ok(WampMessage {
+            let _ = tx.unbounded_send(Ok(WampMessage {
                 args,
                 kw_args: None,
             }));
@@ -276,6 +296,7 @@ where
     ) -> Result<(), Error> {
         match request_type.try_into()? {
             CALL => self.handle_error_call(request_id, details, error_uri, args, kwargs),
+            SUBSCRIBE => self.handle_error_subscribe(request_id, details, error_uri, args, kwargs),
             _ => Ok(()),
         }
     }
@@ -297,6 +318,23 @@ where
             let _ = desc
                 .tx
                 .send(Err(Error::from_wamp_error_message(error_uri, args, kwargs)));
+        } else {
+            log::error!("invalid id");
+        }
+        Ok(())
+    }
+
+    fn handle_error_subscribe(
+        &mut self,
+        request_id: u64,
+        _details: &rmpv::Value,
+        error_uri: &str,
+        args: &rmpv::Value,
+        kwargs: &rmpv::Value,
+    ) -> Result<(), Error> {
+        log::info!("handle call: {}", request_id);
+        if let Some(tx) = self.subscribers()?.remove(&request_id) {
+            let _ = tx.unbounded_send(Err(WampError::new(error_uri, args, kwargs)));
         } else {
             log::error!("invalid id");
         }
@@ -358,10 +396,17 @@ where
                         let _ =
                             self.handle_result(value[1].as_u64().unwrap(), Some(value[3].clone()));
                     }
+                    SUBSCRIBED => {
+                        let request_id = value[1].as_u64().unwrap();
+                        let subscription_id = value[2].as_u64().unwrap();
+                        let _ = self.handle_subscribed(request_id, subscription_id);
+
+                    }
+
                     EVENT => {
                         //[EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]
                         let subscription_id = value[1].as_u64().unwrap();
-                        let publication_id = value[1].as_u64().unwrap();
+                        let publication_id = value[2].as_u64().unwrap();
                         let args = value.as_array().and_then(|a| a.get(4));
                         let kwargs = value.as_array().and_then(|a| a.get(5));
                         self.handle_event(subscription_id, publication_id, args, kwargs)
@@ -578,7 +623,7 @@ where
     type Events =
         FlattenStream<Flatten<Request<Connection<SplitSink<Transport>>, crate::pubsub::Subscribe>>>;
 
-    fn subscribe(&mut self, uri: &str) -> Self::Events {
+    fn subscribe(&self, uri: &str) -> Self::Events {
         self.send(crate::pubsub::Subscribe {
             topic: Cow::Owned(uri.into()),
         })
@@ -593,11 +638,51 @@ where
         + Stream<Item = ws::Frame, Error = ws::ProtocolError>
         + 'static,
 {
-    type Result = Result<crate::pubsub::Subscription, Error>;
+    type Result = ActorResponse<Self, crate::pubsub::Subscription, Error>;
 
     fn handle(&mut self, msg: crate::pubsub::Subscribe, ctx: &mut Self::Context) -> Self::Result {
-        //let (tx, rx) = mpsc::unbounded();
+        let (tx, rx) = oneshot::channel();
 
-        unimplemented!()
+        let request_id = gen_id();
+
+        match self.pending_subscriptions() {
+            Ok(pending_subscriptions) => pending_subscriptions.insert(request_id, tx),
+            Err(e) => return ActorResponse::reply(Err(e)),
+        };
+
+        self.send_message(&(SUBSCRIBE, request_id, Dict::default(), msg.topic.as_ref())).unwrap();
+
+        ActorResponse::r#async(
+            rx.from_err()
+                .and_then(|response| response)
+                .into_actor(self)
+                .and_then(|subscription_id, act: &mut Self, ctx: &mut Self::Context| {
+                    let (tx, rx) = mpsc::unbounded();
+                    actix::fut::result((|| {
+                        act.subscribers()?.insert(subscription_id, tx);
+                        Ok(crate::pubsub::Subscription {
+                            subscription_id,
+                            stream: rx,
+                            connection: ctx.address().recipient(),
+                        })
+                    })())
+                }),
+        )
+    }
+}
+
+impl<Transport> Handler<crate::pubsub::Unsubscribe> for Connection<SplitSink<Transport>>
+where
+    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
+        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+        + 'static,
+{
+    type Result = ();
+
+    fn handle(&mut self, msg: crate::pubsub::Unsubscribe, ctx: &mut Self::Context) -> Self::Result {
+        let _ = self.subscribers().and_then(|s| {
+            let _ = s.remove(&msg.subscription_id);
+            Ok(())
+        });
     }
 }

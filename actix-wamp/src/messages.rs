@@ -67,6 +67,40 @@ impl Display for WampError {
     }
 }
 
+impl WampError {
+    pub fn new(uri: &str, args: &rmpv::Value, kwargs: &rmpv::Value) -> Self {
+        let code = ErrorKind::from_uri(uri);
+        let extra: Dict = kwargs
+            .as_map()
+            .map(|v| {
+                v.into_iter()
+                    .filter_map(|(k, v)| {
+                        let key = match k {
+                            rmpv::Value::String(key) => key.clone().into_str()?,
+                            _ => return None,
+                        };
+                        let value = serde_json::to_value(v).ok()?;
+
+                        Some((key, value))
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| Dict::new());
+        let message = extra
+            .get("message")
+            .and_then(|v| v.as_str())
+            .or_else(|| args[0].as_str())
+            .unwrap_or_else(|| code.uri())
+            .to_string();
+
+        WampError {
+            code,
+            message,
+            extra,
+        }
+    }
+}
+
 macro_rules! error_kinds {
     ($(
         $(#[$outer:meta])*
