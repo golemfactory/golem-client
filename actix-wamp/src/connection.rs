@@ -188,10 +188,10 @@ where
         }
     }
 
-    fn handle_subscribed(&mut self, request_id: u64, subscription_id : u64) -> Result<(), Error> {
-        self.pending_subscriptions()?.remove(&request_id).and_then(|sender| {
-            sender.send(Ok(subscription_id)).ok()
-        });
+    fn handle_subscribed(&mut self, request_id: u64, subscription_id: u64) -> Result<(), Error> {
+        self.pending_subscriptions()?
+            .remove(&request_id)
+            .and_then(|sender| sender.send(Ok(subscription_id)).ok());
         Ok(())
     }
 
@@ -400,7 +400,6 @@ where
                         let request_id = value[1].as_u64().unwrap();
                         let subscription_id = value[2].as_u64().unwrap();
                         let _ = self.handle_subscribed(request_id, subscription_id);
-
                     }
 
                     EVENT => {
@@ -650,7 +649,8 @@ where
             Err(e) => return ActorResponse::reply(Err(e)),
         };
 
-        self.send_message(&(SUBSCRIBE, request_id, Dict::default(), msg.topic.as_ref())).unwrap();
+        self.send_message(&(SUBSCRIBE, request_id, Dict::default(), msg.topic.as_ref()))
+            .unwrap();
 
         ActorResponse::r#async(
             rx.from_err()
