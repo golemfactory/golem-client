@@ -105,9 +105,7 @@ fn wait_for_server(
     endpoint
         .subscribe("golem.rpc_ready")
         .into_future()
-        .and_then(|(h, _)| {
-            Ok(true)
-        })
+        .and_then(|(h, _)| Ok(true))
         .map_err(|(e, _)| e)
 }
 
