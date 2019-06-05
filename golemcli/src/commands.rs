@@ -158,40 +158,6 @@ impl CommandSection {
                 CommandSection::Internal
             }
         }
-
-        /*match self {
-            CommandSection::Internal(ref command) => command.run_command(),
-            CommandSection::Account(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-
-            CommandSection::Concent(command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-
-            #[cfg(feature = "debug_cli")]
-            CommandSection::Debug(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-
-            CommandSection::Network(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-            CommandSection::Terms(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-
-            CommandSection::TestTask(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-            _ => unimplemented!()
-        }*/
     }
 }
 

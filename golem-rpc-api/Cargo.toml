@@ -19,6 +19,9 @@ chrono = {version = "0.4.6", features=["serde"]}
 [dependencies.actix-wamp]
 path="../actix-wamp"
 
+[dependencies.tokio-timer]
+version = "0.2.11"
+
 [dependencies.golem-rpc-macros]
 path="../golem-rpc-macros"
 

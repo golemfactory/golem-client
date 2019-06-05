@@ -1,21 +1,30 @@
 language: rust
 os:
-    - linux
-    - osx
+- linux
+- osx
 rust:
-    - stable
-    - beta
+- stable
+- beta
 matrix:
-    allow_failures: beta
-    fast_finish: true
+  allow_failures: beta
+  fast_finish: true
 before_script:
-    - rustup toolchain install stable
-    - rustup component add rustfmt --toolchain stable
-    - rustup component list --toolchain stable
-    - rustup show
+- rustup toolchain install stable
+- rustup component add rustfmt --toolchain stable
+- rustup component list --toolchain stable
+- rustup show
 script:
-    - cargo +stable fmt --all -- --check
-    - cargo build --release
-    - cargo build
-    - RUST_BACKTRACE=1 cargo test
-
+- cargo +stable fmt --all -- --check
+- cargo build --release
+- cargo build
+- RUST_BACKTRACE=1 cargo test
+deploy:
+  provider: releases
+  api_key:
+    secure: XV01n4Kl5KDatGK2r3HMO6C6lvEYVz0yw1QIQlLbOKkJICHEeEfnxEU5ZoipZ7H1/0otteTFdaWD3ucrCoAlB1E6qVphYEbq5hF2ztzPQB3r7hy7jzGIK6S6ladEBhz3uh6Se+MkDCTwi/WYH3snrXPcdKr810J1QAoG7wA3ppG0xkgnQb2ny1o5bM4XoNr2MLEaPJX477uFYUPCTu9HnxiqyiP+d+XLh/7D6RBG5bvkABaxlSBb5TEKo5VFDtmrU+Ils4U2pPt+yZcP5VedM8jPs2PJgaXR7SlBNd0PtuFkm58nKvStH3r/UlKSQOFCOil9S09hkCaVUv8OwaH372fiIBfKr892tnQzEbU0Mfpsqy15cF9HWmbteiW+NS4OE6/C1Fvo4W7G/TaWlF0HbYvxtYu/UkgHlEQYIGpN9IIbFR5jmzm/dvCkbeuJLVlhIMDJEb8leebIKL1W4RLXrud4mf8hRPOn0upbFFmqFP84RxZs7Jh/q9bSuS5t5pCg+51qEqgjo74esHv+UBcTIPT6yriwjjh7n0bsapVIPHLQ1AkBV2M2/9gw48D6WL0PVgxt6O6QKe1encCiIdvkRMfRGbq9+0BNLrjpqnQAEWXV4Yw7vxJ3mLKPVWAQg7hEbirFCKJ6EtsnHF3YZ+snBNVO2gZJBX3KML1LhY+SDpw=
+  file: target/release/golemcli
+  skip_cleanup: true
+  on:
+    repo: golemfactory/golem-client
+    tags: true
+    
