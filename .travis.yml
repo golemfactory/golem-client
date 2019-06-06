@@ -47,6 +47,8 @@ script:
                 cargo build --release 
         fi
 
+        cargo test --all
+
 before_deploy: |
         TARGET_DIR=releases/golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}
         mkdir -p "$TARGET_DIR"
