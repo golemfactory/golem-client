@@ -30,7 +30,6 @@ version = "0.2"
 
 [dependencies.openssl]
 version="0.10.20"
-features=['vendored']
 
 [features]
 default=["settings"]

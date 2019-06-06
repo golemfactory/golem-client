@@ -2,27 +2,77 @@ language: rust
 os:
 - linux
 - osx
+- windows
 rust:
 - stable
-- beta
-matrix:
-  allow_failures: beta
-  fast_finish: true
+addons:
+        apt:
+                packages:
+                        - musl
+                        - musl-dev
+                        - musl-tools
+                        - libssl-dev
+cache: cargo
+dist: xenial
+before_cache:
+        - rm -rf /home/travis/.cargo/registry
 before_script:
+- |
+        if [ "$TRAVIS_OS_NAME" = "windows" ]; then
+                wget https://s3-eu-west-1.amazonaws.com/unlimited.golem.network/openssl/buildenv-x64-windows-static.zip
+                7z x -obuildenv buildenv-x64-windows-static.zip
+                export OPENSSL_DIR=$PWD/buildenv
+                export OPENSSL_STATIC=1
+        fi
+- echo TAG=$TRAVIS_TAG, TRAVIS_OS_NAME=$TRAVIS_OS_NAME
 - rustup toolchain install stable
+- |
+        if [ "$TRAVIS_OS_NAME" = "linux" ] 
+        then
+                rustup target add x86_64-unknown-linux-musl
+        else
+                echo default
+        fi
 - rustup component add rustfmt --toolchain stable
 - rustup component list --toolchain stable
 - rustup show
 script:
 - cargo +stable fmt --all -- --check
-- cargo build --release
-- cargo build
-- RUST_BACKTRACE=1 cargo test
+- |
+        if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+                (cd golemcli && cargo build --target x86_64-unknown-linux-musl --release --features openssl/vendored)
+        elif [ "$TRAVIS_OS_NAME" = "macos" ]; then
+                (cd golemcli && cargo build --release --features openssl/vendored)
+        else
+                cargo build --release 
+        fi
+
+        cargo test --all
+
+before_deploy: |
+        TARGET_DIR=releases/golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}
+        mkdir -p "$TARGET_DIR"
+        if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+                cp target/x86_64-unknown-linux-musl/release/golemcli "$TARGET_DIR/"
+        elif [ "$TRAVIS_OS_NAME" = "windows" ]; then
+                cp target/release/golemcli.exe "$TARGET_DIR/"
+                strip "$TARGET_DIR/golemcli.exe"
+        else
+                cp target/release/golemcli "$TARGET_DIR/"
+                strip "$TARGET_DIR/golemcli"
+        fi
+        ls -al "$TARGET_DIR"
+        if [ "$TRAVIS_OS_NAME" = "windows" ]; then
+                (cd "$TARGET_DIR" && 7z a "../golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.zip" * )
+        else
+                (cd releases && tar czvf "golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.tar.gz" "golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}")
+        fi
 deploy:
   provider: releases
   api_key:
     secure: XV01n4Kl5KDatGK2r3HMO6C6lvEYVz0yw1QIQlLbOKkJICHEeEfnxEU5ZoipZ7H1/0otteTFdaWD3ucrCoAlB1E6qVphYEbq5hF2ztzPQB3r7hy7jzGIK6S6ladEBhz3uh6Se+MkDCTwi/WYH3snrXPcdKr810J1QAoG7wA3ppG0xkgnQb2ny1o5bM4XoNr2MLEaPJX477uFYUPCTu9HnxiqyiP+d+XLh/7D6RBG5bvkABaxlSBb5TEKo5VFDtmrU+Ils4U2pPt+yZcP5VedM8jPs2PJgaXR7SlBNd0PtuFkm58nKvStH3r/UlKSQOFCOil9S09hkCaVUv8OwaH372fiIBfKr892tnQzEbU0Mfpsqy15cF9HWmbteiW+NS4OE6/C1Fvo4W7G/TaWlF0HbYvxtYu/UkgHlEQYIGpN9IIbFR5jmzm/dvCkbeuJLVlhIMDJEb8leebIKL1W4RLXrud4mf8hRPOn0upbFFmqFP84RxZs7Jh/q9bSuS5t5pCg+51qEqgjo74esHv+UBcTIPT6yriwjjh7n0bsapVIPHLQ1AkBV2M2/9gw48D6WL0PVgxt6O6QKe1encCiIdvkRMfRGbq9+0BNLrjpqnQAEWXV4Yw7vxJ3mLKPVWAQg7hEbirFCKJ6EtsnHF3YZ+snBNVO2gZJBX3KML1LhY+SDpw=
-  file: target/release/golemcli
+  file_glob: true
+  file: releases/golemcli-*.*
   skip_cleanup: true
   on:
     repo: golemfactory/golem-client
