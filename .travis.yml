@@ -13,6 +13,7 @@ addons:
                         - musl-tools
                         - libssl-dev
 cache: cargo
+dist: xenial
 before_cache:
         - rm -rf /home/travis/.cargo/registry
 before_script:
@@ -38,9 +39,10 @@ before_script:
 script:
 - cargo +stable fmt --all -- --check
 - |
-        if [ "$TRAVIS_OS_NAME" = "linux" ]
-        then
+        if [ "$TRAVIS_OS_NAME" = "linux" ]; then
                 (cd golemcli && cargo build --target x86_64-unknown-linux-musl --release --features openssl/vendored)
+        elif [ "$TRAVIS_OS_NAME" = "macos" ]; then
+                (cd golemcli && cargo build --release --features openssl/vendored)
         else
                 cargo build --release 
         fi
@@ -52,13 +54,14 @@ before_deploy: |
                 cp target/x86_64-unknown-linux-musl/release/golemcli "$TARGET_DIR/"
         elif [ "$TRAVIS_OS_NAME" = "windows" ]; then
                 cp target/release/golemcli.exe "$TARGET_DIR/"
+                strip "$TARGET_DIR/golemcli.exe"
         else
                 cp target/release/golemcli "$TARGET_DIR/"
+                strip "$TARGET_DIR/golemcli"
         fi
-        strip "$TARGET_DIR/golemcli"
         ls -al "$TARGET_DIR"
         if [ "$TRAVIS_OS_NAME" = "windows" ]; then
-                (cd "$TARGET_DIR" && 7z a "../golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.zip" golemcli)
+                (cd "$TARGET_DIR" && 7z a "../golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.zip" * )
         else
                 (cd releases && tar czvf "golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.tar.gz" "golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}")
         fi
