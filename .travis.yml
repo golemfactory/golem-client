@@ -63,7 +63,7 @@ before_deploy: |
         fi
         ls -al "$TARGET_DIR"
         if [ "$TRAVIS_OS_NAME" = "windows" ]; then
-                (cd "$TARGET_DIR" && 7z a "../golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.zip" golemcli)
+                (cd "$TARGET_DIR" && 7z a "../golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.zip" * )
         else
                 (cd releases && tar czvf "golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.tar.gz" "golemcli-${TRAVIS_OS_NAME}-${TRAVIS_TAG}")
         fi
