@@ -60,6 +60,9 @@ gen_settings! {
 
         /// Enable reporting to golem monitor service.
         enable_monitor : bool,
+
+        /// Enable resources cleaning
+        cleaning_enabled : bool,
     }
 
     struct Requestor {
@@ -83,7 +86,7 @@ gen_settings! {
 
         /// Maximal resource size
         #[unit = "kB"]
-        max_resource_size: usize,
+        max_resource_size: f64,
 
         /// Max memory size
         #[unit = "kB"]
