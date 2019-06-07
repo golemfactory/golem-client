@@ -41,7 +41,7 @@ script:
 - |
         if [ "$TRAVIS_OS_NAME" = "linux" ]; then
                 (cd golemcli && cargo build --target x86_64-unknown-linux-musl --release --features openssl/vendored)
-        elif [ "$TRAVIS_OS_NAME" = "macos" ]; then
+        elif [ "$TRAVIS_OS_NAME" = "osx" ]; then
                 (cd golemcli && cargo build --release --features openssl/vendored)
         else
                 cargo build --release 
