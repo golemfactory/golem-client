@@ -1,27 +1,20 @@
 use super::messages::types::*;
+use crate::args::RpcEndpoint;
 use crate::args::*;
 use crate::error::Error;
 use crate::messages::{Dict, WampError};
 use crate::pubsub;
+use crate::pubsub::WampMessage;
 use crate::{AuthMethod, ErrorKind};
 use actix::io::WriteHandler;
 use actix::prelude::*;
 use actix_http::ws;
-use futures::prelude::*;
-use futures::stream::SplitSink;
-use futures::sync::mpsc;
-use futures::unsync::oneshot;
+use futures::{prelude::*, stream::SplitSink, sync::mpsc, unsync::oneshot, Flatten, FlattenStream};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::io::Cursor;
-
-use crate::args::RpcEndpoint;
-
-use crate::pubsub::WampMessage;
-use futures::{Flatten, FlattenStream, IntoStream};
 use std::convert::TryInto;
-//use crate::messages::types as msg_type;
+use std::io::Cursor;
 
 fn gen_id() -> u64 {
     use rand::Rng;
@@ -234,9 +227,9 @@ where
     fn handle_event(
         &mut self,
         sub_id: u64,
-        pub_id: u64,
+        _pub_id: u64,
         args: Option<&rmpv::Value>,
-        kwargs: Option<&rmpv::Value>,
+        _kwargs: Option<&rmpv::Value>,
     ) -> Result<(), Error> {
         if let Some(tx) = self.subscribers()?.get_mut(&sub_id) {
             let args = args
@@ -639,7 +632,7 @@ where
 {
     type Result = ActorResponse<Self, crate::pubsub::Subscription, Error>;
 
-    fn handle(&mut self, msg: crate::pubsub::Subscribe, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: crate::pubsub::Subscribe, _ctx: &mut Self::Context) -> Self::Result {
         let (tx, rx) = oneshot::channel();
 
         let request_id = gen_id();
@@ -679,7 +672,11 @@ where
 {
     type Result = ();
 
-    fn handle(&mut self, msg: crate::pubsub::Unsubscribe, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: crate::pubsub::Unsubscribe,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         let _ = self.subscribers().and_then(|s| {
             let _ = s.remove(&msg.subscription_id);
             Ok(())

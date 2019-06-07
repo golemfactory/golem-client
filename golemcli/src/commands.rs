@@ -9,7 +9,6 @@ mod concent;
 #[cfg(feature = "debug_cli")]
 mod debug;
 #[cfg(feature = "concent_cli")]
-mod deposit_payments;
 mod envs;
 mod incomes;
 mod network;
@@ -26,7 +25,7 @@ pub enum CommandSection {
     #[structopt(name = "account")]
     Account(account::AccountSection),
 
-    /// Concent Service (unimplemented)
+    /// Concent Service
     #[cfg(feature = "concent_cli")]
     #[structopt(name = "concent")]
     Concent(concent::Section),
@@ -51,11 +50,6 @@ pub enum CommandSection {
     /// Display payments
     #[structopt(name = "payments")]
     Payments(payments::Section),
-
-    /// Display deposit payments
-    #[cfg(feature = "concent_cli")]
-    #[structopt(name = "deposit_payments")]
-    DepositPayments(deposit_payments::Section),
 
     /// Manage resources
     #[structopt(name = "cache")]
@@ -141,8 +135,6 @@ impl CommandSection {
                 CommandSection::Envs,
                 CommandSection::Incomes,
                 CommandSection::Payments,
-                #[cfg(feature = "concent_cli")]
-                CommandSection::DepositPayments,
                 CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,
