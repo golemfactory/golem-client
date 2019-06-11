@@ -12,7 +12,18 @@
 * golem-rpc-api ([api docs](https://golemfactory.github.io/golem-client/latest/golem_rpc_api/index.html)) - Typesafe binding for golemapp rpc services. 
 * golemcli - command line interface for golem. reimplementation.
 
-## Prerequisites (Windows)
+## GolemCLI
+
+### Install or Upgrade
+
+On Unix:
+
+```
+curl -sSf https://golemfactory.github.io/golem-client/install/golemcli-update.sh | bash
+```
+
+
+### Compilation prerequisites (Windows)
 
 This project builds under Windows (validated under VC toolchain), after following prerequisites are installed:
 
