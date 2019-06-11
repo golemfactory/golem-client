@@ -1,200 +1,140 @@
 use crate::context::*;
+use actix::prelude::*;
 use futures::prelude::*;
 use golem_rpc_api::settings::DynamicSetting;
 use golem_rpc_api::{core::AsGolemCore, settings, Map};
 use serde_json::Value;
 use std::collections::btree_map::BTreeMap;
 use std::collections::{HashMap, HashSet};
+use std::io::{self, Write, StdoutLock};
 use structopt::{clap, StructOpt};
+use golem_rpc_api::comp::{AsGolemComp, SubtaskStats};
+use golem_rpc_api::net::{AsGolemNet, NetStatus, PeerInfo};
+use golem_rpc_api::core::ServerStatus;
+use ansi_term::Colour::{Red, Green};
+use ansi_term::Style;
+
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-    /// Change settings (unimplemented)
-    #[structopt(name = "set")]
-    Set {
-        /// Setting name
-        #[structopt(raw(possible_values = "settings::NAMES",))]
-        key: String,
-        /// Setting value
-        value: String,
-    },
-    /// Show current settings
-    #[structopt(name = "show")]
-    //#[structopt(raw(group = "show_opt_group()"))]
-    Show {
-        /// Show basic settings
-        #[structopt(long)]
-        basic: bool,
+    /// Change settings (unimplemented) TODO:
+    #[structopt(name = "status")]
+    Status {
 
-        /// Show provider settings
-        #[structopt(long)]
-        provider: bool,
-
-        /// Show requestor settings
-        #[structopt(long)]
-        requestor: bool,
-    },
+    }
 }
+
+/*
+macro_rules! map {
+    {
+        $()
+        $($key:expr => $value:expr,)+ => { map!($($key => $value),+) };
+
+    };
+};
+*/
+
+#[derive(Debug)]
+struct ComputationStatus {
+    subtasks_accepted: u32,
+    subtasks_rejected: u32,
+    subtasks_failed: u32,
+    subtasks_computed: u32,
+    subtasks_in_network: u32,
+    provider_state: Option<String>
+}
+
+#[derive(Debug)]
+struct FormattedGeneralStatus {
+    net_status: NetStatus,
+    nodes_online: usize,
+    computation_status: ComputationStatus
+}
+
+/*
+pub struct NetStatus {
+    pub listening: bool,
+    pub connected: bool,
+    pub port_statuses: Map<u16, String>,
+    pub msg: String,
+}*/
+
 
 impl Section {
     pub fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
-            &Section::Show {
-                basic,
-                provider,
-                requestor,
-            } => self.show(endpoint, basic, provider, requestor),
-            Section::Set { key, value } => self.set(endpoint, key, value),
+            &Section::Status {} => Box::new(self.status(endpoint))
         }
     }
 
-    pub fn show(
-        &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        basic: bool,
-        provider: bool,
-        requestor: bool,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        Box::new(endpoint.as_golem().get_settings().from_err().and_then(
-            move |settings: Map<String, Value>| {
-                Ok(CommandResponse::FormattedObject({
-                    if basic || provider || requestor {
-                        let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
 
-                        let mut add_settings = |list: Vec<
-                            &'static (dyn DynamicSetting + 'static),
-                        >|
-                         -> Result<(), Error> {
-                            for setting in list {
-                                if let Some(value) = settings.get(setting.name()) {
-                                    filtered_settings.insert(setting.name().into(), value.clone());
-                                }
-                            }
-                            Ok(())
-                        };
+    pub fn status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static)
+        -> impl Future<Item = CommandResponse, Error = Error> + 'static {
 
-                        if basic {
-                            add_settings(settings::general::list().collect())?;
-                        }
-                        if provider {
-                            add_settings(settings::provider::list().collect())?;
-                        }
-                        if requestor {
-                            add_settings(settings::requestor::list().collect())?;
-                        }
+    let online_nodes = endpoint.as_golem_net().get_connected_peers();
+        let connection_status = endpoint.as_golem_net().connection_status();
+        let status = endpoint.as_golem().status();
+        let task_stats = endpoint.as_golem_comp().get_tasks_stats();
+        let x = online_nodes.from_err().join4(connection_status.from_err(), status.from_err(), task_stats.from_err());
 
-                        Box::new(FormattedSettings(filtered_settings))
-                    } else {
-                        Box::new(FormattedSettings(settings))
-                    }
-                }))
-            },
-        ))
-    }
+        let s = x.map(|(connected_nodes, net_status, b, d)| {
 
-    pub fn set(
-        &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        key: &str,
-        value: &str,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        let key = settings::from_name(key).unwrap();
+            let x : Option<String> = d.provider_state.get("status").cloned();
 
-        Box::new(
-            endpoint
-                .as_golem()
-                .update_setting_dyn(key, value)
-                .from_err()
-                .and_then(|()| CommandResponse::object("Updated")),
-        )
+            let computation_status = ComputationStatus{
+                subtasks_accepted: d.subtasks_accepted.session,
+                subtasks_rejected: d.subtasks_rejected.session,
+                subtasks_failed: d.subtasks_with_errors.session,
+                subtasks_computed: d.subtasks_computed.session,
+                subtasks_in_network: d.in_network,
+                provider_state: x
+            };
+
+            let status = FormattedGeneralStatus {
+                net_status: net_status,
+                nodes_online: connected_nodes.len(),
+                computation_status: computation_status
+            };
+            CommandResponse::FormattedObject(Box::new(status))
+        });
+
+        s
     }
 }
 
-struct FormattedSettings(Map<String, Value>);
-
-impl FormattedSettings {
-    fn dump_section(
-        &self,
-        table: &mut prettytable::Table,
-        keys: &mut HashSet<&'static str>,
-        section_name: &str,
-        settings: impl Iterator<Item = &'static dyn DynamicSetting>,
-    ) -> Result<(), Error> {
-        use prettytable::*;
-
-        let mut header = false;
-        for setting in settings {
-            if let Some(v) = self.0.get(setting.name()) {
-                if !header {
-                    table.add_empty_row();
-                    table.add_row(Row::new(vec![Cell::new(section_name)
-                        //                        .with_style(Attr::Dim)
-                        .with_style(Attr::Underline(true))
-                        .with_style(Attr::ForegroundColor(color::YELLOW))]));
-                    table.add_empty_row();
-                    header = true;
-                }
-                table.add_row(row![
-                    format!("{} [{}]", setting.description(), setting.name()),
-                    setting.display_value(v)?,
-                    setting.validation_desc()
-                ]);
-                keys.insert(setting.name());
-            }
-        }
-
-        Ok(())
+impl FormattedGeneralStatus {
+    fn print_network_status(&self, out: &mut Box<io::Stdout>){
+        write!(*out, "{}:\n\tConnected: {}\n\tNumber of nodes in the network: {}\n",
+               Style::new().bold().underline().paint("Network"),
+               if self.net_status.connected {Green.paint("ONLINE") } else {Red.paint("OFFLINE")},
+               self.nodes_online);
+    }
+    fn print_tasks_status(&self, out: &mut Box<io::Stdout>){
+        write!(*out, "{}:\n\tSubtasks accepted (in session): {}\n\t\
+        Subtasks rejected (in session): {}\n\tSubtasks failed (in session): {}\n\tSubtasks computed (in session): {}\n\t\
+        Subtasks in network: {}\n", Style::new().bold().underline().paint("Computation"),
+        self.computation_status.subtasks_accepted, self.computation_status.subtasks_rejected,
+               self.computation_status.subtasks_failed, self.computation_status.subtasks_computed, self.computation_status.subtasks_in_network);
+//        self.computation_status.provider_state.unwrap_or(String::from("Unknown"))
     }
 }
 
-impl FormattedObject for FormattedSettings {
+impl FormattedObject for FormattedGeneralStatus {
     fn to_json(&self) -> Result<Value, Error> {
-        Ok(serde_json::to_value(&self.0)?)
+        Ok(serde_json::from_str("{}").unwrap())
     }
 
     fn print(&self) -> Result<(), Error> {
-        use prettytable::*;
+        let mut stdout = Box::new(io::stdout());
 
-        let mut table = create_table(vec!["description [name]", "value", "type"]);
-        let mut keys = HashSet::new();
-
-        self.dump_section(&mut table, &mut keys, "General", settings::general::list())?;
-        self.dump_section(
-            &mut table,
-            &mut keys,
-            "Requestor",
-            settings::requestor::list(),
-        )?;
-        self.dump_section(
-            &mut table,
-            &mut keys,
-            "Provider",
-            settings::provider::list(),
-        )?;
-
-        table.add_empty_row();
-        table.add_row(Row::new(vec![Cell::new("Other")
-            .with_style(Attr::Underline(true))
-            .with_style(Attr::ForegroundColor(color::YELLOW))]));
-        table.add_empty_row();
-        table.add_empty_row();
-        for (name, value) in &self.0 {
-            if !keys.contains(name.as_str()) {
-                if let Some(setting) = settings::from_name(name) {
-                    table.add_row(row![
-                        format!("{} [{}]", setting.description(), setting.name()),
-                        setting.display_value(value)?,
-                        setting.validation_desc()
-                    ]);
-                } else {
-                    table.add_row(row![name, value, ""]);
-                }
-            }
-        }
-        table.printstd();
+        self.print_network_status(&mut stdout);
+        self.print_tasks_status(&mut stdout);
         Ok(())
+//        let mut stdout = stdout.lock(); // blokowac?
+////        io::stdout().write();
+//        let mut s = String::new();  // reserve, stream
     }
 }

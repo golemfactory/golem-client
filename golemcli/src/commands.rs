@@ -17,6 +17,7 @@ mod payments;
 mod settings;
 mod tasks;
 mod terms;
+mod status;
 #[cfg(feature = "test_task_cli")]
 mod test_task;
 
@@ -68,6 +69,10 @@ pub enum CommandSection {
     /// Manage tasks
     #[structopt(name = "tasks")]
     Tasks(tasks::Section),
+
+    /// Display general status
+    #[structopt(name = "status")]
+    Status(status::Section),
 
     /// Show and accept terms of use
     #[structopt(name = "terms")]
@@ -146,6 +151,7 @@ impl CommandSection {
                 CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,
+                CommandSection::Status,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
 
