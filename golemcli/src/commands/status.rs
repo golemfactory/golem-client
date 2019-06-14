@@ -16,12 +16,7 @@ use ansi_term::Style;
 
 
 #[derive(StructOpt, Debug)]
-pub enum Section {
-    /// Change settings (unimplemented) TODO:
-    #[structopt(name = "status")]
-    Status {
-
-    }
+pub struct Section {
 }
 
 /*
@@ -65,9 +60,7 @@ impl Section {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        match self {
-            &Section::Status {} => Box::new(self.status(endpoint))
-        }
+        Box::new(self.status(endpoint))
     }
 
 
@@ -106,18 +99,18 @@ impl Section {
 }
 
 impl FormattedGeneralStatus {
-    fn print_network_status(&self, out: &mut Box<io::Stdout>){
-        write!(*out, "{}:\n\tConnected: {}\n\tNumber of nodes in the network: {}\n",
+    fn print_network_status(&self, out: &mut io::Stdout) -> io::Result<()> {
+        write!(out, "{}:\n\tConnected: {}\n\tNumber of nodes in the network: {}\n",
                Style::new().bold().underline().paint("Network"),
                if self.net_status.connected {Green.paint("ONLINE") } else {Red.paint("OFFLINE")},
-               self.nodes_online);
+               self.nodes_online)
     }
-    fn print_tasks_status(&self, out: &mut Box<io::Stdout>){
-        write!(*out, "{}:\n\tSubtasks accepted (in session): {}\n\t\
+    fn print_tasks_status(&self, out: &mut io::Stdout) -> io::Result<()> {
+        write!(out, "{}:\n\tSubtasks accepted (in session): {}\n\t\
         Subtasks rejected (in session): {}\n\tSubtasks failed (in session): {}\n\tSubtasks computed (in session): {}\n\t\
         Subtasks in network: {}\n", Style::new().bold().underline().paint("Computation"),
         self.computation_status.subtasks_accepted, self.computation_status.subtasks_rejected,
-               self.computation_status.subtasks_failed, self.computation_status.subtasks_computed, self.computation_status.subtasks_in_network);
+               self.computation_status.subtasks_failed, self.computation_status.subtasks_computed, self.computation_status.subtasks_in_network)
 //        self.computation_status.provider_state.unwrap_or(String::from("Unknown"))
     }
 }
@@ -128,10 +121,10 @@ impl FormattedObject for FormattedGeneralStatus {
     }
 
     fn print(&self) -> Result<(), Error> {
-        let mut stdout = Box::new(io::stdout());
+        let mut stdout = io::stdout();
 
-        self.print_network_status(&mut stdout);
-        self.print_tasks_status(&mut stdout);
+        self.print_network_status(&mut stdout)?;
+        self.print_tasks_status(&mut stdout)?;
         Ok(())
 //        let mut stdout = stdout.lock(); // blokowac?
 ////        io::stdout().write();
