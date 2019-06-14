@@ -93,8 +93,9 @@ macro_rules! dispatch_subcommand {
         on ($self:expr, $ctx:expr);
         $(async {
             $(
-            $(#[$async_meta:meta])*
-            $async_command:path,)*
+                $(#[$async_meta:meta])*
+                $async_command:path
+            ,)*
         })?
         $(async_with_cxt {
             $(

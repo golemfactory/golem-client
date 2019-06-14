@@ -13,6 +13,7 @@ use golem_rpc_api::net::{AsGolemNet, NetStatus, PeerInfo};
 use golem_rpc_api::core::ServerStatus;
 use ansi_term::Colour::{Red, Green};
 use ansi_term::Style;
+use crate::component_response::map_statuses;
 
 
 #[derive(StructOpt, Debug)]
@@ -24,15 +25,19 @@ pub enum Section {
     }
 }
 
-/*
-macro_rules! map {
-    {
-        $()
-        $($key:expr => $value:expr,)+ => { map!($($key => $value),+) };
 
-    };
-};
-*/
+//macro_rules! map_statuses {
+//    ($component:expr, $method:expr, $stage:expr) => {
+//          let x = include_str!("../component_response.rs");
+//          map_statuses_! {
+//            on($component, $method, $stage);
+//
+//        }
+//    }
+//
+//}
+
+
 
 #[derive(Debug)]
 struct ComputationStatus {
@@ -48,7 +53,8 @@ struct ComputationStatus {
 struct FormattedGeneralStatus {
     net_status: NetStatus,
     nodes_online: usize,
-    computation_status: ComputationStatus
+    computation_status: ComputationStatus,
+    components_status: ServerStatus
 }
 
 /*
@@ -76,11 +82,11 @@ impl Section {
 
     let online_nodes = endpoint.as_golem_net().get_connected_peers();
         let connection_status = endpoint.as_golem_net().connection_status();
-        let status = endpoint.as_golem().status();
+        let component_status = endpoint.as_golem().status();
         let task_stats = endpoint.as_golem_comp().get_tasks_stats();
-        let x = online_nodes.from_err().join4(connection_status.from_err(), status.from_err(), task_stats.from_err());
+        let x = online_nodes.from_err().join4(connection_status.from_err(), component_status.from_err(), task_stats.from_err());
 
-        let s = x.map(|(connected_nodes, net_status, b, d)| {
+        let s = x.map(|(connected_nodes, net_status, component_status, d)| {
 
             let x : Option<String> = d.provider_state.get("status").cloned();
 
@@ -93,10 +99,12 @@ impl Section {
                 provider_state: x
             };
 
+
             let status = FormattedGeneralStatus {
                 net_status: net_status,
                 nodes_online: connected_nodes.len(),
-                computation_status: computation_status
+                computation_status: computation_status,
+                components_status: component_status
             };
             CommandResponse::FormattedObject(Box::new(status))
         });
@@ -120,6 +128,18 @@ impl FormattedGeneralStatus {
                self.computation_status.subtasks_failed, self.computation_status.subtasks_computed, self.computation_status.subtasks_in_network);
 //        self.computation_status.provider_state.unwrap_or(String::from("Unknown"))
     }
+
+    fn print_component_status(&self, out: &mut Box<io::Stdout>) {
+        let component = "0";
+        let method = "0";
+        let stage = "0";
+
+        let docker_status =
+            self.components_status.docker.map_or_else(|| "", |component_report| map_statuses("docker", component_report.0, component_report.1));
+
+        println!("Component status = {:?}", self.components_status);
+        println!("docker status = {:?}", self.components_status.docker);
+    }
 }
 
 impl FormattedObject for FormattedGeneralStatus {
@@ -128,12 +148,14 @@ impl FormattedObject for FormattedGeneralStatus {
     }
 
     fn print(&self) -> Result<(), Error> {
-        let mut stdout = Box::new(io::stdout());
+        let mut stdout = Box::new(io::stdout()); // Why I box that?
 
         self.print_network_status(&mut stdout);
         self.print_tasks_status(&mut stdout);
+        self.print_component_status(&mut stdout);
+
         Ok(())
-//        let mut stdout = stdout.lock(); // blokowac?
+//        let mut stdout = stdout.lock(); // blokowac, buforowac?
 ////        io::stdout().write();
 //        let mut s = String::new();  // reserve, stream
     }

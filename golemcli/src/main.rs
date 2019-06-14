@@ -13,6 +13,9 @@ pub(crate) mod commands;
 pub(crate) mod context;
 pub(crate) mod eth;
 
+#[macro_use]
+pub(crate) mod component_response;
+
 #[cfg(feature = "interactive_cli")]
 mod interactive;
 
