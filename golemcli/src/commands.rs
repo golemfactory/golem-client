@@ -9,7 +9,6 @@ mod concent;
 #[cfg(feature = "debug_cli")]
 mod debug;
 #[cfg(feature = "concent_cli")]
-mod deposit_payments;
 mod envs;
 mod incomes;
 mod network;
@@ -27,7 +26,7 @@ pub enum CommandSection {
     #[structopt(name = "account")]
     Account(account::AccountSection),
 
-    /// Concent Service (unimplemented)
+    /// Concent Service
     #[cfg(feature = "concent_cli")]
     #[structopt(name = "concent")]
     Concent(concent::Section),
@@ -52,11 +51,6 @@ pub enum CommandSection {
     /// Display payments
     #[structopt(name = "payments")]
     Payments(payments::Section),
-
-    /// Display deposit payments
-    #[cfg(feature = "concent_cli")]
-    #[structopt(name = "deposit_payments")]
-    DepositPayments(deposit_payments::Section),
 
     /// Manage resources
     #[structopt(name = "cache")]
@@ -146,8 +140,6 @@ impl CommandSection {
                 CommandSection::Envs,
                 CommandSection::Incomes,
                 CommandSection::Payments,
-                #[cfg(feature = "concent_cli")]
-                CommandSection::DepositPayments,
                 CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,
@@ -164,40 +156,6 @@ impl CommandSection {
                 CommandSection::Internal
             }
         }
-
-        /*match self {
-            CommandSection::Internal(ref command) => command.run_command(),
-            CommandSection::Account(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-
-            CommandSection::Concent(command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-
-            #[cfg(feature = "debug_cli")]
-            CommandSection::Debug(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-
-            CommandSection::Network(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-            CommandSection::Terms(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-
-            CommandSection::TestTask(ref command) => {
-                let (mut sys, endpoint) = ctx.connect_to_app()?;
-                sys.block_on(command.run(endpoint))
-            }
-            _ => unimplemented!()
-        }*/
     }
 }
 

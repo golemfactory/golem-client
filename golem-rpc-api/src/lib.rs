@@ -5,6 +5,7 @@ pub mod rpc;
 
 pub mod apps;
 pub mod comp;
+pub mod concent;
 pub mod core;
 pub mod net;
 pub mod pay;

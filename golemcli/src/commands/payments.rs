@@ -51,7 +51,7 @@ impl Section {
                     })
                     .map(|payment: Payment| {
                         let subtask = payment.subtask;
-                        let payer = if full {
+                        let payer = if full || payment.payee.len() == 42 {
                             payment.payee
                         } else {
                             crate::eth::public_to_addres(payment.payee)

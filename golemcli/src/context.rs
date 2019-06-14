@@ -96,6 +96,19 @@ impl TryFrom<&CliArgs> for CliCtx {
     }
 }
 
+fn wait_for_server(
+    endpoint: impl actix_wamp::PubSubEndpoint + Clone + 'static,
+) -> impl Future<Item = bool, Error = actix_wamp::Error> {
+    use futures::stream::Stream;
+
+    eprintln!("Waiting for server start");
+    endpoint
+        .subscribe("golem.rpc_ready")
+        .into_future()
+        .and_then(|(_, _)| Ok(true))
+        .map_err(|(e, _)| e)
+}
+
 impl CliCtx {
     pub fn connect_to_app(
         &mut self,
@@ -108,6 +121,66 @@ impl CliCtx {
             self.net.clone(),
             Some((address.as_str(), *port)),
         ))?;
+
+        let is_unlocked = sys.block_on(endpoint.as_golem().is_account_unlocked())?;
+        let mut wait_for_start = false;
+
+        if !is_unlocked {
+            eprintln!("account locked");
+            let password = rpassword::read_password_from_tty(Some(
+                "Unlock your account to start golem\n\
+                 This command will time out in 30 seconds.\n\
+                 Password: ",
+            ))?;
+            let is_valid_password = sys.block_on(endpoint.as_golem().set_password(password))?;
+            if !is_valid_password {
+                return Err(failure::err_msg("invalid password"));
+            }
+            wait_for_start = true;
+        }
+
+        let are_terms_accepted = sys.block_on(endpoint.as_golem_terms().are_terms_accepted())?;
+
+        if !are_terms_accepted {
+            use crate::terms::*;
+            use promptly::Promptable;
+            eprintln!("Terms is not accepted");
+
+            loop {
+                match TermsQuery::prompt("Accept terms ? [(s)how / (a)ccept / (r)eject]") {
+                    TermsQuery::Show => {
+                        eprintln!("{}", sys.block_on(get_terms_text(&endpoint))?);
+                    }
+                    TermsQuery::Reject => {
+                        return Err(failure::err_msg("terms not accepted"));
+                    }
+                    TermsQuery::Accept => {
+                        break;
+                    }
+                }
+            }
+            let enable_monitor = self.prompt_for_acceptance(
+                "Enable monitor",
+                Some("monitor will be ENABLED"),
+                Some("monitor will be DISABLED"),
+            );
+            let enable_talkback = self.prompt_for_acceptance(
+                "Enable talkback",
+                Some("talkback will be ENABLED"),
+                Some("talkback will be DISABLED"),
+            );
+
+            let _ = sys.block_on(
+                endpoint
+                    .as_golem_terms()
+                    .accept_terms(Some(enable_monitor), Some(enable_talkback)),
+            )?;
+            wait_for_start = true;
+        }
+
+        if wait_for_start {
+            let _ = sys.block_on(wait_for_server(endpoint.clone()))?;
+        }
 
         Ok((sys, endpoint))
     }
@@ -235,8 +308,12 @@ fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
     let _ = table.printstd();
 }
 
+use golem_rpc_api::core::AsGolemCore;
+use golem_rpc_api::terms::AsGolemTerms;
 use golem_rpc_api::Net;
 use prettytable::{format, format::TableFormat, Table};
+use std::thread::sleep;
+use std::time::Duration;
 lazy_static::lazy_static! {
 
     pub static ref FORMAT_BASIC: TableFormat = format::FormatBuilder::new()

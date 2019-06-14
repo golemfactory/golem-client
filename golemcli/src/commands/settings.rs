@@ -175,7 +175,7 @@ impl FormattedObject for FormattedSettings {
             settings::provider::list(),
         )?;
 
-        table.add_empty_row();
+        /*table.add_empty_row();
         table.add_row(Row::new(vec![Cell::new("Other")
             .with_style(Attr::Underline(true))
             .with_style(Attr::ForegroundColor(color::YELLOW))]));
@@ -193,7 +193,7 @@ impl FormattedObject for FormattedSettings {
                     table.add_row(row![name, value, ""]);
                 }
             }
-        }
+        }*/
         table.printstd();
         Ok(())
     }
