@@ -14,9 +14,9 @@ mod incomes;
 mod network;
 mod payments;
 mod settings;
+mod status;
 mod tasks;
 mod terms;
-mod status;
 #[cfg(feature = "test_task_cli")]
 mod test_task;
 
@@ -87,8 +87,9 @@ macro_rules! dispatch_subcommand {
         on ($self:expr, $ctx:expr);
         $(async {
             $(
-            $(#[$async_meta:meta])*
-            $async_command:path,)*
+                $(#[$async_meta:meta])*
+                $async_command:path
+            ,)*
         })?
         $(async_with_cxt {
             $(
