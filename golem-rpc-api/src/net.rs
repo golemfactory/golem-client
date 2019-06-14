@@ -1,6 +1,9 @@
 use super::Map;
 use crate::rpc::*;
 use serde_derive::*;
+use std::net::IpAddr;
+use std::time::Duration;
+
 
 rpc_interface! {
 
@@ -36,6 +39,28 @@ rpc_interface! {
         ///
         #[id = "net.peer.block"]
         fn block_node(&self, node_id: String) -> Result<(bool, String)>;
+
+        #[id = "net.peer.block_ip"]
+        fn block_ip(&self, node_id: IpAddr) -> Result<(bool, String)>;
+
+
+        #[id="net.peer.allow_ip"]
+        fn allow_ip(&self, ip : IpAddr, timeout : Option<Duration>) -> Result<()>;
+
+        #[id="net.peer.allow"]
+        fn allow_node(&self, node_id : String, timeout : Option<Duration>) -> Result<()>;
+
+        #[id="net.peer.acl"]
+        fn acl_status(&self) -> Result<AclStatus<String>>;
+
+        #[id="net.peer.acl_ip"]
+        fn acl_ip_status(&self) -> Result<AclStatus<IpAddr>>;
+
+        #[id="net.peer.acl.new"]
+        fn acl_setup(&self, default_rule : AclRule, exceptions : Vec<String>) -> Result<()>;
+
+        #[id="net.peer.acl_ip.new"]
+        fn acl_ip_setup(&self, default_rule : AclRule, exceptions : Vec<IpAddr>) -> Result<()>;
 
         #[id = "net.peers.known"]
         fn get_known_peers(&self) -> Result<Vec<NodeInfo>>;
@@ -98,4 +123,16 @@ pub struct NetStatus {
     pub connected: bool,
     pub port_statuses: Map<u16, String>,
     pub msg: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AclStatus<Identity> {
+    pub default_rule : AclRule,
+    pub rules : Vec<(Identity, AclRule, Option<chrono::DateTime<chrono::Utc>>)>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all="lowercase")]
+pub enum AclRule {
+    Allow, Deny
 }
