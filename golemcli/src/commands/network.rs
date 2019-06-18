@@ -82,13 +82,13 @@ impl NetworkSection {
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         endpoint
             .as_golem_net()
-            .block_node(node_id.into())
+            .block_node(node_id.into(), -1)
             .from_err()
             .and_then(|(b, msg)| {
                 if b {
                     CommandResponse::object("Command Send")
                 } else {
-                    CommandResponse::object(format!("error: {}", msg))
+                    CommandResponse::object(format!("error: {}", msg.unwrap_or_default()))
                 }
             })
     }
@@ -154,17 +154,4 @@ fn format_peers(
         .collect();
 
     Ok(ResponseTable { columns, values })
-}
-
-fn format_key(s: &str, full: bool) -> String {
-    if full {
-        return s.to_string();
-    }
-
-    let key_size = s.len();
-    if key_size < 32 {
-        s.into()
-    } else {
-        format!("{}...{}", &s[..16], &s[(key_size - 16)..])
-    }
 }

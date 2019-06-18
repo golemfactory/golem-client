@@ -44,6 +44,7 @@ structopt="0.2.15"
 
 # Needed for terams show
 html2text = "0.1.8"
+chrono = {version = "0.4.6", features=["serde"]}
 
 [dependencies.actix-web]
 version = "1.0.0-beta.5"

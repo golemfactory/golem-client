@@ -334,3 +334,16 @@ lazy_static::lazy_static! {
         .padding(2, 2)
         .build();
 }
+
+pub fn format_key(s: &str, full: bool) -> String {
+    if full {
+        return s.to_string();
+    }
+
+    let key_size = s.len();
+    if key_size < 32 {
+        s.into()
+    } else {
+        format!("{}...{}", &s[..16], &s[(key_size - 16)..])
+    }
+}
