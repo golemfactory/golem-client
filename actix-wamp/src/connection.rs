@@ -1,22 +1,20 @@
 use super::messages::types::*;
+use crate::args::RpcEndpoint;
 use crate::args::*;
 use crate::error::Error;
-use crate::messages::Dict;
+use crate::messages::{Dict, WampError};
+use crate::pubsub;
+use crate::pubsub::WampMessage;
 use crate::{AuthMethod, ErrorKind};
 use actix::io::WriteHandler;
 use actix::prelude::*;
 use actix_http::ws;
-use futures::prelude::*;
-use futures::stream::SplitSink;
-use futures::unsync::oneshot;
+use futures::{prelude::*, stream::SplitSink, sync::mpsc, unsync::oneshot, Flatten, FlattenStream};
 use serde::Serialize;
+use std::borrow::Cow;
 use std::collections::HashMap;
-use std::io::Cursor;
-
-use crate::args::RpcEndpoint;
-
 use std::convert::TryInto;
-//use crate::messages::types as msg_type;
+use std::io::Cursor;
 
 fn gen_id() -> u64 {
     use rand::Rng;
@@ -44,6 +42,8 @@ where
     state: ConnectionState,
 }
 
+type SubSender = mpsc::UnboundedSender<Result<pubsub::WampMessage, WampError>>;
+
 enum ConnectionState {
     Closed,
     Establishing {
@@ -58,6 +58,8 @@ enum ConnectionState {
         #[allow(dead_code)]
         session_id: u64,
         pending_calls: HashMap<u64, CallDesc>,
+        subscribers: HashMap<u64, SubSender>,
+        pending_subscriptions: HashMap<u64, oneshot::Sender<Result<u64, Error>>>,
     },
     Failed,
 }
@@ -115,7 +117,6 @@ where
     }
 
     fn handle_challenge(&mut self, auth_method: &str, extra: &Dict) -> Result<(), Error> {
-        use crate::messages::types::AUTHENTICATE;
         let (auth_methods, auth_id, tx) = match &mut self.state {
             ConnectionState::Establishing {
                 auth, auth_id, tx, ..
@@ -156,6 +157,8 @@ where
             ConnectionState::Established {
                 session_id,
                 pending_calls: HashMap::new(),
+                subscribers: HashMap::new(),
+                pending_subscriptions: HashMap::new(),
             },
         );
         match old_state {
@@ -178,6 +181,13 @@ where
         }
     }
 
+    fn handle_subscribed(&mut self, request_id: u64, subscription_id: u64) -> Result<(), Error> {
+        self.pending_subscriptions()?
+            .remove(&request_id)
+            .and_then(|sender| sender.send(Ok(subscription_id)).ok());
+        Ok(())
+    }
+
     fn handle_result(&mut self, call_id: u64, args: Option<rmpv::Value>) -> Result<(), Error> {
         if let Some(CallDesc { tx }) = self.pending_calls()?.remove(&call_id) {
             let args = args
@@ -189,6 +199,52 @@ where
                 args,
                 kw_args: None,
             }));
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn subscribers(&mut self) -> Result<&mut HashMap<u64, SubSender>, Error> {
+        match &mut self.state {
+            ConnectionState::Established { subscribers, .. } => Ok(subscribers),
+            _ => Err(Error::InvalidState("session is closed or pending")),
+        }
+    }
+
+    #[inline]
+    fn pending_subscriptions(
+        &mut self,
+    ) -> Result<&mut HashMap<u64, oneshot::Sender<Result<u64, Error>>>, Error> {
+        match &mut self.state {
+            ConnectionState::Established {
+                pending_subscriptions,
+                ..
+            } => Ok(pending_subscriptions),
+            _ => Err(Error::InvalidState("session is closed or pending")),
+        }
+    }
+
+    fn handle_event(
+        &mut self,
+        sub_id: u64,
+        _pub_id: u64,
+        args: Option<&rmpv::Value>,
+        _kwargs: Option<&rmpv::Value>,
+    ) -> Result<(), Error> {
+        if let Some(tx) = self.subscribers()?.get_mut(&sub_id) {
+            let args = args
+                .and_then(|args| serde_json::to_value(args).ok())
+                .and_then(|args| args.as_array().cloned())
+                .unwrap_or_default();
+
+            // TODO: catch kw_args
+
+            let _ = tx.unbounded_send(Ok(WampMessage {
+                args,
+                kw_args: None,
+            }));
+        } else {
+            log::warn!("unhandled event: subscription_id={}", sub_id);
         }
         Ok(())
     }
@@ -233,6 +289,7 @@ where
     ) -> Result<(), Error> {
         match request_type.try_into()? {
             CALL => self.handle_error_call(request_id, details, error_uri, args, kwargs),
+            SUBSCRIBE => self.handle_error_subscribe(request_id, details, error_uri, args, kwargs),
             _ => Ok(()),
         }
     }
@@ -254,6 +311,23 @@ where
             let _ = desc
                 .tx
                 .send(Err(Error::from_wamp_error_message(error_uri, args, kwargs)));
+        } else {
+            log::error!("invalid id");
+        }
+        Ok(())
+    }
+
+    fn handle_error_subscribe(
+        &mut self,
+        request_id: u64,
+        _details: &rmpv::Value,
+        error_uri: &str,
+        args: &rmpv::Value,
+        kwargs: &rmpv::Value,
+    ) -> Result<(), Error> {
+        log::info!("handle call: {}", request_id);
+        if let Some(tx) = self.subscribers()?.remove(&request_id) {
+            let _ = tx.unbounded_send(Err(WampError::new(error_uri, args, kwargs)));
         } else {
             log::error!("invalid id");
         }
@@ -315,6 +389,21 @@ where
                         let _ =
                             self.handle_result(value[1].as_u64().unwrap(), Some(value[3].clone()));
                     }
+                    SUBSCRIBED => {
+                        let request_id = value[1].as_u64().unwrap();
+                        let subscription_id = value[2].as_u64().unwrap();
+                        let _ = self.handle_subscribed(request_id, subscription_id);
+                    }
+
+                    EVENT => {
+                        //[EVENT, SUBSCRIBED.Subscription|id, PUBLISHED.Publication|id, Details|dict, PUBLISH.Arguments|list, PUBLISH.ArgumentKw|dict]
+                        let subscription_id = value[1].as_u64().unwrap();
+                        let publication_id = value[2].as_u64().unwrap();
+                        let args = value.as_array().and_then(|a| a.get(4));
+                        let kwargs = value.as_array().and_then(|a| a.get(5));
+                        self.handle_event(subscription_id, publication_id, args, kwargs)
+                            .unwrap();
+                    }
                     ERROR => {
                         // There are 2 formats
                         // [
@@ -373,7 +462,7 @@ where
         }: OpenSession,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        use crate::messages::{types::HELLO, HelloSpec, Role, RoleDesc};
+        use crate::messages::{HelloSpec, Role, RoleDesc};
 
         // check state
         match self.state {
@@ -514,5 +603,83 @@ where
             Err(e) => Err(Error::MailboxError(e)),
             Ok(v) => v,
         }))
+    }
+}
+
+impl<Transport> super::PubSubEndpoint for Addr<Connection<SplitSink<Transport>>>
+where
+    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
+        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+        + 'static,
+{
+    type Events =
+        FlattenStream<Flatten<Request<Connection<SplitSink<Transport>>, crate::pubsub::Subscribe>>>;
+
+    fn subscribe(&self, uri: &str) -> Self::Events {
+        self.send(crate::pubsub::Subscribe {
+            topic: Cow::Owned(uri.into()),
+        })
+        .flatten()
+        .flatten_stream()
+    }
+}
+
+impl<Transport> Handler<crate::pubsub::Subscribe> for Connection<SplitSink<Transport>>
+where
+    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
+        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+        + 'static,
+{
+    type Result = ActorResponse<Self, crate::pubsub::Subscription, Error>;
+
+    fn handle(&mut self, msg: crate::pubsub::Subscribe, _ctx: &mut Self::Context) -> Self::Result {
+        let (tx, rx) = oneshot::channel();
+
+        let request_id = gen_id();
+
+        match self.pending_subscriptions() {
+            Ok(pending_subscriptions) => pending_subscriptions.insert(request_id, tx),
+            Err(e) => return ActorResponse::reply(Err(e)),
+        };
+
+        self.send_message(&(SUBSCRIBE, request_id, Dict::default(), msg.topic.as_ref()))
+            .unwrap();
+
+        ActorResponse::r#async(
+            rx.from_err()
+                .and_then(|response| response)
+                .into_actor(self)
+                .and_then(|subscription_id, act: &mut Self, ctx: &mut Self::Context| {
+                    let (tx, rx) = mpsc::unbounded();
+                    actix::fut::result((|| {
+                        act.subscribers()?.insert(subscription_id, tx);
+                        Ok(crate::pubsub::Subscription {
+                            subscription_id,
+                            stream: rx,
+                            connection: ctx.address().recipient(),
+                        })
+                    })())
+                }),
+        )
+    }
+}
+
+impl<Transport> Handler<crate::pubsub::Unsubscribe> for Connection<SplitSink<Transport>>
+where
+    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
+        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+        + 'static,
+{
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: crate::pubsub::Unsubscribe,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let _ = self.subscribers().and_then(|s| {
+            let _ = s.remove(&msg.subscription_id);
+            Ok(())
+        });
     }
 }

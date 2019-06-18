@@ -19,6 +19,9 @@ chrono = {version = "0.4.6", features=["serde"]}
 [dependencies.actix-wamp]
 path="../actix-wamp"
 
+[dependencies.tokio-timer]
+version = "0.2.11"
+
 [dependencies.golem-rpc-macros]
 path="../golem-rpc-macros"
 
@@ -27,7 +30,6 @@ version = "0.2"
 
 [dependencies.openssl]
 version="0.10.20"
-features=['vendored']
 
 [features]
 default=["settings"]

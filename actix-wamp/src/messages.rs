@@ -18,6 +18,11 @@ pub mod types {
     pub const ERROR: u8 = 08;
     pub const PUBLISH: u8 = 16;
     pub const PUBLISHED: u8 = 17;
+    pub const SUBSCRIBE: u8 = 32;
+    pub const SUBSCRIBED: u8 = 33;
+    pub const UNSUBSCRIBE: u8 = 34;
+    pub const UNSUBSCRIBED: u8 = 35;
+    pub const EVENT: u8 = 36;
     pub const CALL: u8 = 48;
     pub const CANCEL: u8 = 49;
     pub const RESULT: u8 = 50;
@@ -59,6 +64,40 @@ pub struct WampError {
 impl Display for WampError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(f, "{}: {}", self.code.uri(), self.message)
+    }
+}
+
+impl WampError {
+    pub fn new(uri: &str, args: &rmpv::Value, kwargs: &rmpv::Value) -> Self {
+        let code = ErrorKind::from_uri(uri);
+        let extra: Dict = kwargs
+            .as_map()
+            .map(|v| {
+                v.into_iter()
+                    .filter_map(|(k, v)| {
+                        let key = match k {
+                            rmpv::Value::String(key) => key.clone().into_str()?,
+                            _ => return None,
+                        };
+                        let value = serde_json::to_value(v).ok()?;
+
+                        Some((key, value))
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| Dict::new());
+        let message = extra
+            .get("message")
+            .and_then(|v| v.as_str())
+            .or_else(|| args[0].as_str())
+            .unwrap_or_else(|| code.uri())
+            .to_string();
+
+        WampError {
+            code,
+            message,
+            extra,
+        }
     }
 }
 

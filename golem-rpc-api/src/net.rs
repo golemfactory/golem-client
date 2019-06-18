@@ -3,45 +3,47 @@ use crate::rpc::*;
 use serde_derive::*;
 
 rpc_interface! {
-trait GolemNet {
-    #[id = "net.ident"]
-    fn get_node(&self) -> Result<NodeInfo>;
 
-    #[id = "net.ident.key"]
-    fn get_node_key(&self) -> Result<String>;
+    trait GolemNet {
+        #[id = "net.ident"]
+        fn get_node(&self) -> Result<NodeInfo>;
 
-    #[id = "net.ident.name"]
-    fn get_node_name(&self) -> Result<String>;
+        #[id = "net.ident.key"]
+        fn get_node_key(&self) -> Result<String>;
 
-    #[id = "net.p2p.port"]
-    fn get_p2p_port(&self) -> Result<u16>;
+        #[id = "net.ident.name"]
+        fn get_node_name(&self) -> Result<String>;
 
-    #[id = "net.tasks.port"]
-    fn get_task_server_port(&self) -> Result<u16>;
+        #[id = "net.p2p.port"]
+        fn get_p2p_port(&self) -> Result<u16>;
 
-    #[id = "net.status"]
-    fn connection_status(&self) -> Result<NetStatus>;
+        #[id = "net.tasks.port"]
+        fn get_task_server_port(&self) -> Result<u16>;
 
-    /// Connect to specific node
-    ///
-    #[id = "net.peer.connect"]
-    fn connect(&self, peer: (String, u16)) -> Result<()>;
+        #[id = "net.status"]
+        fn connection_status(&self) -> Result<NetStatus>;
 
-    ///
-    /// Returns:
-    ///
-    /// * `(true, None)` - if node is successively blocked.
-    /// * `(false, reason)` - on error
-    ///
-    #[id = "net.peer.block"]
-    fn block_node(&self, node_id: String) -> Result<(bool, String)>;
+        /// Connect to specific node
+        ///
+        #[id = "net.peer.connect"]
+        fn connect(&self, peer: (String, u16)) -> Result<()>;
 
-    #[id = "net.peers.known"]
-    fn get_known_peers(&self) -> Result<Vec<NodeInfo>>;
+        ///
+        /// Returns:
+        ///
+        /// * `(true, None)` - if node is successively blocked.
+        /// * `(false, reason)` - on error
+        ///
+        #[id = "net.peer.block"]
+        fn block_node(&self, node_id: String) -> Result<(bool, String)>;
 
-    #[id = "net.peers.connected"]
-    fn get_connected_peers(&self) -> Result<Vec<PeerInfo>>;
-}
+        #[id = "net.peers.known"]
+        fn get_known_peers(&self) -> Result<Vec<NodeInfo>>;
+
+        #[id = "net.peers.connected"]
+        fn get_connected_peers(&self) -> Result<Vec<PeerInfo>>;
+
+    }
 }
 
 pub trait AsGolemNet: wamp::RpcEndpoint {
