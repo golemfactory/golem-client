@@ -7,13 +7,16 @@ use serde_json::Value;
 use std::collections::btree_map::BTreeMap;
 use std::collections::{HashMap, HashSet};
 use std::io::{self, Write, StdoutLock};
+use futures::future::{Join, Future, ok};
 use structopt::{clap, StructOpt};
 use golem_rpc_api::comp::{AsGolemComp, SubtaskStats};
-use golem_rpc_api::net::{AsGolemNet, NetStatus, PeerInfo};
+use golem_rpc_api::net::{AsGolemNet, NetStatus, PeerInfo, NodeInfo};
 use golem_rpc_api::core::ServerStatus;
 use ansi_term::Colour::{Red, Green};
 use ansi_term::Style;
 use crate::component_response::map_statuses;
+use golem_rpc_api::rpc::AsInvoker;
+use golem_rpc_api::pay::PaymentStatus;
 
 
 #[derive(StructOpt, Debug)]
@@ -25,121 +28,205 @@ pub enum Section {
     }
 }
 
+#[derive(Debug)]
+enum ProcessState {
+    Running,
+    Stopped,
+    Stopping
+}
 
-//macro_rules! map_statuses {
-//    ($component:expr, $method:expr, $stage:expr) => {
-//          let x = include_str!("../component_response.rs");
-//          map_statuses_! {
-//            on($component, $method, $stage);
-//
-//        }
-//    }
-//
-//}
-
+#[derive(Debug)]
+enum GolemNet {
+    mainnet,
+    testnet
+}
 
 
 #[derive(Debug)]
-struct ComputationStatus {
+struct ComponentStatuses {
+    docker_status: Option<String>,
+    client: Option<String>,
+    hypervisor: Option<String>,
+    hyperdrive: Option<String>
+}
+
+#[derive(Debug)]
+struct RunningStatus {
+    process_state: ProcessState,
+    component_statuses: ComponentStatuses,
+    network: GolemNet,
+    golem_version: String,
+    node_name: String,
+    disk_usage: String
+}
+
+
+#[derive(Debug)]
+struct NetworkStatus {
+    is_connected: bool,
+    port_status: Map<u16, String>,
+    nodes_online: usize
+}
+
+#[derive(Debug)]
+struct AccountStatus {
+    eth_address: String,
+    gnt_available: String,
+    eth_available: String
+}
+
+
+#[derive(Debug)]
+struct ProviderStatus {
     subtasks_accepted: u32,
     subtasks_rejected: u32,
     subtasks_failed: u32,
     subtasks_computed: u32,
     subtasks_in_network: u32,
-    provider_state: Option<String>
+    provider_state: Option<String>,
+    pending_payments: Option<String>
 }
+
+
+#[derive(Debug)]
+struct RequestorStatus {
+    is_any_task_active: bool,
+    tasks_progress: String
+}
+
 
 #[derive(Debug)]
 struct FormattedGeneralStatus {
-    net_status: NetStatus,
-    nodes_online: usize,
-    computation_status: ComputationStatus,
-    components_status: ServerStatus
+    running_status: Option<RunningStatus>,
+    net_status: Option<NetworkStatus>,
+    account_status: Option<AccountStatus>,
+    provider_status: Option<ProviderStatus>,
+    requestor_status: Option<RequestorStatus>
 }
-
-/*
-pub struct NetStatus {
-    pub listening: bool,
-    pub connected: bool,
-    pub port_statuses: Map<u16, String>,
-    pub msg: String,
-}*/
-
 
 impl Section {
     pub fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> Box<dyn Future<Item=CommandResponse, Error=Error> + 'static> {
         match self {
             &Section::Status {} => Box::new(self.status(endpoint))
         }
     }
 
-
     pub fn status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static)
-        -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+                  -> impl Future<Item=CommandResponse, Error=Error> + 'static {
 
-    let online_nodes = endpoint.as_golem_net().get_connected_peers();
-        let connection_status = endpoint.as_golem_net().connection_status();
-        let component_status = endpoint.as_golem().status();
-        let task_stats = endpoint.as_golem_comp().get_tasks_stats();
-        let x = online_nodes.from_err().join4(connection_status.from_err(), component_status.from_err(), task_stats.from_err());
-
-        let s = x.map(|(connected_nodes, net_status, component_status, d)| {
-
-            let x : Option<String> = d.provider_state.get("status").cloned();
-
-            let computation_status = ComputationStatus{
-                subtasks_accepted: d.subtasks_accepted.session,
-                subtasks_rejected: d.subtasks_rejected.session,
-                subtasks_failed: d.subtasks_with_errors.session,
-                subtasks_computed: d.subtasks_computed.session,
-                subtasks_in_network: d.in_network,
-                provider_state: x
-            };
-
-
-            let status = FormattedGeneralStatus {
-                net_status: net_status,
-                nodes_online: connected_nodes.len(),
-                computation_status: computation_status,
-                components_status: component_status
-            };
-            CommandResponse::FormattedObject(Box::new(status))
+        let status = self.get_network_status(endpoint)
+            .and_then(|network_status| {
+            ok(FormattedGeneralStatus {
+                running_status: None, //self.get_running_status(endpoint),
+                net_status: Some(network_status),
+                account_status: None, //self.get_account_status(endpoint),
+                provider_status: None, //self.get_provider_status(endpoint),
+                requestor_status: None, //self.get_requestor_status(endpoint)
+            }).and_then(|general_status|)
+//            futures::future::ok(CommandResponse::FormattedObject(Box::new(x)))
         });
-
-        s
+        status
     }
+
+    /*fn get_running_status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static) { // zwroc typ
+        let is_mainnet = endpoint.as_golem().is_mainnet().from_err(); // <- to sa futuresy
+        let server_status = endpoint.as_golem().status().from_err(); // <- to sa futuresy
+        let node_info = endpoint.as_golem_net().get_node().from_err();
+
+        is_mainnet.join4(server_status).map(|is_mainnet, server_status, node_info|
+            RunningStatus {
+                process_state: ProcessState::Running,
+                network: if is_mainnet { GolemNet::mainnet } else { GolemNet::testnet },
+                component_statuses: ComponentStatuses {
+                    docker_status: server_status.docker.map(|component_report|
+                        map_statuses("docker", component_report.0, component_report.1)),
+                    client: server_status.client.map(|component_report|
+                        map_statuses("client", component_report.0, component_report.1)),
+                    hyperdrive: server_status.hyperdrive.map(
+                        |component_report| map_statuses("hyperdrive", component_report.0, component_report.1)),
+                    hypervisor: server_status.hypervisor.map(
+                        |component_report| map_statuses("hypervisor", component_report.0, component_report.1))
+                },
+                disk_usage: "",
+                golem_version: golem_version,
+                node_name: node_info.node_name
+            }
+        )
+    }*/
+
+
+    fn get_network_status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static) ->
+        impl Future<Item = NetworkStatus, Error = Error>
+    {
+        let net_status = endpoint.as_golem_net().connection_status().from_err();
+        let online_nodes = endpoint.as_golem_net().get_connected_peers().from_err();
+
+        net_status.join(online_nodes).map(|(net_status, online_nodes)|
+            NetworkStatus {
+                is_connected: net_status.connected,
+                port_status: net_status.port_statuses,
+                nodes_online: online_nodes.len()
+            })
+    }
+    /*
+    fn get_account_status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static) { // zwroc typ
+        let payment_address = endpoint.as_invoker().rpc_call("pay.ident", &()).from_err();
+        let balance = endpoint.as_invoker().rpc_call("pay.balance", &()).from_err();
+
+        payment_address.join(balance).map(|payment_address, balance|
+            AccountStatus {
+                eth_address: payment_address,
+                gnt_available: Currency::GNT.format_decimal(&balance.av_gnt),
+                eth_available: Currency::ETH.format_decimal(&balance.eth)
+            })
+    }
+
+    fn get_provider_status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static) { // zwroc typ
+        let task_stats = endpoint.as_golem_comp().get_tasks_stats().from_err();
+        let awaiting_incomes = endpoint.as_golem_pay().get_incomes_list().from_err();
+
+        task_stats.join(balance).map(|task_stats, awaiting_incomes|
+            ProviderStatus {
+                subtasks_accepted: task_stats.subtasks_accepted.session,
+                subtasks_rejected: task_stats.subtasks_rejected.session,
+                subtasks_failed: task_stats.subtasks_with_errors.session,
+                subtasks_computed: task_stats.subtasks_computed.session,
+                subtasks_in_network: task_stats.in_network,
+                provider_state: task_stats.provider_state.get("status"),
+                pending_payments: awaiting_incomes.iter()
+                    .filter(|income| income.status == PaymentStatus::Awaiting)
+                    .fold(bigdecimal::Zero, |sum, val| sum += val)
+            })
+    }
+
+    fn get_requestor_status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static) { // zwroc typ
+        RequestorStatus {
+            is_any_task_active: false,
+            tasks_progress: String::from_str("")
+        }
+    }*/
+
 }
 
 impl FormattedGeneralStatus {
-    fn print_network_status(&self, out: &mut Box<io::Stdout>){
-        write!(*out, "{}:\n\tConnected: {}\n\tNumber of nodes in the network: {}\n",
-               Style::new().bold().underline().paint("Network"),
-               if self.net_status.connected {Green.paint("ONLINE") } else {Red.paint("OFFLINE")},
-               self.nodes_online);
-    }
-    fn print_tasks_status(&self, out: &mut Box<io::Stdout>){
-        write!(*out, "{}:\n\tSubtasks accepted (in session): {}\n\t\
-        Subtasks rejected (in session): {}\n\tSubtasks failed (in session): {}\n\tSubtasks computed (in session): {}\n\t\
-        Subtasks in network: {}\n", Style::new().bold().underline().paint("Computation"),
-        self.computation_status.subtasks_accepted, self.computation_status.subtasks_rejected,
-               self.computation_status.subtasks_failed, self.computation_status.subtasks_computed, self.computation_status.subtasks_in_network);
-//        self.computation_status.provider_state.unwrap_or(String::from("Unknown"))
-    }
+//    fn print_network_status(&self, out: &mut Box<io::Stdout>){
+//        write!(*out, "{}:\n\tConnected: {}\n\tNumber of nodes in the network: {}\n",
+//               Style::new().bold().underline().paint("Network"),
+//               if self.net_status.connected {Green.paint("ONLINE") } else {Red.paint("OFFLINE")},
+//               self.nodes_online);
+//    }
+//    fn print_tasks_status(&self, out: &mut Box<io::Stdout>){
+//        write!(*out, "{}:\n\tSubtasks accepted (in session): {}\n\t\
+//        Subtasks rejected (in session): {}\n\tSubtasks failed (in session): {}\n\tSubtasks computed (in session): {}\n\t\
+//        Subtasks in network: {}\n", Style::new().bold().underline().paint("Computation"),
+//        self.computation_status.subtasks_accepted, self.computation_status.subtasks_rejected,
+//               self.computation_status.subtasks_failed, self.computation_status.subtasks_computed, self.computation_status.subtasks_in_network);
+////        self.computation_status.provider_state.unwrap_or(String::from("Unknown"))
+//    }
 
-    fn print_component_status(&self, out: &mut Box<io::Stdout>) {
-        let component = "0";
-        let method = "0";
-        let stage = "0";
-
-        let docker_status =
-            self.components_status.docker.map_or_else(|| "", |component_report| map_statuses("docker", component_report.0, component_report.1));
-
-        println!("Component status = {:?}", self.components_status);
-        println!("docker status = {:?}", self.components_status.docker);
-    }
 }
 
 impl FormattedObject for FormattedGeneralStatus {
@@ -148,11 +235,12 @@ impl FormattedObject for FormattedGeneralStatus {
     }
 
     fn print(&self) -> Result<(), Error> {
+        println!("{:?}", self.net_status);
         let mut stdout = Box::new(io::stdout()); // Why I box that?
 
-        self.print_network_status(&mut stdout);
-        self.print_tasks_status(&mut stdout);
-        self.print_component_status(&mut stdout);
+//        self.print_network_status(&mut stdout);
+//        self.print_tasks_status(&mut stdout);
+//        self.print_component_status(&mut stdout);
 
         Ok(())
 //        let mut stdout = stdout.lock(); // blokowac, buforowac?
