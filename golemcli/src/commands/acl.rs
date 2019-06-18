@@ -2,14 +2,16 @@ use crate::context::*;
 use crate::utils::GolemIdPattern;
 use futures::{future, prelude::*};
 use golem_rpc_api::core::AsGolemCore;
-use golem_rpc_api::net::{AclRule, AclRuleItem, AclStatus, AsGolemNet};
+use golem_rpc_api::net::{AclRule, AclRuleItem, AclStatus, AsGolemNet, NodeInfo, PeerInfo};
 use std::borrow::Borrow;
+use std::collections::BTreeSet;
 use std::net::IpAddr;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
     /// Show current access list status
+    #[structopt(raw(display_order = "490"))]
     #[structopt(name = "list")]
     List {
         ///
@@ -17,27 +19,57 @@ pub enum Section {
         ip: bool,
         #[structopt(long)]
         node: bool,
-        #[structopt(short="l", long)]
+        #[structopt(short = "l", long)]
         full: bool,
     },
+
+    /// Deny interaction with given nodes or ips.
+    #[structopt(raw(display_order = "500"))]
     #[structopt(name = "deny")]
     Deny {
+        /// IPv4/IPv6 address, will be added to ip deny list.
         #[structopt(long)]
         ip: Vec<IpAddr>,
 
+        /// GOLEM node id. it can be pattern in form <prefix>...<suffix>
         #[structopt(long)]
         node: Vec<GolemIdPattern>,
 
+        /// Sets temporaty rule for given number of seconds.
         #[structopt(short = "s", long = "for-secs")]
         for_secs: Option<u32>,
     },
 
+    #[structopt(raw(display_order = "500"))]
     #[structopt(name = "allow")]
     Allow {
         #[structopt(long)]
         ip: Vec<IpAddr>,
         #[structopt(long)]
         node: Vec<GolemIdPattern>,
+    },
+
+    #[structopt(name = "setup")]
+    Setup(Setup),
+}
+
+#[derive(StructOpt, Debug)]
+pub enum Setup {
+    /// Reset ACL to all nodes are allowed except listed.
+    #[structopt(name = "all-except")]
+    #[structopt(raw(display_order = "500"))]
+    AllExcept {
+        /// Banned GOLEM ids. Full id or pattern from list of known
+        /// hosts
+        nodes: Vec<GolemIdPattern>,
+    },
+    /// Reset ACL to only listed nodes are allowed.
+    #[structopt(name = "only-listed")]
+    #[structopt(raw(display_order = "500"))]
+    OnlyListed {
+        /// Initial list of GOLEM nodes that will be allowed to interact.
+        #[structopt(required = true)]
+        nodes: Vec<GolemIdPattern>,
     },
 }
 
@@ -52,13 +84,19 @@ impl Section {
                 Box::new(self.deny(endpoint, ip, node, for_secs.map(|s| s as i32).unwrap_or(-1)))
             }
             Section::Allow { ip, node } => Box::new(self.allow(endpoint, ip, node)),
+            Section::Setup(Setup::AllExcept { nodes }) => {
+                Box::new(self.setup(endpoint, AclRule::Allow, nodes))
+            }
+            Section::Setup(Setup::OnlyListed { nodes }) => {
+                Box::new(self.setup(endpoint, AclRule::Deny, nodes))
+            }
         }
     }
 
     fn list(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        full : bool
+        full: bool,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         endpoint
             .as_golem_net()
@@ -69,10 +107,68 @@ impl Section {
                 Ok(AclListOutput {
                     nodes: node_acl,
                     ips: ip_acl.rules,
-                    full
+                    full,
                 }
                 .to_response())
             })
+    }
+
+    fn setup(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        default_rule: AclRule,
+        exceptions: &Vec<GolemIdPattern>,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        let exceptions = exceptions.clone();
+
+        let known_peers = endpoint
+            .as_golem_net()
+            .get_known_peers()
+            .from_err()
+            .and_then(|peers: Vec<NodeInfo>| {
+                Ok(peers.into_iter().map(|p| p.key).collect::<BTreeSet<_>>())
+            });
+        let connected_peers = endpoint
+            .as_golem_net()
+            .get_connected_peers()
+            .from_err()
+            .and_then(|peers: Vec<PeerInfo>| {
+                Ok(peers
+                    .into_iter()
+                    .map(|p| p.node_info.key)
+                    .collect::<BTreeSet<_>>())
+            });
+        let current_acl = endpoint.as_golem_net().acl_status().from_err().and_then(
+            |status: AclStatus<String>| {
+                Ok(status
+                    .rules
+                    .into_iter()
+                    .map(|AclRuleItem(key, _, _)| key)
+                    .collect::<BTreeSet<_>>())
+            },
+        );
+
+        crate::utils::resolve_from_list(
+            known_peers.join3(connected_peers, current_acl).and_then(
+                |(mut l1, mut l2, mut l3): (
+                    BTreeSet<String>,
+                    BTreeSet<String>,
+                    BTreeSet<String>,
+                )| {
+                    l1.append(&mut l2);
+                    l1.append(&mut l3);
+                    Ok(l1.into_iter().collect::<Vec<_>>())
+                },
+            ),
+            exceptions.clone(),
+        )
+        .and_then(move |nodes| {
+            endpoint
+                .as_golem_net()
+                .acl_setup(default_rule, nodes)
+                .from_err()
+        })
+        .and_then(|()| CommandResponse::object("ACL reset"))
     }
 
     fn deny(
@@ -200,7 +296,7 @@ impl Section {
 }
 
 struct AclListOutput {
-    full : bool,
+    full: bool,
     ips: Vec<AclRuleItem<IpAddr>>,
     nodes: AclStatus<String>,
 }
@@ -251,7 +347,6 @@ impl FormattedObject for AclListOutput {
         if self.nodes.rules.is_empty() {
             table.add_row(row!["", ""]);
         }
-
 
         for AclRuleItem(node, _, valid_to) in &self.nodes.rules {
             table.add_row(Row::new(vec![

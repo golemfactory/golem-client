@@ -140,7 +140,7 @@ pub struct AclRuleItem<Identity>(
     pub Option<chrono::DateTime<chrono::Utc>>,
 );
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum AclRule {
     Allow,

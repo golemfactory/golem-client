@@ -1,6 +1,6 @@
 [package]
 name = "golemcli"
-version = "0.1.1"
+version = "0.1.2.acl"
 authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
 

@@ -138,7 +138,6 @@ pub fn resolve_from_list(
                     .map(|p| {
                         p.resolve(candidates.iter().map(|c| c.as_ref()))
                             .map(|k| k.to_owned())
-
                     })
                     .collect()
             },
