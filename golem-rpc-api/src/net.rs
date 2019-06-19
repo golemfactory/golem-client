@@ -44,7 +44,7 @@ rpc_interface! {
         fn block_node(&self, node_id: String, timeout_seconds : i32) -> Result<(bool, Option<String>)>;
 
         #[id = "net.peer.block_ip"]
-        fn block_ip(&self, node_id: IpAddr, timeout_seconds : i32) -> Result<()>;
+        fn block_ip(&self, ip_addr: IpAddr, timeout_seconds : i32) -> Result<()>;
 
 
         #[id="net.peer.allow_ip"]
