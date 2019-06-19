@@ -2,6 +2,7 @@ use super::Map;
 use crate::rpc::*;
 use crate::serde::opt_ts_seconds;
 use serde_derive::*;
+use serde::*;
 use std::net::IpAddr;
 
 rpc_interface! {

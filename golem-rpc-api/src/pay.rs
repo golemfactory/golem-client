@@ -1,7 +1,7 @@
 use crate::rpc::*;
 use crate::serde::ts_seconds;
 use bigdecimal::BigDecimal;
-use serde_derive::*;
+use serde::*;
 
 rpc_interface! {
     trait GolemPay {

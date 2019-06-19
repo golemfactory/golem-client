@@ -1,6 +1,6 @@
 [package]
 name = "golemcli"
-version = "0.1.2-acl"
+version = "0.2.0"
 authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
 
@@ -29,14 +29,14 @@ lazy_static="1.1"
 log="0.4"
 prettytable-rs = "0.8"
 promptly = "0.1.5"
-rand={git = "https://github.com/rust-random/rand.git", branch="0.5"}
+rand="0.5"
 rmp = "0.8.7"
 rmp-serde = "0.13.7"
 rmpv = "0.4.0"
 rpassword = "3.0.2"
 rustc-hex = "2.0"
-serde="1.0"
-serde_derive="1.0"
+serde={ version ="1.0", features=["derive"]}
+
 serde_json = "1.0.39"
 serde_yaml = "0.8"
 sha2 = "0.8.0"
@@ -45,11 +45,6 @@ structopt="0.2.15"
 # Needed for terams show
 html2text = "0.1.8"
 chrono = {version = "0.4.6", features=["serde"]}
-
-[dependencies.actix-web]
-version = "1.0.0-beta.5"
-default-features=false
-features = ['ssl', 'client']
 
 [dependencies.openssl]
 version="0.10.20"
