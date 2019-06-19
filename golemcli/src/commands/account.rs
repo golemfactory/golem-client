@@ -8,6 +8,7 @@ use golem_rpc_api::net::AsGolemNet;
 use golem_rpc_api::rpc::*;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
+use golem_rpc_api::pay::Balance;
 
 #[derive(StructOpt, Debug)]
 pub enum AccountSection {
@@ -213,18 +214,4 @@ struct DepositBalance {
     value: String,
     status: DepositStatus,
     timelock: String,
-}
-
-#[derive(Deserialize, Serialize)]
-struct Balance {
-    #[serde(default)]
-    eth: BigDecimal,
-    #[serde(default)]
-    eth_lock: BigDecimal,
-    #[serde(default)]
-    av_gnt: BigDecimal,
-    #[serde(default)]
-    gnt_lock: BigDecimal,
-    #[serde(default)]
-    gnt_nonconverted: BigDecimal,
 }
