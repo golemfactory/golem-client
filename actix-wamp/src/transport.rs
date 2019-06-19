@@ -1,5 +1,6 @@
 use actix_http::ws;
-use actix_web::client::*;
+use awc::error::WsClientError;
+use awc::*;
 use futures::prelude::*;
 use openssl::ssl;
 use std::sync::{Arc, Mutex};

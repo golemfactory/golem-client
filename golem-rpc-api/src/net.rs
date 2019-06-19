@@ -1,6 +1,6 @@
 use super::Map;
 use crate::rpc::*;
-use serde_derive::*;
+use serde::*;
 
 rpc_interface! {
 
