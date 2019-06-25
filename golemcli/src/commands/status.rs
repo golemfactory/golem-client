@@ -24,12 +24,7 @@ use std::net::ToSocketAddrs;
 use std::fmt::Display;
 
 #[derive(StructOpt, Debug)]
-pub enum Section {
-    /// Change settings (unimplemented) TODO:
-    #[structopt(name = "status")]
-    Status {
-
-    }
+pub struct Section {
 }
 
 #[derive(Debug)]
@@ -78,10 +73,10 @@ trait AsSection {
 
 impl AsSection for ComponentStatuses {
     fn to_section(&self, indentation: usize) -> String {
-        format!("{}docker status: {}\n{}", "\t".repeat(indentation), self.docker_status.as_ref().unwrap_or(&String::from("unknown")),
+        format!("{}docker: {}\n{}", "\t".repeat(indentation), self.docker_status.as_ref().unwrap_or(&String::from("unknown")),
         format!("{}client: {}\n{}", "\t".repeat(indentation), self.client.as_ref().unwrap_or(&String::from("unknown")),
-        format!("{}hyperdrive status: {}\n{}", "\t".repeat(indentation), self.hyperdrive.as_ref().unwrap_or(&String::from("unknown")),
-        self.hypervisor.as_ref().map_or("".to_string(), |hv_status| format!("{}hypervisor: {}\n", "\t".repeat(indentation), hv_status)))))
+        format!("{}hyperdrive status: {}{}", "\t".repeat(indentation), self.hyperdrive.as_ref().unwrap_or(&String::from("unknown")),
+        self.hypervisor.as_ref().map_or("".to_string(), |hv_status| format!("\n{}hypervisor: {}", "\t".repeat(indentation), hv_status)))))
     }
 }
 
@@ -98,8 +93,8 @@ struct RunningStatus {
 impl AsSection for RunningStatus {
     fn to_section(&self, indentation: usize) -> String {
         format!("{}Process state: {}\n{}", "\t".repeat(indentation), &self.process_state,
-                format!("{}Component statuses: {}\n{}", "\t".repeat(indentation), self.component_statuses.to_section(indentation + 1),
-                        format!("{}Network: {}\n{}Golem version: {}\n{}", "\t".repeat(indentation), "\t".repeat(indentation), self.network, self.golem_version,
+                format!("{}Component statuses:\n{}\n{}", "\t".repeat(indentation), self.component_statuses.to_section(indentation + 1),
+                        format!("{}Network: {}\n{}Golem version: {}\n{}", "\t".repeat(indentation), self.network,  "\t".repeat(indentation), self.golem_version,
                                 self.node_name.as_ref().map_or("".to_string(), |hv_status| format!("{}Node name: {}\n", "\t".repeat(indentation), hv_status)
                                 )
                         )
@@ -115,11 +110,30 @@ struct NetworkStatus {
     nodes_online: usize
 }
 
+impl AsSection for NetworkStatus {
+    fn to_section(&self, indentation: usize) -> String {
+        let status = match self.is_connected {
+            true => Green.paint("ONLINE"),
+            false => Red.paint("OFFLINE")
+        };
+        format!("{}status: {}\n{}", "\t".repeat(indentation), status,
+            format!("{}port status: {:?}\n{}", "\t".repeat(indentation), self.port_status,
+                format!("{}nodes online: {}", "\t".repeat(indentation), self.nodes_online)
+        ))
+    }
+}
+
 #[derive(Debug)]
 struct AccountStatus {
     eth_address: String,
     gnt_available: String,
     eth_available: String
+}
+
+impl AsSection for AccountStatus {
+    fn to_section(&self, indentation: usize) -> String {
+        format!("{}ETH address: {}\n{}available GNT: {}\n{}available ETH: {}", "\t".repeat(indentation), self.eth_address, "\t".repeat(indentation), self.gnt_available, "\t".repeat(indentation), self.eth_available)
+    }
 }
 
 #[derive(Debug)]
@@ -133,17 +147,42 @@ struct ProviderStatus {
     pending_payments: BigDecimal
 }
 
+impl AsSection for ProviderStatus {
+    fn to_section(&self, indentation: usize) -> String {
+        format!("{}subtasks accepted (in session): {}\n{}", "\t".repeat(indentation), self.subtasks_accepted,
+                format!("{}subtasks rejected (in session): {}\n{}", "\t".repeat(indentation), self.subtasks_rejected,
+                    format!("{}subtasks computed (in session): {}\n{}", "\t".repeat(indentation), self.subtasks_computed,
+                        format!("{}subtasks failed(in session): {}\n{}", "\t".repeat(indentation), self.subtasks_failed,
+                            format!("{}subtasks in network: {}\n{}", "\t".repeat(indentation), self.subtasks_in_network,
+                                format!("{}pending payments: {}\n{}", "\t".repeat(indentation), &self.pending_payments,
+                                        self.provider_state.as_ref().map_or("".to_string(), |provider_state| format!("{}Provider state: {}\n", "\t".repeat(indentation), provider_state))
+                                )
+                            )
+                        )
+                    )
+                )
+        )
+    }
+}
+
 #[derive(Debug)]
 struct RequestorStatus {
     tasks_progress: Option<String>
 }
 
+impl AsSection for RequestorStatus {
+    fn to_section(&self, indentation: usize) -> String {
+        self.tasks_progress.as_ref().map_or()
+    }
+        format!("{}Tasks progress: {}",  "\t".repeat(indentation), self.)
+    }
+
 #[derive(Debug)]
 struct FormattedGeneralStatus {
     running_status: RunningStatus,
-    net_status: Option<NetworkStatus>,
-    account_status: Option<AccountStatus>,
-    provider_status: Option<ProviderStatus>,
+    net_status: NetworkStatus,
+    account_status: AccountStatus,
+    provider_status: ProviderStatus,
     requestor_status: Option<RequestorStatus>
 }
 
@@ -152,9 +191,7 @@ impl Section {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Box<dyn Future<Item=CommandResponse, Error=Error> + 'static> {
-        match self {
-            &Section::Status {} => Box::new(self.status(endpoint))
-        }
+        Box::new(self.status(endpoint))
     }
 
     pub fn status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static)
@@ -165,11 +202,11 @@ impl Section {
                    self.get_account_status(endpoint.clone()))
             .map(|(net_status, provider_status, running_status, requestor_status, account_status)| {
                 let x = FormattedGeneralStatus {
-                    running_status: running_status,
-                    net_status: Some(net_status),
-                    account_status: Some(account_status),
-                    provider_status: Some(provider_status),
-                    requestor_status: Some(requestor_status),
+                    running_status,
+                    net_status,
+                    account_status,
+                    provider_status,
+                    requestor_status,
                 };
                 CommandResponse::FormattedObject(Box::new(x))
 
@@ -282,7 +319,6 @@ impl Section {
                     let subtask = endpoint.as_golem_comp().get_subtasks(task_in_fly.id.clone());
                     subtasks.push(subtask);
                 }
-                //futures::future::ok(subtasks)
                  futures::future::join_all(subtasks).join(futures::future::ok(total_subtasks))
             }).map(|(all_subtasks, total_subtasks)|
                                               (total_subtasks, all_subtasks.into_iter().fold(0, |finished_subtasks, subtasks|
@@ -305,7 +341,12 @@ impl FormattedObject for FormattedGeneralStatus {
 
 
     fn print(&self) -> Result<(), Error> {
-        println!("{}\n{}",  Style::new().bold().paint("General:"), self.running_status.to_section(1));
+        println!("{}\n{}\n{}\n{}\n{}\n{}\n",
+                 Style::new().bold().paint("General:"), self.running_status.to_section(1),
+                 Style::new().bold().paint("Network:"), self.net_status.to_section(1),
+                 Style::new().bold().paint("Account:"), self.account_status.to_section(1),
+                 Style::new().bold().paint("Provider status:"), self.provider_status.to_section(1),
+                 Style::new().bold().paint("Requestor status:"), self.requestor_status.to_section(1));
         println!("------");
         println!("{:?}", self);
         let mut stdout = Box::new(io::stdout()); // Why I box that?
