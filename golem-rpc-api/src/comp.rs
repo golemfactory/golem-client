@@ -151,7 +151,7 @@ pub struct TaskTestResult {
     pub more: Value,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TaskStatus {
     #[serde(rename = "Not started")]
     NotStarted,

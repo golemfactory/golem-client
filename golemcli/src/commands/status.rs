@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{self, Write, StdoutLock};
 use futures::future::{Join, Future, ok};
 use structopt::{clap, StructOpt};
-use golem_rpc_api::comp::{AsGolemComp, SubtaskStats};
+use golem_rpc_api::comp::{AsGolemComp, SubtaskStats, TaskStatus, SubtaskInfo, TaskInfo, SubtaskStatus};
 use golem_rpc_api::net::{AsGolemNet, NetStatus, PeerInfo, NodeInfo};
 use golem_rpc_api::core::ServerStatus;
 use ansi_term::Colour::{Red, Green};
@@ -19,7 +19,6 @@ use golem_rpc_api::rpc::AsInvoker;
 use golem_rpc_api::pay::{PaymentStatus, Balance};
 use bigdecimal::{Zero, BigDecimal};
 use std::mem;
-
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -91,7 +90,6 @@ struct ProviderStatus {
 
 #[derive(Debug)]
 struct RequestorStatus {
-    is_any_task_active: bool,
     tasks_progress: String
 }
 
@@ -117,32 +115,15 @@ impl Section {
     pub fn status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static)
                   -> impl Future<Item=CommandResponse, Error=Error> + 'static {
 
-        /*let status = self.get_network_status(endpoint)
-            .and_then(|network_status| {
-            ok(FormattedGeneralStatus {
-                running_status: None, //self.get_running_status(endpoint),
-                net_status: Some(network_status),
-                account_status: None, //self.get_account_status(endpoint),
-                provider_status: None, //self.get_provider_status(endpoint),
-                requestor_status: None, //self.get_requestor_status(endpoint)
-            }).and_then(|general_status| {
-                self.get_provider_status(endpoint).and_then(|provider_status|) {
-
-                }
-                general_status
-            })
-//            futures::future::ok(CommandResponse::FormattedObject(Box::new(x)))
-        });
-        status*/
         let status = self.get_network_status(endpoint.clone())
             .join3(self.get_provider_status(endpoint.clone()), self.get_running_status(endpoint.clone()))
             .map(|(net_status, provider_status, running_status)| {
                 let x = FormattedGeneralStatus {
                     running_status: Some(running_status),
                     net_status: Some(net_status),
-                    account_status: None, //Some(self.get_account_status(endpoint)),
-                    provider_status: Some(provider_status), //self.get_provider_status(endpoint),
-                    requestor_status: None, //self.get_requestor_status(endpoint)
+                    account_status: None,
+                    provider_status: Some(provider_status),
+                    requestor_status: None,
                 };
                 CommandResponse::FormattedObject(Box::new(x))
 
@@ -153,8 +134,8 @@ impl Section {
     fn get_running_status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static) ->
         impl Future<Item = RunningStatus, Error = Error> {
 
-        let is_mainnet = endpoint.as_golem().is_mainnet().from_err(); // <- to sa futuresy
-        let server_status = endpoint.as_golem().status().from_err(); // <- to sa futuresy
+        let is_mainnet = endpoint.as_golem().is_mainnet().from_err();
+        let server_status = endpoint.as_golem().status().from_err();
         let node_info = endpoint.as_golem_net().get_node().from_err();
         let version = endpoint.as_golem().get_version().from_err();
 
@@ -228,33 +209,45 @@ impl Section {
                     .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val)
             })
     }
+
     fn get_requestor_status(&self, endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static) ->
          impl Future<Item = RequestorStatus, Error = Error> {
-        futures::future::ok(
-        RequestorStatus {
-                is_any_task_active: false,
-                tasks_progress: String::from("")
-            }
-        )
+
+        let active_tasks = vec![TaskStatus::Restarted, TaskStatus::Computing,
+                                TaskStatus::CreatingDeposit, TaskStatus::Sending,
+                                TaskStatus::Waiting, TaskStatus::Starting];
+
+        let mut task_status_in_fly = active_tasks.clone();
+
+        task_status_in_fly.extend(vec![TaskStatus::NotStarted]);
+
+        endpoint.as_golem_comp().get_tasks().and_then(
+            move |tasks: Vec<TaskInfo>| {
+                let mut subtasks = Vec::new();
+
+                let tasks_in_fly : Vec<TaskInfo> = tasks.into_iter()
+                    .filter(|task|
+                        task_status_in_fly.contains(&task.status) && task.subtasks_count.is_some())
+                    .collect();
+                let total_subtasks = tasks_in_fly.iter().fold(0, |total_subtasks, task| total_subtasks + task.subtasks_count.unwrap());
+                subtasks.reserve(tasks_in_fly.len() * 2);
+                for task_in_fly in &tasks_in_fly {
+                    let subtask = endpoint.as_golem_comp().get_subtasks(task_in_fly.id.clone());
+                    subtasks.push(subtask);
+                }
+                //futures::future::ok(subtasks)
+                 futures::future::join_all(subtasks).join(futures::future::ok(total_subtasks))
+            }).map(|(all_subtasks, total_subtasks)|
+                                              (total_subtasks, all_subtasks.into_iter().fold(0, |finished_subtasks, subtasks|
+                    finished_subtasks +
+                        subtasks.map_or_else(|| 0, |subtasks: Vec<SubtaskInfo>| subtasks.iter().filter(|subtask|
+                            mem::discriminant(&subtask.status) == mem::discriminant(&SubtaskStatus::Finished)).count()))))
+            .map(|(total_subtasks, finished_subtasks)|
+                RequestorStatus {
+                    tasks_progress: format!("{}/{}", finished_subtasks, total_subtasks)
+                }
+            ).from_err()
     }
-}
-
-impl FormattedGeneralStatus {
-//    fn print_network_status(&self, out: &mut Box<io::Stdout>){
-//        write!(*out, "{}:\n\tConnected: {}\n\tNumber of nodes in the network: {}\n",
-//               Style::new().bold().underline().paint("Network"),
-//               if self.net_status.connected {Green.paint("ONLINE") } else {Red.paint("OFFLINE")},
-//               self.nodes_online);
-//    }
-//    fn print_tasks_status(&self, out: &mut Box<io::Stdout>){
-//        write!(*out, "{}:\n\tSubtasks accepted (in session): {}\n\t\
-//        Subtasks rejected (in session): {}\n\tSubtasks failed (in session): {}\n\tSubtasks computed (in session): {}\n\t\
-//        Subtasks in network: {}\n", Style::new().bold().underline().paint("Computation"),
-//        self.computation_status.subtasks_accepted, self.computation_status.subtasks_rejected,
-//               self.computation_status.subtasks_failed, self.computation_status.subtasks_computed, self.computation_status.subtasks_in_network);
-////        self.computation_status.provider_state.unwrap_or(String::from("Unknown"))
-//    }
-
 }
 
 impl FormattedObject for FormattedGeneralStatus {
