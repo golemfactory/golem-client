@@ -2,7 +2,7 @@ use crate::context::*;
 use actix::prelude::*;
 use futures::prelude::*;
 use golem_rpc_api::settings::DynamicSetting;
-use golem_rpc_api::{core::AsGolemCore, settings, Map, pay::AsGolemPay};
+use golem_rpc_api::{core::AsGolemCore, settings, Map, pay::AsGolemPay, res::AsGolemRes};
 use serde_json::Value;
 use std::collections::btree_map::BTreeMap;
 use std::collections::{HashMap, HashSet};
@@ -19,6 +19,7 @@ use golem_rpc_api::rpc::AsInvoker;
 use golem_rpc_api::pay::{PaymentStatus, Balance};
 use bigdecimal::{Zero, BigDecimal};
 use std::mem;
+use golem_rpc_api::res::CacheSizes;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -60,7 +61,7 @@ struct RunningStatus {
     network: GolemNet,
     golem_version: String,
     node_name: String,
-    disk_usage: String
+    disk_usage: CacheSizes
 }
 
 #[derive(Debug)]
@@ -90,7 +91,7 @@ struct ProviderStatus {
 
 #[derive(Debug)]
 struct RequestorStatus {
-    tasks_progress: String
+    tasks_progress: Option<String>
 }
 
 #[derive(Debug)]
@@ -116,14 +117,15 @@ impl Section {
                   -> impl Future<Item=CommandResponse, Error=Error> + 'static {
 
         let status = self.get_network_status(endpoint.clone())
-            .join3(self.get_provider_status(endpoint.clone()), self.get_running_status(endpoint.clone()))
-            .map(|(net_status, provider_status, running_status)| {
+            .join5(self.get_provider_status(endpoint.clone()), self.get_running_status(endpoint.clone()), self.get_requestor_status(endpoint.clone()),
+                   self.get_account_status(endpoint.clone()))
+            .map(|(net_status, provider_status, running_status, requestor_status, account_status)| {
                 let x = FormattedGeneralStatus {
                     running_status: Some(running_status),
                     net_status: Some(net_status),
-                    account_status: None,
+                    account_status: Some(account_status),
                     provider_status: Some(provider_status),
-                    requestor_status: None,
+                    requestor_status: Some(requestor_status),
                 };
                 CommandResponse::FormattedObject(Box::new(x))
 
@@ -138,8 +140,9 @@ impl Section {
         let server_status = endpoint.as_golem().status().from_err();
         let node_info = endpoint.as_golem_net().get_node().from_err();
         let version = endpoint.as_golem().get_version().from_err();
+        let disk_usage = endpoint.as_golem_res().get_res_dirs_sizes().from_err();
 
-        is_mainnet.join4(server_status, node_info, version).map(|(is_mainnet, server_status, node_info, version)|
+        is_mainnet.join5(server_status, node_info, version, disk_usage).map(|(is_mainnet, server_status, node_info, version, disk_usage)|
             RunningStatus {
                 process_state: ProcessState::Running,
                 network: if is_mainnet { GolemNet::Mainnet } else { GolemNet::Testnet },
@@ -153,7 +156,7 @@ impl Section {
                     hypervisor: server_status.hypervisor.map(|component_report|
                         String::from(map_statuses("hypervisor", &component_report.0, &component_report.1)))
                 },
-                disk_usage: String::from(""),
+                disk_usage: disk_usage,
                 golem_version: version,
                 node_name: node_info.node_name
             }
@@ -244,7 +247,7 @@ impl Section {
                             mem::discriminant(&subtask.status) == mem::discriminant(&SubtaskStatus::Finished)).count()))))
             .map(|(total_subtasks, finished_subtasks)|
                 RequestorStatus {
-                    tasks_progress: format!("{}/{}", finished_subtasks, total_subtasks)
+                    tasks_progress:  if total_subtasks > 0 { Some(format!("{}/{}", finished_subtasks, total_subtasks)) } else {None}
                 }
             ).from_err()
     }
