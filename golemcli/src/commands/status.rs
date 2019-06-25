@@ -18,8 +18,10 @@ use crate::component_response::map_statuses;
 use golem_rpc_api::rpc::AsInvoker;
 use golem_rpc_api::pay::{PaymentStatus, Balance};
 use bigdecimal::{Zero, BigDecimal};
-use std::mem;
+use std::{mem, fmt};
 use golem_rpc_api::res::CacheSizes;
+use std::net::ToSocketAddrs;
+use std::fmt::Display;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -31,7 +33,6 @@ pub enum Section {
 }
 
 #[derive(Debug)]
-#[derive(PartialEq)] // ok?
 enum ProcessState {
     Running,
     Stopped,
@@ -39,11 +40,28 @@ enum ProcessState {
 }
 
 #[derive(Debug)]
-#[derive(PartialEq)] // ok?
-// implement to string
 enum GolemNet {
     Mainnet,
     Testnet
+}
+
+impl Display for GolemNet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            GolemNet::Mainnet => write!(f, "mainnet"),
+            GolemNet::Testnet => write!(f, "testnet")
+        }
+    }
+}
+
+impl Display for ProcessState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ProcessState::Running => write!(f, "running"),
+            ProcessState::Stopped => write!(f, "stopped"),
+            ProcessState::Stopping => write!(f, "stopping"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -54,14 +72,40 @@ struct ComponentStatuses {
     hyperdrive: Option<String>
 }
 
+trait AsSection {
+    fn to_section(&self, indentation: usize) -> String;
+}
+
+impl AsSection for ComponentStatuses {
+    fn to_section(&self, indentation: usize) -> String {
+        format!("{}docker status: {}\n{}", "\t".repeat(indentation), self.docker_status.as_ref().unwrap_or(&String::from("unknown")),
+        format!("{}client: {}\n{}", "\t".repeat(indentation), self.client.as_ref().unwrap_or(&String::from("unknown")),
+        format!("{}hyperdrive status: {}\n{}", "\t".repeat(indentation), self.hyperdrive.as_ref().unwrap_or(&String::from("unknown")),
+        self.hypervisor.as_ref().map_or("".to_string(), |hv_status| format!("{}hypervisor: {}\n", "\t".repeat(indentation), hv_status)))))
+    }
+}
+
 #[derive(Debug)]
 struct RunningStatus {
     process_state: ProcessState,
     component_statuses: ComponentStatuses,
     network: GolemNet,
     golem_version: String,
-    node_name: String,
+    node_name: Option<String>,
     disk_usage: CacheSizes
+}
+
+impl AsSection for RunningStatus {
+    fn to_section(&self, indentation: usize) -> String {
+        format!("{}Process state: {}\n{}", "\t".repeat(indentation), &self.process_state,
+                format!("{}Component statuses: {}\n{}", "\t".repeat(indentation), self.component_statuses.to_section(indentation + 1),
+                        format!("{}Network: {}\n{}Golem version: {}\n{}", "\t".repeat(indentation), "\t".repeat(indentation), self.network, self.golem_version,
+                                self.node_name.as_ref().map_or("".to_string(), |hv_status| format!("{}Node name: {}\n", "\t".repeat(indentation), hv_status)
+                                )
+                        )
+                )
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -96,7 +140,7 @@ struct RequestorStatus {
 
 #[derive(Debug)]
 struct FormattedGeneralStatus {
-    running_status: Option<RunningStatus>,
+    running_status: RunningStatus,
     net_status: Option<NetworkStatus>,
     account_status: Option<AccountStatus>,
     provider_status: Option<ProviderStatus>,
@@ -121,7 +165,7 @@ impl Section {
                    self.get_account_status(endpoint.clone()))
             .map(|(net_status, provider_status, running_status, requestor_status, account_status)| {
                 let x = FormattedGeneralStatus {
-                    running_status: Some(running_status),
+                    running_status: running_status,
                     net_status: Some(net_status),
                     account_status: Some(account_status),
                     provider_status: Some(provider_status),
@@ -158,7 +202,7 @@ impl Section {
                 },
                 disk_usage: disk_usage,
                 golem_version: version,
-                node_name: node_info.node_name
+                node_name: if node_info.node_name.len() > 0 { Some(node_info.node_name)} else {None}
             }
         )
     }
@@ -256,9 +300,13 @@ impl Section {
 impl FormattedObject for FormattedGeneralStatus {
     fn to_json(&self) -> Result<Value, Error> {
         Ok(serde_json::from_str("{}").unwrap())
+//        Ok(serde_json::to_value(&self)?)
     }
 
+
     fn print(&self) -> Result<(), Error> {
+        println!("{}\n{}",  Style::new().bold().paint("General:"), self.running_status.to_section(1));
+        println!("------");
         println!("{:?}", self);
         let mut stdout = Box::new(io::stdout()); // Why I box that?
 
