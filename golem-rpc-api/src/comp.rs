@@ -159,6 +159,7 @@ pub enum TaskStatus {
     CreatingDeposit,
     Sending,
     Waiting,
+    Creating,
     Starting,
     Computing,
     Finished,
