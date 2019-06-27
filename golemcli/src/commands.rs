@@ -91,7 +91,7 @@ macro_rules! dispatch_subcommand {
                 $async_command:path
             ,)*
         })?
-        $(async_with_cxt {
+        $(async_with_ctx {
             $(
             $(#[$async_with_context_meta:meta])*
             $async_with_context_command:path,)*
@@ -148,7 +148,7 @@ impl CommandSection {
                 CommandSection::TestTask,
 
             }
-            async_with_cxt {
+            async_with_ctx {
                 CommandSection::Account,
                 CommandSection::Terms,
                 CommandSection::Status,
