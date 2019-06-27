@@ -290,7 +290,6 @@ impl Section {
             .join5(server_status, node_info, version, disk_usage)
             .map(
                 move |(is_mainnet, server_status, node_info, version, disk_usage)| {
-                    println!("status = {:?}", server_status);
                     RunningStatus {
                         process_state: match is_golem_run {
                             true => ProcessState::Running,
@@ -516,7 +515,7 @@ impl FormattedObject for FormattedGeneralStatus {
                 "hypervisor",
                 self.running_status
                     .component_statuses
-                    .client
+                    .hypervisor
                     .as_ref()
                     .unwrap(),
             );
