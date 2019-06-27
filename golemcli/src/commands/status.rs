@@ -83,7 +83,6 @@ struct RunningStatus {
 }
 
 struct SectionBuilder {
-    indentation_size: u8,
     indentation_mark: &'static str,
     content: Vec<SectionEntry>,
 }
@@ -96,9 +95,8 @@ enum SectionEntry {
 }
 
 impl SectionBuilder {
-    fn new(indentation_size: u8, indentation_mark: &'static str) -> SectionBuilder {
+    fn new(indentation_mark: &'static str) -> SectionBuilder {
         SectionBuilder {
-            indentation_size,
             indentation_mark,
             content: Vec::new(),
         }
@@ -271,7 +269,7 @@ impl Section {
         let is_golem_running = file.unwrap().try_lock_exclusive();
         match is_golem_running {
             Ok(_) => false,
-            Err(e) => true,
+            Err(_) => true,
         }
     }
 
@@ -476,7 +474,7 @@ impl FormattedObject for FormattedGeneralStatus {
     }
 
     fn print(&self) -> Result<(), Error> {
-        let mut section_builder = SectionBuilder::new(2, "  ");
+        let mut section_builder = SectionBuilder::new( "  ");
 
         section_builder
             .new_section("General")
