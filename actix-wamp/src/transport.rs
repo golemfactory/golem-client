@@ -2,8 +2,6 @@ use actix_http::ws;
 use actix_web::client::*;
 use futures::prelude::*;
 use openssl::ssl;
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 pub type ClientError = WsClientError;
@@ -45,6 +43,7 @@ pub fn wss(
         .connector(connector)
         .finish()
         .ws(format!("wss://{}:{}", host, port))
+        .max_frame_size(107_374_182_400) // 100 MB
         .header("Host", format!("{}:{}", host, port))
         .protocols(&["wamp.2.msgpack"])
         .connect()

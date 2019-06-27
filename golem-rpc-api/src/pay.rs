@@ -16,6 +16,10 @@ rpc_interface! {
         // TODO: kwargs limit=1000, offset=0
         #[id = "pay.deposit_payments"]
         fn get_deposit_payments_list(&self, #[kwarg] _limit : Option<usize>, #[kwarg] _offset : Option<usize>) -> Result<Option<Vec<DepositPayment>>>;
+
+        #[id = "pay.deposit_balance"]
+        fn get_deposit_balance(&self) -> Result<DepositBalance>;
+
     }
 
     converter AsGolemPay as_golem_pay;
@@ -34,6 +38,9 @@ pub enum PaymentStatus {
 
     /// Confirmed on the payment network.
     Confirmed = 3,
+
+    /// Not confirmed on the payment network, but expected to be.
+    Overdue = 4,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -67,6 +74,22 @@ pub struct DepositPayment {
     pub transaction: String,
     pub created: chrono::DateTime<chrono::Utc>,
     pub modified: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum DepositStatus {
+    Locked,
+    Unlocking,
+    Unlocked,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DepositBalance {
+    pub status: DepositStatus,
+    pub timelock: BigDecimal,
+    #[serde(rename = "value")]
+    pub balance: BigDecimal,
 }
 
 #[cfg(test)]
