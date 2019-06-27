@@ -144,7 +144,6 @@ impl CommandSection {
                 CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,
-                CommandSection::Status,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
 
@@ -152,6 +151,7 @@ impl CommandSection {
             async_with_cxt {
                 CommandSection::Account,
                 CommandSection::Terms,
+                CommandSection::Status,
             }
             sync {
                 CommandSection::Internal

@@ -249,6 +249,10 @@ impl CliCtx {
         }
         enabled
     }
+
+    pub fn get_golem_lock_path(&self) -> PathBuf {
+        self.data_dir.join(PathBuf::from("rinkeby").join("LOCK"))
+    }
 }
 
 pub fn create_table<'a>(columns: impl IntoIterator<Item = &'a str>) -> prettytable::Table {

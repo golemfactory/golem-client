@@ -3,10 +3,13 @@
 use crate::context::CliCtx;
 use actix::prelude::*;
 use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
+use fs2::FileExt;
 use golem_rpc_api::Net;
 use std::convert::TryInto;
 use std::fmt::Debug;
+use std::fs::File;
 use std::path::PathBuf;
+use std::{thread, time};
 use structopt::*;
 
 pub(crate) mod commands;

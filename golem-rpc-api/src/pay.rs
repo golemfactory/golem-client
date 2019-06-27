@@ -94,7 +94,6 @@ pub struct DepositBalance {
     pub balance: BigDecimal,
 }
 
-
 #[derive(Deserialize, Serialize)]
 pub struct Balance {
     #[serde(default)]
@@ -108,7 +107,6 @@ pub struct Balance {
     #[serde(default)]
     pub gnt_nonconverted: BigDecimal,
 }
-
 
 #[cfg(test)]
 mod test {

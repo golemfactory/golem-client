@@ -30,7 +30,6 @@ macro_rules! map_statuses {
         };
 }
 
-
 pub fn map_statuses(component: &str, method: &str, stage: &Stage) -> &'static str {
     map_statuses! {
         on(component, method, stage);
