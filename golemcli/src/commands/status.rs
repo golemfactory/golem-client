@@ -243,14 +243,14 @@ impl Section {
                     requestor_tasks_progress,
                     account_status,
                 )| {
-                    let x = FormattedGeneralStatus {
+                    CommandResponse::FormattedObject(Box::new(FormattedGeneralStatus {
                         running_status,
                         net_status,
                         account_status,
                         provider_status,
                         requestor_tasks_progress,
-                    };
-                    CommandResponse::FormattedObject(Box::new(x))
+                    }
+                    ))
                 },
             );
         status
