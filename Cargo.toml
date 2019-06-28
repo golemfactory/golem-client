@@ -3,7 +3,8 @@ members= [
     'golem-rpc-api',
     'golem-rpc-macros',
     'golemcli',
-    'actix-wamp'
+    'actix-wamp',
+    'golem-model'
 ]
 
 [profile.release]
