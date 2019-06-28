@@ -5,7 +5,7 @@ use failure::Fallible;
 use futures::{future, prelude::*};
 use golem_rpc_api::core::AsGolemCore;
 use golem_rpc_api::net::AsGolemNet;
-use golem_rpc_api::pay::{Balance, AsGolemPay};
+use golem_rpc_api::pay::{AsGolemPay, Balance};
 use golem_rpc_api::rpc::*;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;

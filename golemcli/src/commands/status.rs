@@ -2,7 +2,7 @@ use crate::component_response::map_statuses;
 use crate::context::*;
 use actix::prelude::*;
 use ansi_term::Colour::{Green, Red};
-use ansi_term::{Style, Colour};
+use ansi_term::{Colour, Style};
 use bigdecimal::{BigDecimal, Zero};
 use fs2::FileExt;
 use futures::future::{ok, Future, Join};
@@ -32,9 +32,7 @@ use std::{fmt, mem};
 use structopt::{clap, StructOpt};
 
 #[derive(StructOpt, Debug)]
-pub struct Section {
-
-}
+pub struct Section {}
 
 #[derive(Debug, Serialize, Deserialize)]
 enum ProcessState {
@@ -47,7 +45,6 @@ enum GolemNet {
     Mainnet,
     Testnet,
 }
-
 
 impl Display for GolemNet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -126,7 +123,7 @@ impl SectionBuilder {
     }
 
     fn entry(&mut self, key: &String, value: &String) -> &mut Self {
-        self.content.push(SectionEntry::Entry{
+        self.content.push(SectionEntry::Entry {
             key: key.clone(),
             value: value.clone(),
         });
@@ -148,7 +145,11 @@ impl SectionBuilder {
                         format!(
                             "{}{}\n",
                             self.make_ident(ident),
-                            Style::new().fg(Colour::Yellow).underline().bold().paint(format!("{}", title))
+                            Style::new()
+                                .fg(Colour::Yellow)
+                                .underline()
+                                .bold()
+                                .paint(format!("{}", title))
                         )
                         .as_ref(),
                     );
@@ -158,11 +159,11 @@ impl SectionBuilder {
                     assert!(ident > 0);
                     result.push_str("\n");
                     ident = ident - 1;
-                },
+                }
                 SectionEntry::EndSubSection => {
                     assert!(ident > 0);
                     ident = ident - 1;
-                },
+                }
                 SectionEntry::Entry { key, value } => result.push_str(
                     format!(
                         "{}{} {}\n",
@@ -237,7 +238,6 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         ctx: &CliCtx,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-
         let status = self
             .get_network_status(endpoint.clone())
             .join5(
@@ -260,13 +260,11 @@ impl Section {
                         account_status,
                         provider_status,
                         requestor_tasks_progress,
-                    }
-                    ))
+                    }))
                 },
             );
         status
     }
-
 
     fn check_is_golem_run(is_mainnet: bool, ctx: CliCtx) -> bool {
         let lock_path = ctx.get_golem_lock_path(is_mainnet);
@@ -290,7 +288,8 @@ impl Section {
 
     fn get_running_status(
         &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static, ctx: &CliCtx
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        ctx: &CliCtx,
     ) -> impl Future<Item = RunningStatus, Error = Error> {
         let is_mainnet = endpoint.as_golem().is_mainnet().from_err();
         let server_status = endpoint.as_golem().status().from_err();
@@ -379,7 +378,8 @@ impl Section {
             .join(balance)
             .map(|(payment_address, balance)| AccountStatus {
                 eth_address: payment_address.clone(),
-                gnt_available: crate::eth::Currency::GNT.format_decimal(&balance.av_gnt.with_prec(3)),
+                gnt_available: crate::eth::Currency::GNT
+                    .format_decimal(&balance.av_gnt.with_prec(3)),
                 eth_available: crate::eth::Currency::ETH.format_decimal(&balance.eth),
             })
     }
@@ -490,7 +490,7 @@ impl FormattedObject for FormattedGeneralStatus {
     }
 
     fn print(&self) -> Result<(), Error> {
-        let mut section_builder = SectionBuilder::new( "  ");
+        let mut section_builder = SectionBuilder::new("  ");
 
         section_builder
             .new_section(String::from("General"))
@@ -542,9 +542,15 @@ impl FormattedObject for FormattedGeneralStatus {
 
         section_builder
             .end_subsection()
-            .entry(&String::from("Golem version"), &self.running_status.golem_version)
+            .entry(
+                &String::from("Golem version"),
+                &self.running_status.golem_version,
+            )
             .entry(&String::from("Node name"), &self.running_status.node_name)
-            .entry(&String::from("Network"), &self.running_status.network.to_string())
+            .entry(
+                &String::from("Network"),
+                &self.running_status.network.to_string(),
+            )
             .new_subsection(String::from("Disk usage"))
             .entry(
                 &String::from("Received files"),
@@ -560,18 +566,31 @@ impl FormattedObject for FormattedGeneralStatus {
             .entry(&String::from("Connection"), &connection_status)
             .new_subsection(String::from("Port statuses"));
 
-            for (key, value) in self.net_status.port_status.iter() {
-                let key = key.to_string();
-                section_builder.entry(&key.to_string(), value);
-            }
+        for (key, value) in self.net_status.port_status.iter() {
+            let key = key.to_string();
+            section_builder.entry(&key.to_string(), value);
+        }
 
-            section_builder.end_subsection()
-            .entry(&String::from("Nodes online"), &self.net_status.nodes_online.to_string())
+        section_builder
+            .end_subsection()
+            .entry(
+                &String::from("Nodes online"),
+                &self.net_status.nodes_online.to_string(),
+            )
             .end_section()
             .new_section(String::from("Account"))
-            .entry(&String::from("ETH address"), &self.account_status.eth_address)
-            .entry(&String::from("GNT available"), &self.account_status.gnt_available)
-            .entry(&String::from("ETH available"), &self.account_status.eth_available)
+            .entry(
+                &String::from("ETH address"),
+                &self.account_status.eth_address,
+            )
+            .entry(
+                &String::from("GNT available"),
+                &self.account_status.gnt_available,
+            )
+            .entry(
+                &String::from("ETH available"),
+                &self.account_status.eth_available,
+            )
             .end_section()
             .new_section(String::from("Provider Status"))
             .entry(
@@ -614,7 +633,10 @@ impl FormattedObject for FormattedGeneralStatus {
             .as_ref()
             .unwrap_or(&requestor_perpective);
         section_builder.new_section(String::from("Requestor status"));
-        section_builder.entry(&String::from("all computed subtasks / all subtasks [from all tasks]"), &requestor_status);
+        section_builder.entry(
+            &String::from("all computed subtasks / all subtasks [from all tasks]"),
+            &requestor_status,
+        );
 
         println!("{}", section_builder.build());
         Ok(())

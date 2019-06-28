@@ -254,7 +254,7 @@ impl CliCtx {
     pub fn get_golem_lock_path(&self, is_mainnet: bool) -> PathBuf {
         let dir = match is_mainnet {
             true => "mainnet",
-            false => "rinkeby"
+            false => "rinkeby",
         };
 
         self.data_dir.join(PathBuf::from(dir).join("LOCK"))
