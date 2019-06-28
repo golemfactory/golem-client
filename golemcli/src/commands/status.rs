@@ -2,7 +2,7 @@ use crate::component_response::map_statuses;
 use crate::context::*;
 use actix::prelude::*;
 use ansi_term::Colour::{Green, Red};
-use ansi_term::Style;
+use ansi_term::{Style, Colour};
 use bigdecimal::{BigDecimal, Zero};
 use fs2::FileExt;
 use futures::future::{ok, Future, Join};
@@ -26,13 +26,15 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, StdoutLock, Write};
 use std::net::ToSocketAddrs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering::SeqCst;
 use std::{fmt, mem};
 use structopt::{clap, StructOpt};
 
 #[derive(StructOpt, Debug)]
-pub struct Section {}
+pub struct Section {
+
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 enum ProcessState {
@@ -45,6 +47,7 @@ enum GolemNet {
     Mainnet,
     Testnet,
 }
+
 
 impl Display for GolemNet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -88,10 +91,11 @@ struct SectionBuilder {
 }
 
 enum SectionEntry {
-    StartSection { title: &'static str },
-    StartSubSection { title: &'static str },
+    StartSection { title: String },
+    StartSubSection { title: String },
     EndSection,
-    Entry { key: &'static str, value: String },
+    EndSubSection,
+    Entry { key: String, value: String },
 }
 
 impl SectionBuilder {
@@ -101,12 +105,12 @@ impl SectionBuilder {
             content: Vec::new(),
         }
     }
-    fn new_section(&mut self, title: &'static str) -> &mut Self {
+    fn new_section(&mut self, title: String) -> &mut Self {
         self.content.push(SectionEntry::StartSection { title });
         self
     }
 
-    fn new_subsection(&mut self, title: &'static str) -> &mut Self {
+    fn new_subsection(&mut self, title: String) -> &mut Self {
         self.content.push(SectionEntry::StartSubSection { title });
         self
     }
@@ -116,9 +120,14 @@ impl SectionBuilder {
         self
     }
 
-    fn entry(&mut self, key: &'static str, value: &String) -> &mut Self {
-        self.content.push(SectionEntry::Entry {
-            key,
+    fn end_subsection(&mut self) -> &mut Self {
+        self.content.push(SectionEntry::EndSubSection);
+        self
+    }
+
+    fn entry(&mut self, key: &String, value: &String) -> &mut Self {
+        self.content.push(SectionEntry::Entry{
+            key: key.clone(),
             value: value.clone(),
         });
         self
@@ -139,7 +148,7 @@ impl SectionBuilder {
                         format!(
                             "{}{}\n",
                             self.make_ident(ident),
-                            Style::new().underline().bold().paint(format!("{}", title))
+                            Style::new().fg(Colour::Yellow).underline().bold().paint(format!("{}", title))
                         )
                         .as_ref(),
                     );
@@ -147,8 +156,13 @@ impl SectionBuilder {
                 }
                 SectionEntry::EndSection => {
                     assert!(ident > 0);
+                    result.push_str("\n");
                     ident = ident - 1;
-                }
+                },
+                SectionEntry::EndSubSection => {
+                    assert!(ident > 0);
+                    ident = ident - 1;
+                },
                 SectionEntry::Entry { key, value } => result.push_str(
                     format!(
                         "{}{} {}\n",
@@ -223,13 +237,12 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         ctx: &CliCtx,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let is_golem_run = self.check_is_golem_run(ctx);
 
         let status = self
             .get_network_status(endpoint.clone())
             .join5(
                 self.get_provider_status(endpoint.clone()),
-                self.get_running_status(endpoint.clone(), is_golem_run),
+                self.get_running_status(endpoint.clone(), ctx),
                 self.get_requestor_status(endpoint.clone()),
                 self.get_account_status(endpoint.clone()),
             )
@@ -254,8 +267,10 @@ impl Section {
         status
     }
 
-    fn check_is_golem_run(&self, ctx: &CliCtx) -> bool {
-        let lock_path = ctx.get_golem_lock_path();
+
+    fn check_is_golem_run(is_mainnet: bool, ctx: CliCtx) -> bool {
+        let lock_path = ctx.get_golem_lock_path(is_mainnet);
+
         let lock_file_path = lock_path.to_str();
 
         if lock_file_path.is_none() {
@@ -275,21 +290,22 @@ impl Section {
 
     fn get_running_status(
         &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        is_golem_run: bool,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static, ctx: &CliCtx
     ) -> impl Future<Item = RunningStatus, Error = Error> {
         let is_mainnet = endpoint.as_golem().is_mainnet().from_err();
         let server_status = endpoint.as_golem().status().from_err();
         let node_info = endpoint.as_golem_net().get_node().from_err();
         let version = endpoint.as_golem().get_version().from_err();
         let disk_usage = endpoint.as_golem_res().get_res_dirs_sizes().from_err();
+        let ctx_cloned = ctx.clone();
 
         is_mainnet
             .join5(server_status, node_info, version, disk_usage)
             .map(
                 move |(is_mainnet, server_status, node_info, version, disk_usage)| {
+                    let is_golem_running = Section::check_is_golem_run(is_mainnet, ctx_cloned);
                     RunningStatus {
-                        process_state: match is_golem_run {
+                        process_state: match is_golem_running {
                             true => ProcessState::Running,
                             false => ProcessState::Stopped,
                         },
@@ -363,7 +379,7 @@ impl Section {
             .join(balance)
             .map(|(payment_address, balance)| AccountStatus {
                 eth_address: payment_address.clone(),
-                gnt_available: crate::eth::Currency::GNT.format_decimal(&balance.av_gnt),
+                gnt_available: crate::eth::Currency::GNT.format_decimal(&balance.av_gnt.with_prec(3)),
                 eth_available: crate::eth::Currency::ETH.format_decimal(&balance.eth),
             })
     }
@@ -477,14 +493,14 @@ impl FormattedObject for FormattedGeneralStatus {
         let mut section_builder = SectionBuilder::new( "  ");
 
         section_builder
-            .new_section("General")
+            .new_section(String::from("General"))
             .entry(
-                "Process State",
+                &String::from("Process State"),
                 &self.running_status.process_state.to_string(),
             )
-            .new_subsection("Components Status")
+            .new_subsection(String::from("Components Status"))
             .entry(
-                "docker",
+                &String::from("docker"),
                 self.running_status
                     .component_statuses
                     .docker_status
@@ -492,7 +508,7 @@ impl FormattedObject for FormattedGeneralStatus {
                     .unwrap_or(&String::from("unknown")),
             )
             .entry(
-                "hyperdrive",
+                &String::from("hyperdrive"),
                 self.running_status
                     .component_statuses
                     .hyperdrive
@@ -500,7 +516,7 @@ impl FormattedObject for FormattedGeneralStatus {
                     .unwrap_or(&String::from("unknown")),
             )
             .entry(
-                "client",
+                &String::from("client"),
                 self.running_status
                     .component_statuses
                     .client
@@ -510,7 +526,7 @@ impl FormattedObject for FormattedGeneralStatus {
 
         if self.running_status.component_statuses.hypervisor.is_some() {
             section_builder.entry(
-                "hypervisor",
+                &String::from("hypervisor"),
                 self.running_status
                     .component_statuses
                     .hypervisor
@@ -525,77 +541,80 @@ impl FormattedObject for FormattedGeneralStatus {
         };
 
         section_builder
-            .end_section()
-            .entry("Golem version", &self.running_status.golem_version)
-            .entry("Node name", &self.running_status.node_name)
-            .entry("Network", &self.running_status.network.to_string())
-            .new_subsection("Disk usage")
+            .end_subsection()
+            .entry(&String::from("Golem version"), &self.running_status.golem_version)
+            .entry(&String::from("Node name"), &self.running_status.node_name)
+            .entry(&String::from("Network"), &self.running_status.network.to_string())
+            .new_subsection(String::from("Disk usage"))
             .entry(
-                "Received files",
+                &String::from("Received files"),
                 &self.running_status.disk_usage.received_files,
             )
             .entry(
-                "Distributed files",
+                &String::from("Distributed files"),
                 &self.running_status.disk_usage.distributed_files,
             )
+            .end_subsection()
             .end_section()
+            .new_section(String::from("Network"))
+            .entry(&String::from("Connection"), &connection_status)
+            .new_subsection(String::from("Port statuses"));
+
+            for (key, value) in self.net_status.port_status.iter() {
+                let key = key.to_string();
+                section_builder.entry(&key.to_string(), value);
+            }
+
+            section_builder.end_subsection()
+            .entry(&String::from("Nodes online"), &self.net_status.nodes_online.to_string())
             .end_section()
-            .new_section("Network")
-            .entry("Connection", &connection_status)
+            .new_section(String::from("Account"))
+            .entry(&String::from("ETH address"), &self.account_status.eth_address)
+            .entry(&String::from("GNT available"), &self.account_status.gnt_available)
+            .entry(&String::from("ETH available"), &self.account_status.eth_available)
+            .end_section()
+            .new_section(String::from("Provider Status"))
             .entry(
-                "Port statuses",
-                &format!("{:?}", self.net_status.port_status),
-            )
-            .entry("Nodes online", &self.net_status.nodes_online.to_string())
-            .end_section()
-            .new_section("Account")
-            .entry("ETH address", &self.account_status.eth_address)
-            .entry("GNT available", &self.account_status.gnt_available)
-            .entry("ETH available", &self.account_status.eth_available)
-            .end_section()
-            .new_section("Provider Status")
-            .entry(
-                "Subtasks accepted (in session)",
+                &String::from("Subtasks accepted (in session)"),
                 &self.provider_status.subtasks_accepted.to_string(),
             )
             .entry(
-                "Subtasks rejected (in session)",
+                &String::from("Subtasks rejected (in session)"),
                 &self.provider_status.subtasks_rejected.to_string(),
             )
             .entry(
-                "Subtasks failed (in session)",
+                &String::from("Subtasks failed (in session)"),
                 &self.provider_status.subtasks_failed.to_string(),
             )
             .entry(
-                "Subtasks computed (in session)",
+                &String::from("Subtasks computed (in session)"),
                 &self.provider_status.subtasks_computed.to_string(),
             )
             .entry(
-                "Tasks in network (in session)",
+                &String::from("Tasks in network (in session)"),
                 &self.provider_status.subtasks_in_network.to_string(),
             )
             .entry(
-                "Pending payments",
+                &String::from("Pending payments"),
                 &self.provider_status.pending_payments.to_string(),
             );
 
         if self.provider_status.provider_state.is_some() {
             section_builder.entry(
-                "Provider state",
+                &String::from("Provider state"),
                 &self.provider_status.provider_state.as_ref().unwrap(),
             );
         };
 
         section_builder.end_section();
 
-        let requestor_perpective = String::from("No active tasks");
+        let requestor_perpective = String::from("0/0");
         let requestor_status = self
             .requestor_tasks_progress
             .as_ref()
             .unwrap_or(&requestor_perpective);
-        section_builder.new_section("Requestor status");
-        section_builder.entry("Status", &requestor_status);
-        section_builder.end_section();
+        section_builder.new_section(String::from("Requestor status"));
+        section_builder.entry(&String::from("all computed subtasks / all subtasks [from all tasks]"), &requestor_status);
 
         println!("{}", section_builder.build());
         Ok(())

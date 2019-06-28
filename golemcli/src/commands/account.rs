@@ -5,7 +5,7 @@ use failure::Fallible;
 use futures::{future, prelude::*};
 use golem_rpc_api::core::AsGolemCore;
 use golem_rpc_api::net::AsGolemNet;
-use golem_rpc_api::pay::Balance;
+use golem_rpc_api::pay::{Balance, AsGolemPay};
 use golem_rpc_api::rpc::*;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -104,8 +104,8 @@ impl AccountSection {
                     let node_id = node.key.to_string();
                     let computing_trust = endpoint.as_invoker().rpc_call("rep.comp", &(node_id.clone(), ));
                     let requesting_trust = endpoint.as_invoker().rpc_call("rep.requesting", &(node_id, ));
-                    let payment_address = endpoint.as_invoker().rpc_call("pay.ident", &()); // Option<String>
-                    let balance = endpoint.as_invoker().rpc_call("pay.balance", &());
+                    let payment_address = endpoint.as_golem_pay().get_pay_ident().from_err();
+                    let balance = endpoint.as_golem_pay().get_pay_balance().from_err();
                     let deposit_balance = endpoint.as_invoker().rpc_call("pay.deposit_balance", &());
 
                     computing_trust
