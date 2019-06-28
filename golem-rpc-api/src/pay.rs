@@ -38,6 +38,9 @@ pub enum PaymentStatus {
 
     /// Confirmed on the payment network.
     Confirmed = 3,
+
+    /// Not confirmed on the payment network, but expected to be.
+    Overdue = 4,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

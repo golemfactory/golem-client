@@ -44,6 +44,7 @@ pub fn wss(
         .connector(connector)
         .finish()
         .ws(format!("wss://{}:{}", host, port))
+        .max_frame_size(107_374_182_400) // 100 MB
         .header("Host", format!("{}:{}", host, port))
         .protocols(&["wamp.2.msgpack"])
         .connect()
