@@ -49,7 +49,7 @@ enum GolemNet {
 impl Display for GolemNet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            GolemNet::Mainnet => write!(f, "mainnet "),
+            GolemNet::Mainnet => write!(f, "mainnet"),
             GolemNet::Testnet => write!(f, "testnet"),
         }
     }
