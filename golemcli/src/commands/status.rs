@@ -151,7 +151,7 @@ impl SectionBuilder {
                                 .bold()
                                 .paint(format!("{}", title))
                         )
-                        .as_ref(),
+                            .as_ref(),
                     );
                     ident = ident + 1;
                 }
@@ -171,7 +171,7 @@ impl SectionBuilder {
                         Style::new().bold().paint(format!("{}:", key)),
                         value
                     )
-                    .as_ref(),
+                        .as_ref(),
                 ),
                 SectionEntry::StartSubSection { title } => {
                     result.push_str(
@@ -180,13 +180,55 @@ impl SectionBuilder {
                             self.make_ident(ident),
                             Style::new().bold().paint(format!("{}:", title))
                         )
-                        .as_ref(),
+                            .as_ref(),
                     );
                     ident = ident + 1;
                 }
             }
         }
         result
+    }
+
+    fn to_table(&self) -> prettytable::Table {
+        use prettytable::*;
+
+        let mut table = Table::new();
+        let mut ident = 0;
+        let format = format::FormatBuilder::new()
+            .padding(1, 1)
+            .build();
+        table.set_format(format);
+
+        for item in &self.content {
+            match item {
+                SectionEntry::StartSection { title } => {
+                    table.add_empty_row();
+                    table.add_row(Row::new(vec![Cell::new(title)
+                        .with_style(Attr::Underline(true))
+                        .with_style(Attr::ForegroundColor(color::YELLOW))]));
+                    table.add_empty_row();
+                },
+                SectionEntry::Entry { key, value } => {
+                    table.add_row(Row::new(vec![Cell::new(format!("{}{}:",
+                                                                  self.make_ident(ident), key).as_ref())
+                    .with_style(Attr::Bold), Cell::new(value)]));
+                },
+                SectionEntry::EndSubSection => {
+                    assert!(ident > 0);
+                    ident = ident - 1;
+                },
+                SectionEntry::StartSubSection { title }=> {
+                    table.add_row(row![format!(
+                        "{}{}\n",
+                        self.make_ident(ident),
+                        Style::new().bold().paint(format!("{}:", title))
+                    ), ""]);
+                    ident = ident + 1;
+                },
+                _ => {}
+            }
+        }
+        table
     }
 }
 
@@ -248,12 +290,12 @@ impl Section {
             )
             .map(
                 |(
-                    net_status,
-                    provider_status,
-                    running_status,
-                    requestor_tasks_progress,
-                    account_status,
-                )| {
+                     net_status,
+                     provider_status,
+                     running_status,
+                     requestor_tasks_progress,
+                     account_status,
+                 )| {
                     CommandResponse::FormattedObject(Box::new(FormattedGeneralStatus {
                         running_status,
                         net_status,
@@ -460,17 +502,17 @@ impl Section {
                         .fold(0, |finished_subtasks, subtasks| {
                             finished_subtasks
                                 + subtasks.map_or_else(
-                                    || 0,
-                                    |subtasks: Vec<SubtaskInfo>| {
-                                        subtasks
-                                            .iter()
-                                            .filter(|subtask| {
-                                                mem::discriminant(&subtask.status)
-                                                    == mem::discriminant(&SubtaskStatus::Finished)
-                                            })
-                                            .count()
-                                    },
-                                )
+                                || 0,
+                                |subtasks: Vec<SubtaskInfo>| {
+                                    subtasks
+                                        .iter()
+                                        .filter(|subtask| {
+                                            mem::discriminant(&subtask.status)
+                                                == mem::discriminant(&SubtaskStatus::Finished)
+                                        })
+                                        .count()
+                                },
+                            )
                         }),
                 )
             })
@@ -634,11 +676,10 @@ impl FormattedObject for FormattedGeneralStatus {
             .unwrap_or(&requestor_perpective);
         section_builder.new_section(String::from("Requestor status"));
         section_builder.entry(
-            &String::from("all computed subtasks / all subtasks [from all tasks]"),
+            &String::from("all computed subtasks / all subtasks \n[from all tasks]"),
             &requestor_status,
         );
-
-        println!("{}", section_builder.build());
+        section_builder.to_table().printstd();
         Ok(())
     }
 }
