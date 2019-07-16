@@ -1,4 +1,6 @@
 use crate::context::{CliCtx, CommandResponse};
+use futures::{future, prelude::*};
+use golem_rpc_api::rpc::*;
 use std::fmt::{self, Debug};
 use structopt::*;
 
@@ -72,6 +74,10 @@ pub enum CommandSection {
     #[structopt(name = "test_task")]
     TestTask(test_task::Section),
 
+    /// Trigger graceful shutdown of Golem
+    #[structopt(name = "shutdown")]
+    Shutdown(ShutdownCommand),
+
     #[structopt(name = "_int")]
     #[structopt(raw(setting = "structopt::clap::AppSettings::Hidden"))]
     Internal(InternalSection),
@@ -140,6 +146,7 @@ impl CommandSection {
                 CommandSection::Tasks,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
+                CommandSection::Shutdown,
 
             }
             async_with_cxt {
@@ -189,5 +196,24 @@ impl InternalSection {
         }
 
         Ok(CommandResponse::NoOutput)
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct ShutdownCommand { }
+
+impl ShutdownCommand {
+    fn run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = crate::context::Error> + 'static {
+        endpoint
+            .as_invoker()
+            .rpc_call("golem.graceful_shutdown", &())
+            .and_then(|ret: u64| {
+                let result = format!("Graceful shutdown triggered result: {}", ret);
+                Ok(CommandResponse::Object(result.into()))
+            })
+            .from_err()
     }
 }
