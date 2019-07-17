@@ -160,6 +160,7 @@ pub enum TaskStatus {
     #[serde(rename = "Creating the deposit")]
     CreatingDeposit,
     Sending,
+    Creating,
     Waiting,
     Starting,
     Computing,
