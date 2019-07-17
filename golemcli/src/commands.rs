@@ -200,7 +200,7 @@ impl InternalSection {
 }
 
 #[derive(StructOpt, Debug)]
-pub struct ShutdownCommand { }
+pub struct ShutdownCommand {}
 
 impl ShutdownCommand {
     fn run(
