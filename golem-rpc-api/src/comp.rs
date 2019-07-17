@@ -162,7 +162,6 @@ pub enum TaskStatus {
     Sending,
     Creating,
     Waiting,
-    Creating,
     Starting,
     Computing,
     Finished,
