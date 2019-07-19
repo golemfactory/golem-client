@@ -6,28 +6,33 @@ use structopt::{clap::arg_enum, StructOpt};
 const INCOMES_COLUMNS: &[&str] = &["payer", "status", "value"];
 
 #[derive(StructOpt, Debug)]
-pub struct Section {
-    /// Filter by status
-    #[structopt(
-        parse(try_from_str),
-        raw(
-            possible_values = "&[\"awaiting\",\"confirmed\"]",
-            case_insensitive = "true"
-        )
-    )]
-    filter_by: Option<crate::eth::PaymentStatus>,
+pub enum Section {
+    /// Show incomes
+    #[structopt(name = "show")]
+    Show {
+        /// Filter by status
+        #[structopt(long = "filter")]
+        #[structopt(
+            parse(try_from_str),
+            raw(
+                possible_values = "&[\"awaiting\",\"confirmed\"]",
+                case_insensitive = "true"
+            )
+        )]
+        filter_by: Option<crate::eth::PaymentStatus>,
 
-    #[structopt(long = "sort")]
-    #[structopt(
-        parse(try_from_str),
-        raw(possible_values = "INCOMES_COLUMNS", case_insensitive = "true")
-    )]
-    /// Sort incomes
-    sort_by: Option<String>,
+        #[structopt(long = "sort")]
+        #[structopt(
+            parse(try_from_str),
+            raw(possible_values = "INCOMES_COLUMNS", case_insensitive = "true")
+        )]
+        /// Sort incomes
+        sort_by: Option<String>,
 
-    /// Show full table contents
-    #[structopt(long)]
-    full: bool,
+        /// Show full table contents
+        #[structopt(long)]
+        full: bool,
+    },
 }
 
 arg_enum! {
@@ -42,11 +47,27 @@ arg_enum! {
 impl Section {
     pub fn run(
         &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static
+    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+        match self {
+            Section::Show {
+                filter_by,
+                sort_by,
+                full
+            } => Box::new(self.show(endpoint, filter_by, sort_by, full))
+        }
+    }
+
+    pub fn show(
+        &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        filter_by: &Option<crate::eth::PaymentStatus>,
+        sort_by: &Option<String>,
+        full: &bool
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let sort_by = self.sort_by.clone();
-        let filter_by = self.filter_by.clone();
-        let full = self.full.clone();
+        let filter_by = filter_by.clone();
+        let sort_by = sort_by.clone();
+        let full = *full;
 
         endpoint
             .as_golem_pay()
