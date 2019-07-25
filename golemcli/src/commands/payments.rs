@@ -6,35 +6,55 @@ use structopt::StructOpt;
 const PAYMENTS_COLUMNS: &[&str] = &["subtask", "payee", "status", "value", "fee"];
 
 #[derive(StructOpt, Debug)]
-pub struct Section {
-    /// Filter by status
-    #[structopt(
-        parse(try_from_str),
-        raw(
-            possible_values = "&[\"awaiting\",\"confirmed\"]",
-            case_insensitive = "true"
-        )
-    )]
-    filter_by: Option<crate::eth::PaymentStatus>,
-    /// Sort payments
-    #[structopt(long = "sort")]
-    #[structopt(
-        parse(try_from_str),
-        raw(possible_values = "PAYMENTS_COLUMNS", case_insensitive = "true")
-    )]
-    sort_by: Option<String>,
-    #[structopt(long)]
-    full: bool,
+pub enum Section {
+    /// Show payments
+    #[structopt(name = "show")]
+    Show {
+        /// Filter by status
+        #[structopt(
+            parse(try_from_str),
+            raw(
+                possible_values = "&[\"awaiting\",\"confirmed\"]",
+                case_insensitive = "true"
+            )
+        )]
+        filter_by: Option<crate::eth::PaymentStatus>,
+        /// Sort payments
+        #[structopt(long = "sort")]
+        #[structopt(
+            parse(try_from_str),
+            raw(possible_values = "PAYMENTS_COLUMNS", case_insensitive = "true")
+        )]
+        sort_by: Option<String>,
+        #[structopt(long)]
+        full: bool,
+    },
 }
 
 impl Section {
     pub fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+        match self {
+            Section::Show {
+                filter_by,
+                sort_by,
+                full,
+            } => Box::new(self.show(endpoint, filter_by, sort_by, full)),
+        }
+    }
+
+    pub fn show(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        filter_by: &Option<crate::eth::PaymentStatus>,
+        sort_by: &Option<String>,
+        full: &bool,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let sort_by = self.sort_by.clone();
-        let full = self.full;
-        let filter_by = self.filter_by.clone();
+        let sort_by = sort_by.clone();
+        let filter_by = filter_by.clone();
+        let full = *full;
 
         endpoint
             .as_golem_pay()
