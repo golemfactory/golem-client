@@ -3,16 +3,22 @@
 use crate::context::CliCtx;
 use actix::prelude::*;
 use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
+use fs2::FileExt;
 use golem_rpc_api::Net;
 use std::convert::TryInto;
 use std::fmt::Debug;
+use std::fs::File;
 use std::path::PathBuf;
+use std::{thread, time};
 use structopt::*;
 
 pub(crate) mod commands;
 pub(crate) mod context;
 pub(crate) mod eth;
 pub(crate) mod terms;
+
+#[macro_use]
+pub(crate) mod component_response;
 
 #[cfg(feature = "interactive_cli")]
 mod interactive;

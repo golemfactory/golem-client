@@ -16,6 +16,7 @@ mod incomes;
 mod network;
 mod payments;
 mod settings;
+mod status;
 mod tasks;
 mod terms;
 #[cfg(feature = "test_task_cli")]
@@ -65,6 +66,10 @@ pub enum CommandSection {
     #[structopt(name = "tasks")]
     Tasks(tasks::Section),
 
+    /// Display general status
+    #[structopt(name = "status")]
+    Status(status::Section),
+
     /// Show and accept terms of use
     #[structopt(name = "terms")]
     Terms(terms::Section),
@@ -88,10 +93,11 @@ macro_rules! dispatch_subcommand {
         on ($self:expr, $ctx:expr);
         $(async {
             $(
-            $(#[$async_meta:meta])*
-            $async_command:path,)*
+                $(#[$async_meta:meta])*
+                $async_command:path
+            ,)*
         })?
-        $(async_with_cxt {
+        $(async_with_ctx {
             $(
             $(#[$async_with_context_meta:meta])*
             $async_with_context_command:path,)*
@@ -149,9 +155,10 @@ impl CommandSection {
                 CommandSection::Shutdown,
 
             }
-            async_with_cxt {
+            async_with_ctx {
                 CommandSection::Account,
                 CommandSection::Terms,
+                CommandSection::Status,
             }
             sync {
                 CommandSection::Internal

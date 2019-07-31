@@ -20,6 +20,11 @@ rpc_interface! {
         #[id = "pay.deposit_balance"]
         fn get_deposit_balance(&self) -> Result<DepositBalance>;
 
+        #[id = "pay.balance"]
+        fn get_pay_balance(&self) -> Result<Balance>;
+
+        #[id = "pay.ident"]
+        fn get_pay_ident(&self) -> Result<String>;
     }
 
     converter AsGolemPay as_golem_pay;
@@ -90,6 +95,20 @@ pub struct DepositBalance {
     pub timelock: BigDecimal,
     #[serde(rename = "value")]
     pub balance: BigDecimal,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Balance {
+    #[serde(default)]
+    pub eth: BigDecimal,
+    #[serde(default)]
+    pub eth_lock: BigDecimal,
+    #[serde(default)]
+    pub av_gnt: BigDecimal,
+    #[serde(default)]
+    pub gnt_lock: BigDecimal,
+    #[serde(default)]
+    pub gnt_nonconverted: BigDecimal,
 }
 
 #[cfg(test)]

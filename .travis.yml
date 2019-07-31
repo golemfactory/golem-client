@@ -15,7 +15,9 @@ addons:
 cache: cargo
 dist: xenial
 before_cache:
-        - rm -rf /home/travis/.cargo/registry
+- |
+        rm -rf $HOME/.cargo/registry
+
 before_script:
 - |
         if [ "$TRAVIS_OS_NAME" = "windows" ]; then
