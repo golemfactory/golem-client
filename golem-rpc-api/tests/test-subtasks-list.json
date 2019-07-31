@@ -1,0 +1,264 @@
+[
+  {
+    "deadline": 1564582261,
+    "extra_data": {
+      "crops": [
+        {
+          "borders_x": [
+            0.0,
+            1.0
+          ],
+          "borders_y": [
+            0.6666666666666666,
+            1.0
+          ],
+          "outfilebasename": "scene-Helicopter-10-30-2_1"
+        }
+      ],
+      "entrypoint": "python3 /golem/entrypoints/render_entrypoint.py",
+      "frames": [
+        1
+      ],
+      "output_format": "PNG",
+      "path_root": "/home/ederenn/Desktop/Host_Share_Folder/test files",
+      "resolution": [
+        400,
+        400
+      ],
+      "samples": 30,
+      "scene_file": "/golem/resources/scene-Helicopter-27-cycles.blend",
+      "start_task": 1,
+      "total_tasks": 30,
+      "use_compositing": false
+    },
+    "node_id": "bdb78989b15ecfba5059f6fdd16703683f87729cdf57f9913cb362666f9a331ca45811882df9f56b9c4721e471ff9d024fc6fe046f48a791d9e725be6efde4e1",
+    "node_name": "samthegolem",
+    "price": 1200474276352472,
+    "progress": 0.0,
+    "results": [],
+    "status": "Cancelled",
+    "stderr": "[GOLEM] Cancelled",
+    "stdout": "",
+    "subtask_id": "a141b782-b39b-11e9-85ae-5dbf74ee525e",
+    "time_started": 1564581662
+  },
+  {
+    "deadline": 1564582262,
+    "extra_data": {
+      "crops": [
+        {
+          "borders_x": [
+            0.0,
+            1.0
+          ],
+          "borders_y": [
+            0.3333333333333333,
+            0.6666666666666666
+          ],
+          "outfilebasename": "scene-Helicopter-10-30-2_2"
+        }
+      ],
+      "entrypoint": "python3 /golem/entrypoints/render_entrypoint.py",
+      "frames": [
+        1
+      ],
+      "output_format": "PNG",
+      "path_root": "/home/ederenn/Desktop/Host_Share_Folder/test files",
+      "resolution": [
+        400,
+        400
+      ],
+      "samples": 30,
+      "scene_file": "/golem/resources/scene-Helicopter-27-cycles.blend",
+      "start_task": 2,
+      "total_tasks": 30,
+      "use_compositing": false
+    },
+    "node_id": "157f3260a452c211021951677edfd0b67400a86a181829588d98eddda51d8e25f2600174125cb57291bd15d8ed3ebd979f61e6da69180f9306e1ffe37d583327",
+    "node_name": "Pacifica01",
+    "price": 100000000000000000,
+    "progress": 0.0,
+    "results": [],
+    "status": "Cancelled",
+    "stderr": "[GOLEM] Cancelled",
+    "stdout": "",
+    "subtask_id": "a15f2a50-b39b-11e9-8c4e-5dbf74ee525e",
+    "time_started": 1564581662
+  },
+  {
+    "deadline": 1564582262,
+    "extra_data": {
+      "crops": [
+        {
+          "borders_x": [
+            0.0,
+            1.0
+          ],
+          "borders_y": [
+            0.0,
+            0.3333333333333333
+          ],
+          "outfilebasename": "scene-Helicopter-10-30-2_3"
+        }
+      ],
+      "entrypoint": "python3 /golem/entrypoints/render_entrypoint.py",
+      "frames": [
+        1
+      ],
+      "output_format": "PNG",
+      "path_root": "/home/ederenn/Desktop/Host_Share_Folder/test files",
+      "resolution": [
+        400,
+        400
+      ],
+      "samples": 30,
+      "scene_file": "/golem/resources/scene-Helicopter-27-cycles.blend",
+      "start_task": 3,
+      "total_tasks": 30,
+      "use_compositing": false
+    },
+    "node_id": "de002b1df0f7885e88339d35a1f53d4afa6e370830d92882c9003dbeff7dfa71c6626765193ddaa5b8649b4eeae04136c44b5af86a8d8ad4b935e73a1a78e20f",
+    "node_name": "aussiemark",
+    "price": 100000000000000000,
+    "progress": 0.0,
+    "results": [],
+    "status": "Cancelled",
+    "stderr": "[GOLEM] Cancelled",
+    "stdout": "",
+    "subtask_id": "a18cf4fa-b39b-11e9-bd00-5dbf74ee525e",
+    "time_started": 1564581662
+  },
+  {
+    "deadline": 1564582263,
+    "extra_data": {
+      "crops": [
+        {
+          "borders_x": [
+            0.0,
+            1.0
+          ],
+          "borders_y": [
+            0.6666666666666666,
+            1.0
+          ],
+          "outfilebasename": "scene-Helicopter-10-30-2_4"
+        }
+      ],
+      "entrypoint": "python3 /golem/entrypoints/render_entrypoint.py",
+      "frames": [
+        2
+      ],
+      "output_format": "PNG",
+      "path_root": "/home/ederenn/Desktop/Host_Share_Folder/test files",
+      "resolution": [
+        400,
+        400
+      ],
+      "samples": 30,
+      "scene_file": "/golem/resources/scene-Helicopter-27-cycles.blend",
+      "start_task": 4,
+      "total_tasks": 30,
+      "use_compositing": false
+    },
+    "node_id": "4e92f89baa8ff673cbe87ff48f66e3202c2783d5a3ee6e0ca54276c14ef5eec60fe91c04511f11602f389c811b7276e259c27aa027fcf2c95f1e40fc218fc408",
+    "node_name": "macgyver",
+    "price": 100000000000000000,
+    "progress": 0.0,
+    "results": [],
+    "status": "Cancelled",
+    "stderr": "[GOLEM] Cancelled",
+    "stdout": "",
+    "subtask_id": "a1bdd268-b39b-11e9-8859-5dbf74ee525e",
+    "time_started": 1564581663
+  },
+  {
+    "deadline": 1564582300,
+    "extra_data": {
+      "crops": [
+        {
+          "borders_x": [
+            0.0,
+            1.0
+          ],
+          "borders_y": [
+            0.3333333333333333,
+            0.6666666666666666
+          ],
+          "outfilebasename": "scene-Helicopter-10-30-2_5"
+        }
+      ],
+      "entrypoint": "python3 /golem/entrypoints/render_entrypoint.py",
+      "frames": [
+        2
+      ],
+      "output_format": "PNG",
+      "path_root": "/home/ederenn/Desktop/Host_Share_Folder/test files",
+      "resolution": [
+        400,
+        400
+      ],
+      "samples": 30,
+      "scene_file": "/golem/resources/scene-Helicopter-27-cycles.blend",
+      "start_task": 5,
+      "total_tasks": 30,
+      "use_compositing": false
+    },
+    "node_id": "07a87d17adf5f281d75224626abaeb4ad5e1fe47958894055b8b275d057b3bb7b894d2b9bf16a08710cb088bbb297197391b11e4ccbde353d6c8a4e0c90acd93",
+    "node_name": "JMHnode",
+    "price": 100000000000000000,
+    "progress": 1.0,
+    "results": [
+      "/home/ederenn/.local/share/golem/default/mainnet/ComputerRes/e32a91f0-b39a-11e9-ae28-5dbf74ee525e/tmp/scene-Helicopter-10-30-2_50002.png"
+    ],
+    "status": "Finished",
+    "stderr": "/home/ederenn/.local/share/golem/default/mainnet/ComputerRes/e32a91f0-b39a-11e9-ae28-5dbf74ee525e/tmp/b7efa56e-b39b-11e9-a18b-5dbf74ee525e/stderr.log",
+    "stdout": "/home/ederenn/.local/share/golem/default/mainnet/ComputerRes/e32a91f0-b39a-11e9-ae28-5dbf74ee525e/tmp/b7efa56e-b39b-11e9-a18b-5dbf74ee525e/stdout.log",
+    "subtask_id": "b7efa56e-b39b-11e9-a18b-5dbf74ee525e",
+    "time_started": 1564581700
+  },
+  {
+    "deadline": 1564582539,
+    "extra_data": {
+      "crops": [
+        {
+          "borders_x": [
+            0.0,
+            1.0
+          ],
+          "borders_y": [
+            0.0,
+            0.3333333333333333
+          ],
+          "outfilebasename": "scene-Helicopter-10-30-2_6"
+        }
+      ],
+      "entrypoint": "python3 /golem/entrypoints/render_entrypoint.py",
+      "frames": [
+        2
+      ],
+      "output_format": "PNG",
+      "path_root": "/home/ederenn/Desktop/Host_Share_Folder/test files",
+      "resolution": [
+        400,
+        400
+      ],
+      "samples": 30,
+      "scene_file": "/golem/resources/scene-Helicopter-27-cycles.blend",
+      "start_task": 6,
+      "total_tasks": 30,
+      "use_compositing": false
+    },
+    "node_id": "07a87d17adf5f281d75224626abaeb4ad5e1fe47958894055b8b275d057b3bb7b894d2b9bf16a08710cb088bbb297197391b11e4ccbde353d6c8a4e0c90acd93",
+    "node_name": "JMHnode",
+    "price": 100000000000000000,
+    "progress": 1.0,
+    "results": [
+      "/home/ederenn/.local/share/golem/default/mainnet/ComputerRes/e32a91f0-b39a-11e9-ae28-5dbf74ee525e/tmp/scene-Helicopter-10-30-2_60002.png"
+    ],
+    "status": "Finished",
+    "stderr": "/home/ederenn/.local/share/golem/default/mainnet/ComputerRes/e32a91f0-b39a-11e9-ae28-5dbf74ee525e/tmp/464ee698-b39c-11e9-8d61-5dbf74ee525e/stderr.log",
+    "stdout": "/home/ederenn/.local/share/golem/default/mainnet/ComputerRes/e32a91f0-b39a-11e9-ae28-5dbf74ee525e/tmp/464ee698-b39c-11e9-8d61-5dbf74ee525e/stdout.log",
+    "subtask_id": "464ee698-b39c-11e9-8d61-5dbf74ee525e",
+    "time_started": 1564581939
+  }
+]
