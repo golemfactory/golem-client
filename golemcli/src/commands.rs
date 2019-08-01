@@ -1,4 +1,6 @@
 use crate::context::{CliCtx, CommandResponse};
+use futures::{future, prelude::*};
+use golem_rpc_api::rpc::*;
 use std::fmt::{self, Debug};
 use structopt::*;
 
@@ -14,6 +16,7 @@ mod incomes;
 mod network;
 mod payments;
 mod settings;
+mod status;
 mod tasks;
 mod terms;
 #[cfg(feature = "test_task_cli")]
@@ -69,6 +72,10 @@ pub enum CommandSection {
     #[structopt(name = "tasks")]
     Tasks(tasks::Section),
 
+    /// Display general status
+    #[structopt(name = "status")]
+    Status(status::Section),
+
     /// Show and accept terms of use
     #[structopt(name = "terms")]
     Terms(terms::Section),
@@ -77,6 +84,10 @@ pub enum CommandSection {
     #[cfg(feature = "test_task_cli")]
     #[structopt(name = "test_task")]
     TestTask(test_task::Section),
+
+    /// Trigger graceful shutdown of Golem
+    #[structopt(name = "shutdown")]
+    Shutdown(ShutdownCommand),
 
     #[structopt(name = "_int")]
     #[structopt(raw(setting = "structopt::clap::AppSettings::Hidden"))]
@@ -88,10 +99,11 @@ macro_rules! dispatch_subcommand {
         on ($self:expr, $ctx:expr);
         $(async {
             $(
-            $(#[$async_meta:meta])*
-            $async_command:path,)*
+                $(#[$async_meta:meta])*
+                $async_command:path
+            ,)*
         })?
-        $(async_with_cxt {
+        $(async_with_ctx {
             $(
             $(#[$async_with_context_meta:meta])*
             $async_with_context_command:path,)*
@@ -147,11 +159,12 @@ impl CommandSection {
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
                 CommandSection::Acl,
-
+                CommandSection::Shutdown,
             }
-            async_with_cxt {
+            async_with_ctx {
                 CommandSection::Account,
                 CommandSection::Terms,
+                CommandSection::Status,
             }
             sync {
                 CommandSection::Internal
@@ -196,5 +209,24 @@ impl InternalSection {
         }
 
         Ok(CommandResponse::NoOutput)
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct ShutdownCommand {}
+
+impl ShutdownCommand {
+    fn run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = crate::context::Error> + 'static {
+        endpoint
+            .as_invoker()
+            .rpc_call("golem.graceful_shutdown", &())
+            .and_then(|ret: u64| {
+                let result = format!("Graceful shutdown triggered result: {}", ret);
+                Ok(CommandResponse::Object(result.into()))
+            })
+            .from_err()
     }
 }

@@ -151,13 +151,16 @@ pub struct TaskTestResult {
     pub more: Value,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TaskStatus {
+    #[serde(rename = "Error creating")]
+    ErrorCreating,
     #[serde(rename = "Not started")]
     NotStarted,
     #[serde(rename = "Creating the deposit")]
     CreatingDeposit,
     Sending,
+    Creating,
     Waiting,
     Starting,
     Computing,
@@ -226,6 +229,7 @@ pub enum SubtaskStatus {
     Finished,
     Failure,
     Restart,
+    Cancelled,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

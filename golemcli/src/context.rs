@@ -65,6 +65,7 @@ impl From<ResponseTable> for CommandResponse {
     }
 }
 
+#[derive(Clone)]
 pub struct CliCtx {
     rpc_addr: (String, u16),
     data_dir: PathBuf,
@@ -248,6 +249,15 @@ impl CliCtx {
             eprintln!("\t {}", msg_on_reject.unwrap());
         }
         enabled
+    }
+
+    pub fn get_golem_lock_path(&self, is_mainnet: bool) -> PathBuf {
+        let dir = match is_mainnet {
+            true => "mainnet",
+            false => "rinkeby",
+        };
+
+        self.data_dir.join(PathBuf::from(dir).join("LOCK"))
     }
 }
 
