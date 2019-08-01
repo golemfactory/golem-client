@@ -3,6 +3,7 @@ use ethkey::{Address, PublicKey};
 use rustc_hex::FromHex;
 use serde::Serialize;
 use structopt::clap::arg_enum;
+use num_bigint::{BigInt, ToBigInt};
 
 arg_enum! {
     #[derive(Debug, Serialize, Clone, Copy)]
@@ -47,12 +48,17 @@ impl Currency {
         format!("{} {}", val / eth_denoms(), self.as_str())
     }
 
+    pub fn from_user(&self, val :&bigdecimal::BigDecimal) -> String {
+        format!("{}", (val * eth_denoms()).to_bigint().unwrap())
+    }
+
     pub fn as_str(&self) -> &str {
         match self {
             Currency::GNT => "GNT",
             Currency::ETH => "ETH",
         }
     }
+
 }
 
 pub fn public_to_addres(pubkey_hex: String) -> String {

@@ -331,7 +331,7 @@ impl AclListOutput {
 impl FormattedObject for AclListOutput {
     fn to_json(&self) -> Result<serde_json::Value, Error> {
         Ok(match &self.ips {
-            Some(ips) => serde_json::json!({"nodes": self.nodes, "ips": self.ips}),
+            Some(ips) => serde_json::json!({"nodes": self.nodes, "ips": ips}),
             None => serde_json::json!({"nodes": self.nodes}),
         })
     }
