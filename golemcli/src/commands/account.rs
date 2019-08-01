@@ -160,6 +160,7 @@ impl AccountSection {
         gas_price: &Option<bigdecimal::BigDecimal>,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        use crate::eth::Currency::ETH;
         let ack = ctx.prompt_for_acceptance("Are you sure?", None, Some("Withdraw cancelled"));
 
         if !ack {
@@ -171,10 +172,10 @@ impl AccountSection {
                 .rpc_call(
                     "pay.withdraw",
                     &(
-                        amount.clone(),
+                        currency.from_user(amount),
                         destination.clone(),
                         currency.clone(),
-                        gas_price.clone(),
+                        gas_price.as_ref().map(|gas_price| ETH.from_user(&gas_price)),
                     ),
                 )
                 .from_err()
