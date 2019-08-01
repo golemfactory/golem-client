@@ -167,6 +167,7 @@ pub enum TaskStatus {
     Finished,
     Aborted,
     Timeout,
+    #[serde(rename = "Restart")]
     Restarted,
 }
 
