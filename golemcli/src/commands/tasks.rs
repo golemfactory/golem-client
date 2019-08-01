@@ -70,22 +70,22 @@ pub enum Section {
         #[structopt(long)]
         sort: Option<String>,
     },
-    /// Show statistics for tasks (unimplemented)
+    /// Show statistics for tasks
     #[structopt(name = "stats")]
     Stats,
-    /// Show sub-tasks (unimplemented)
+    /// Show sub-tasks
     #[structopt(name = "subtasks")]
     Subtasks {
         /// Task or subtask identifier
         task_or_subtask_id: String,
     },
-    /// Dump a task template (unimplemented)
+    /// Dump a task template
     #[structopt(name = "template")]
     Template {
         #[structopt(raw(possible_values = "TASK_TYPES",))]
         task_type: String,
     },
-    /// Show statistics for unsupported tasks (unimplemented)
+    /// Show statistics for unsupported tasks
     #[structopt(name = "unsupport")]
     Unsupport { last_days: Option<i32> },
 }

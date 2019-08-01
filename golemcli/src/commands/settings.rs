@@ -7,9 +7,11 @@ use std::collections::btree_map::BTreeMap;
 use std::collections::{HashMap, HashSet};
 use structopt::{clap, StructOpt};
 
+// TODO: Add restart info on change.
+
 #[derive(StructOpt, Debug)]
 pub enum Section {
-    /// Change settings (unimplemented)
+    /// Change settings
     #[structopt(name = "set")]
     Set {
         /// Setting name
