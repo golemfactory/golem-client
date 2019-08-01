@@ -6,12 +6,6 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum NetworkSection {
-    /// Block provider
-    #[structopt(name = "block")]
-    Block {
-        /// ID of a node
-        node_id: String,
-    },
     /// Connect to a node
     #[structopt(name = "connect")]
     Connect {
@@ -62,7 +56,6 @@ impl NetworkSection {
                     .from_err()
                     .and_then(|_| CommandResponse::object("Command Send")),
             ),
-            NetworkSection::Block { node_id } => Box::new(self.block(endpoint, node_id)),
             NetworkSection::Dht { sort, full } => Box::new(self.dht(endpoint, sort, *full)),
             NetworkSection::Show { sort, full } => Box::new(self.show(endpoint, sort, *full)),
             NetworkSection::Status => Box::new(
@@ -73,24 +66,6 @@ impl NetworkSection {
                     .and_then(|status| CommandResponse::object(status.msg)),
             ),
         }
-    }
-
-    fn block(
-        &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        node_id: &str,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_net()
-            .block_node(node_id.into(), -1)
-            .from_err()
-            .and_then(|(b, msg)| {
-                if b {
-                    CommandResponse::object("Command Send")
-                } else {
-                    CommandResponse::object(format!("error: {}", msg.unwrap_or_default()))
-                }
-            })
     }
 
     fn dht(

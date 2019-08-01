@@ -175,7 +175,9 @@ impl AccountSection {
                         currency.from_user(amount),
                         destination.clone(),
                         currency.clone(),
-                        gas_price.as_ref().map(|gas_price| ETH.from_user(&gas_price)),
+                        gas_price
+                            .as_ref()
+                            .map(|gas_price| ETH.from_user(&gas_price)),
                     ),
                 )
                 .from_err()
