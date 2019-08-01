@@ -6,7 +6,7 @@ use golem_rpc_api::net::{AclRule, AclRuleItem, AclStatus, AsGolemNet, NodeInfo, 
 use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::net::IpAddr;
-use structopt::StructOpt;
+use structopt::{clap::ArgSettings, StructOpt};
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -16,23 +16,23 @@ pub enum Section {
     List {
         ///
         #[structopt(long)]
+        #[structopt(raw(hidden = "true"))]
         ip: bool,
-        #[structopt(long)]
-        node: bool,
         #[structopt(short = "l", long)]
         full: bool,
     },
 
-    /// Deny interaction with given nodes or ips.
+    /// Deny interaction with given nodes.
+    /// Adds for blacklist or removes from whitelist.
     #[structopt(raw(display_order = "500"))]
     #[structopt(name = "deny")]
     Deny {
         /// IPv4/IPv6 address, will be added to ip deny list.
         #[structopt(long)]
+        #[structopt(raw(hidden = "true"))]
         ip: Vec<IpAddr>,
 
         /// GOLEM node id. it can be pattern in form <prefix>...<suffix>
-        #[structopt(long)]
         node: Vec<GolemIdPattern>,
 
         /// Sets temporaty rule for given number of seconds.
@@ -40,15 +40,18 @@ pub enum Section {
         for_secs: Option<u32>,
     },
 
+    /// Allows interaction with given nodes.
+    /// Removes from blacklist or adds to whitelist.
     #[structopt(raw(display_order = "500"))]
     #[structopt(name = "allow")]
     Allow {
         #[structopt(long)]
+        #[structopt(raw(hidden = "true"))]
         ip: Vec<IpAddr>,
-        #[structopt(long)]
         node: Vec<GolemIdPattern>,
     },
 
+    /// Creates new acl list with given configuration.
     #[structopt(name = "setup")]
     Setup(Setup),
 }
@@ -79,7 +82,7 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
-            Section::List { full, .. } => Box::new(self.list(endpoint, *full)),
+            Section::List { full, ip, .. } => Box::new(self.list(endpoint, *full, *ip)),
             Section::Deny { ip, node, for_secs } => {
                 Box::new(self.deny(endpoint, ip, node, for_secs.map(|s| s as i32).unwrap_or(-1)))
             }
@@ -97,20 +100,36 @@ impl Section {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         full: bool,
+        ip: bool,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_net()
-            .acl_status()
-            .join(endpoint.as_golem_net().acl_ip_status())
-            .from_err()
-            .and_then(move |(node_acl, ip_acl)| {
-                Ok(AclListOutput {
-                    nodes: node_acl,
-                    ips: ip_acl.rules,
-                    full,
-                }
-                .to_response())
-            })
+        if ip {
+            future::Either::A(
+                endpoint
+                    .as_golem_net()
+                    .acl_status()
+                    .join(endpoint.as_golem_net().acl_ip_status())
+                    .from_err()
+                    .and_then(move |(node_acl, ip_acl)| {
+                        Ok(AclListOutput {
+                            nodes: node_acl,
+                            ips: Some(ip_acl.rules),
+                            full,
+                        }
+                        .to_response())
+                    }),
+            )
+        } else {
+            future::Either::B(endpoint.as_golem_net().acl_status().from_err().and_then(
+                move |node_acl| {
+                    Ok(AclListOutput {
+                        nodes: node_acl,
+                        ips: None,
+                        full,
+                    }
+                    .to_response())
+                },
+            ))
+        }
     }
 
     fn setup(
@@ -297,7 +316,7 @@ impl Section {
 
 struct AclListOutput {
     full: bool,
-    ips: Vec<AclRuleItem<IpAddr>>,
+    ips: Option<Vec<AclRuleItem<IpAddr>>>,
     nodes: AclStatus<String>,
 }
 
@@ -311,30 +330,35 @@ impl AclListOutput {
 
 impl FormattedObject for AclListOutput {
     fn to_json(&self) -> Result<serde_json::Value, Error> {
-        Ok(serde_json::json!({"nodes": self.nodes, "ips": self.ips}))
+        Ok(match &self.ips {
+            Some(ips) => serde_json::json!({"nodes": self.nodes, "ips": self.ips}),
+            None => serde_json::json!({"nodes": self.nodes}),
+        })
     }
 
     fn print(&self) -> Result<(), Error> {
         use prettytable::*;
 
-        println!("Blocked IP Addreses");
+        if let Some(ref ips) = self.ips {
+            println!("Blocked IP Addreses");
 
-        let mut table = create_table(vec!["ip", "valid to"]);
+            let mut table = create_table(vec!["ip", "valid to"]);
 
-        if self.ips.is_empty() {
-            table.add_row(row!["", ""]);
+            if ips.is_empty() {
+                table.add_row(row!["", ""]);
+            }
+            for AclRuleItem(ip, _, valid_to) in ips {
+                table.add_row(Row::new(vec![
+                    Cell::new(&ip.to_string()),
+                    Cell::new(
+                        &valid_to
+                            .map(|d| format!("{}", d.with_timezone(&chrono::Local)))
+                            .unwrap_or_default(),
+                    ),
+                ]));
+            }
+            table.printstd();
         }
-        for AclRuleItem(ip, _, valid_to) in &self.ips {
-            table.add_row(Row::new(vec![
-                Cell::new(&ip.to_string()),
-                Cell::new(
-                    &valid_to
-                        .map(|d| format!("{}", d.with_timezone(&chrono::Local)))
-                        .unwrap_or_default(),
-                ),
-            ]));
-        }
-        table.printstd();
 
         match self.nodes.default_rule {
             AclRule::Deny => println!("Allowed nodes"),
