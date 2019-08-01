@@ -22,6 +22,8 @@ mod terms;
 #[cfg(feature = "test_task_cli")]
 mod test_task;
 
+mod acl;
+
 #[derive(StructOpt, Debug)]
 pub enum CommandSection {
     /// Manage account
@@ -45,6 +47,10 @@ pub enum CommandSection {
     /// Manage network
     #[structopt(name = "network")]
     Network(network::NetworkSection),
+
+    /// Manage peer access control lists
+    #[structopt(name = "acl")]
+    Acl(acl::Section),
 
     /// Display incomes
     #[structopt(name = "incomes")]
@@ -152,8 +158,8 @@ impl CommandSection {
                 CommandSection::Tasks,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
+                CommandSection::Acl,
                 CommandSection::Shutdown,
-
             }
             async_with_ctx {
                 CommandSection::Account,

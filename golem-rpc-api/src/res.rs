@@ -1,5 +1,5 @@
 use crate::rpc::*;
-use serde_derive::*;
+use serde::*;
 use serde_json::Value;
 use serde_repr::*;
 use std::path::PathBuf;

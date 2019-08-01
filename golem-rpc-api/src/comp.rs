@@ -1,7 +1,7 @@
 use super::Map;
 use crate::rpc::*;
 use bigdecimal::BigDecimal;
-use serde_derive::*;
+use serde::*;
 use serde_json::Value;
 
 rpc_interface! {
