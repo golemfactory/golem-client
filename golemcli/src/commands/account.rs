@@ -128,6 +128,7 @@ impl AccountSection {
                             let eth_locked = Currency::ETH.format_decimal(&balance.eth_lock);
                             let gnt_available = Currency::GNT.format_decimal(&balance.av_gnt);
                             let gnt_unadopted = Currency::GNT.format_decimal(&balance.gnt_nonconverted);
+                            let gnt_locked = Currency::GNT.format_decimal(&balance.gnt_lock);
 
                             Ok(CommandResponse::Object(serde_json::json!({
                                 "node_name": node.node_name,
@@ -139,7 +140,7 @@ impl AccountSection {
                                     "eth_available": eth_available,
                                     "eth_locked": eth_locked,
                                     "gnt_available": gnt_available,
-                                    "gnt_locked": balance.gnt_lock,
+                                    "gnt_locked": gnt_locked,
                                     "gnt_unadopted": gnt_unadopted,
                                     "deposit_balance": deposit_balance
                                 }
