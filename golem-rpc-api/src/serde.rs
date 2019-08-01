@@ -76,6 +76,55 @@ pub mod ts_seconds {
     }
 }
 
+pub mod opt_ts_seconds {
+    use serde::{de, ser};
+    use std::fmt;
+
+    use chrono::{DateTime, Utc};
+
+    pub fn serialize<S>(dt: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        match dt {
+            None => serializer.serialize_none(),
+            Some(dt) => super::ts_seconds::serialize(dt, serializer),
+        }
+    }
+
+    pub fn deserialize<'de, D>(d: D) -> Result<Option<DateTime<Utc>>, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        Ok(d.deserialize_option(OptSecondsTimestampVisitor)?)
+    }
+
+    struct OptSecondsTimestampVisitor;
+
+    impl<'de> de::Visitor<'de> for OptSecondsTimestampVisitor {
+        type Value = Option<DateTime<Utc>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a unix timestamp in seconds or none")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: de::Deserializer<'de>,
+        {
+            super::ts_seconds::deserialize(deserializer).map(|v| Some(v))
+        }
+    }
+
+}
+
 pub mod duration {
     use serde::{de, ser};
     use std::fmt;

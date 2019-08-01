@@ -25,9 +25,14 @@ serde_derive="1.0"
 base64 = "0.10.1"
 rand = "0.6"
 
-[dependencies.actix-web]
-version = "1.0.0-beta.5"
+[dependencies.awc]
+version = "0.2.1"
+default-features=false
 features = ['ssl']
+
+#[dependencies.actix-web]
+#version = "1.0.0"
+#features = ['ssl']
 
 [dependencies.openssl]
 version="0.10.20"
