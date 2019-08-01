@@ -35,4 +35,5 @@ default=["settings"]
 settings=[]
 
 [dev-dependencies]
-rand={git = "https://github.com/rust-random/rand.git", branch="0.5"}
+rand="0.5"
+

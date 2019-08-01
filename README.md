@@ -1,7 +1,7 @@
 # golem-client
 [![build-status-travis]][travis] 
 
-[build-status-travis]: https://travis-ci.org/golemfactory/golem-client.svg?branch=release/0.2
+[build-status-travis]: https://travis-ci.org/golemfactory/golem-client.svg?branch=master
 [travis]: https://travis-ci.org/golemfactory/golem-client
 
 [Project roadmap](https://docs.google.com/document/d/1h1pUB-LT6YwozfqX9rAO7vrgzM5CaGGr9WsePeZ95C8) 
