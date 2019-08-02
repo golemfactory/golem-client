@@ -167,6 +167,7 @@ pub enum TaskStatus {
     Finished,
     Aborted,
     Timeout,
+    #[serde(rename = "Restart")]
     Restarted,
 }
 
@@ -272,9 +273,15 @@ pub struct SubtaskStats {
 pub struct UnsupportInfo {
     pub reason: String,
     #[serde(rename(serialize = "no_of_tasks"))]
-    pub ntasks: u32,
+    pub n_tasks: u32,
+    /// avg (if available) is the current most
+    ///  typical corresponding value.  For unsupport reason
+    ///  MAX_PRICE avg is the average price of all tasks currently observed in
+    ///  the network. For unsupport reason APP_VERSION avg is
+    ///  the most popular app version of all tasks currently observed in the
+    ///  network.
     #[serde(rename(serialize = "avg_for_all_tasks"))]
-    pub avg: Option<f32>,
+    pub avg: serde_json::Value,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

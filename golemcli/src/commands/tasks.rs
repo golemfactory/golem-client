@@ -418,7 +418,7 @@ impl Section {
                 ];
                 let values = unsupported
                     .into_iter()
-                    .map(|stat| serde_json::json!([stat.reason, stat.ntasks, stat.avg,]))
+                    .map(|stat| serde_json::json!([stat.reason, stat.n_tasks, stat.avg,]))
                     .collect();
                 Ok(ResponseTable { columns, values }.into())
             })
