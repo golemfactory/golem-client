@@ -17,6 +17,7 @@ use golem_rpc_api::res::CacheSizes;
 use golem_rpc_api::rpc::AsInvoker;
 use golem_rpc_api::settings::DynamicSetting;
 use golem_rpc_api::{core::AsGolemCore, pay::AsGolemPay, res::AsGolemRes, settings, Map};
+use prettytable::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::btree_map::BTreeMap;
@@ -44,6 +45,8 @@ enum GolemNet {
     Mainnet,
     Testnet,
 }
+
+const UNDERLINE_TITLE_WIDTH: usize = 25;
 
 impl Display for GolemNet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -83,9 +86,11 @@ struct RunningStatus {
 
 struct SectionBuilder {
     indentation_mark: &'static str,
-    content: Vec<SectionEntry>,
+    content: Vec<Vec<SectionEntry>>,
+    current_section: Vec<SectionEntry>,
 }
 
+#[derive(Clone, Debug)]
 enum SectionEntry {
     StartSection { title: String },
     StartSubSection { title: String },
@@ -99,95 +104,119 @@ impl SectionBuilder {
         SectionBuilder {
             indentation_mark,
             content: Vec::new(),
+            current_section: Vec::new(),
         }
     }
     fn new_section(&mut self, title: impl Into<String>) -> &mut Self {
         let title = title.into();
-        self.content.push(SectionEntry::StartSection { title });
+        self.current_section
+            .push(SectionEntry::StartSection { title });
         self
     }
 
     fn new_subsection(&mut self, title: impl Into<String>) -> &mut Self {
-        self.content.push(SectionEntry::StartSubSection {
-            title: title.into(),
-        });
+        let title = title.into();
+        self.current_section
+            .push(SectionEntry::StartSubSection { title });
         self
     }
 
     fn end_section(&mut self) -> &mut Self {
-        self.content.push(SectionEntry::EndSection);
+        self.current_section.push(SectionEntry::EndSection);
+        self.content.push(self.current_section.clone());
+        self.current_section = Vec::new();
         self
     }
 
     fn end_subsection(&mut self) -> &mut Self {
-        self.content.push(SectionEntry::EndSubSection);
+        self.current_section.push(SectionEntry::EndSubSection);
         self
     }
 
     fn entry(&mut self, key: &str, value: &str) -> &mut Self {
-        self.content.push(SectionEntry::Entry {
+        self.current_section.push(SectionEntry::Entry {
             key: key.into(),
             value: value.into(),
         });
         self
     }
 
+    fn fill(&self, len: usize) -> String {
+        " ".repeat(UNDERLINE_TITLE_WIDTH - len)
+    }
+
     fn make_ident(&self, ident: u8) -> String {
         self.indentation_mark.repeat(ident.into())
     }
 
-    fn build(&mut self) -> String {
-        let mut ident: u8 = 0;
-        let mut result = String::new();
-
-        for item in &self.content {
+    fn section_to_table(&self, section: &Vec<SectionEntry>) -> Table {
+        let mut table = Table::new();
+        let format = format::FormatBuilder::new().padding(1, 1).build();
+        table.set_format(format);
+        let mut ident = 0;
+        for item in section {
             match item {
                 SectionEntry::StartSection { title } => {
-                    result.push_str(
-                        format!(
-                            "{}{}\n",
-                            self.make_ident(ident),
-                            Style::new()
-                                .fg(Colour::Yellow)
-                                .underline()
-                                .paint(format!("{}", title))
-                        )
-                        .as_ref(),
-                    );
-                    ident = ident + 1;
+                    table.add_row(row![Style::new()
+                        .fg(Colour::Yellow)
+                        .underline()
+                        .paint(format!("{}{}", title, self.fill(title.len())))]);
                 }
                 SectionEntry::EndSection => {
-                    assert!(ident > 0);
-                    result.push_str("\n");
-                    ident = ident - 1;
+                    table.add_empty_row();
+                }
+                SectionEntry::Entry { key, value } => {
+                    table.add_row(row![
+                        format!(
+                            "{}{}",
+                            self.make_ident(ident),
+                            Style::new().bold().paint(format!("{}:", key))
+                        ),
+                        value
+                    ]);
                 }
                 SectionEntry::EndSubSection => {
                     assert!(ident > 0);
                     ident = ident - 1;
                 }
-                SectionEntry::Entry { key, value } => result.push_str(
-                    format!(
-                        "{}{} {}\n",
-                        self.make_ident(ident),
-                        Style::new().bold().paint(format!("{}:", key)),
-                        value
-                    )
-                    .as_ref(),
-                ),
                 SectionEntry::StartSubSection { title } => {
-                    result.push_str(
+                    table.add_row(row![
                         format!(
                             "{}{}\n",
                             self.make_ident(ident),
                             Style::new().bold().paint(format!("{}:", title))
-                        )
-                        .as_ref(),
-                    );
+                        ),
+                        ""
+                    ]);
                     ident = ident + 1;
                 }
-            }
+            };
         }
-        result
+        table
+    }
+
+    fn to_table(&self) -> prettytable::Table {
+        use prettytable::*;
+
+        let mut table = Table::new();
+        let mut left_column = Table::new();
+        let mut right_column = Table::new();
+        let format = format::FormatBuilder::new().padding(2, 0).build();
+        table.set_format(format);
+        left_column.set_format(format);
+        right_column.set_format(format);
+
+        let mut left_sections = self.content.clone();
+        let right_sections = left_sections.split_off(self.content.len() / 2);
+
+        for sec in left_sections {
+            left_column.add_row(row![self.section_to_table(&sec)]);
+        }
+        for sec in right_sections {
+            right_column.add_row(row![self.section_to_table(&sec)]);
+        }
+        table.add_row(row![left_column, right_column]);
+        table
     }
 }
 
@@ -213,7 +242,7 @@ struct ProviderStatus {
     subtasks_computed: u32,
     subtasks_in_network: u32,
     provider_state: Option<String>,
-    pending_payments: BigDecimal,
+    pending_payments: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -222,7 +251,7 @@ struct FormattedGeneralStatus {
     net_status: NetworkStatus,
     account_status: AccountStatus,
     provider_status: ProviderStatus,
-    requestor_tasks_progress: Option<String>,
+    requestor_tasks_progress: String,
 }
 
 impl Section {
@@ -401,21 +430,23 @@ impl Section {
                 subtasks_computed: task_stats.subtasks_computed.session,
                 subtasks_in_network: task_stats.in_network,
                 provider_state: task_stats.provider_state.get("status").cloned(),
-                pending_payments: awaiting_incomes
-                    .iter()
-                    .filter(|income| {
-                        mem::discriminant(&income.status)
-                            == mem::discriminant(&PaymentStatus::Awaiting)
-                    })
-                    .map(|x| &x.value)
-                    .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val),
+                pending_payments: crate::eth::Currency::GNT.format_decimal(
+                    &awaiting_incomes
+                        .iter()
+                        .filter(|income| {
+                            mem::discriminant(&income.status)
+                                == mem::discriminant(&PaymentStatus::Awaiting)
+                        })
+                        .map(|x| &x.value)
+                        .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val),
+                ),
             })
     }
 
     fn get_requestor_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = Option<String>, Error = Error> {
+    ) -> impl Future<Item = String, Error = Error> {
         let active_tasks = vec![
             TaskStatus::Restarted,
             TaskStatus::Computing,
@@ -477,8 +508,8 @@ impl Section {
             })
             .map(
                 |(total_subtasks, finished_subtasks)| match total_subtasks > 0 {
-                    true => Some(format!("{}/{}", finished_subtasks, total_subtasks)),
-                    false => None,
+                    true => format!("{}/{}", finished_subtasks, total_subtasks),
+                    false => String::from("0/0"),
                 },
             )
             .from_err()
@@ -594,7 +625,7 @@ impl FormattedObject for FormattedGeneralStatus {
             )
             .entry(
                 &String::from("Pending payments"),
-                &self.provider_status.pending_payments.to_string(),
+                &self.provider_status.pending_payments,
             );
 
         if self.provider_status.provider_state.is_some() {
@@ -611,18 +642,13 @@ impl FormattedObject for FormattedGeneralStatus {
 
         section_builder.end_section();
 
-        let requestor_perpective = String::from("0/0");
-        let requestor_status = self
-            .requestor_tasks_progress
-            .as_ref()
-            .unwrap_or(&requestor_perpective);
         section_builder.new_section("Requestor status");
         section_builder.entry(
-            "all computed subtasks / all subtasks [from all tasks]",
-            &requestor_status,
+            "all computed subtasks / all subtasks",
+            self.requestor_tasks_progress.as_ref(),
         );
-
-        println!("{}", section_builder.build());
+        section_builder.end_section();
+        section_builder.to_table().printstd();
         Ok(())
     }
 }
