@@ -1,0 +1,6 @@
+disable-publish=true
+sign-commit=true
+upload-doc=false
+tag-prefix="v"
+no-dev-version=true
+

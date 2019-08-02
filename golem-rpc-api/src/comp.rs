@@ -1,7 +1,7 @@
 use super::Map;
 use crate::rpc::*;
 use bigdecimal::BigDecimal;
-use serde_derive::*;
+use serde::*;
 use serde_json::Value;
 
 rpc_interface! {
@@ -153,13 +153,15 @@ pub struct TaskTestResult {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TaskStatus {
+    #[serde(rename = "Error creating")]
+    ErrorCreating,
     #[serde(rename = "Not started")]
     NotStarted,
     #[serde(rename = "Creating the deposit")]
     CreatingDeposit,
     Sending,
-    Waiting,
     Creating,
+    Waiting,
     Starting,
     Computing,
     Finished,
@@ -227,6 +229,7 @@ pub enum SubtaskStatus {
     Finished,
     Failure,
     Restart,
+    Cancelled,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

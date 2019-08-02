@@ -1,4 +1,6 @@
 use crate::context::{CliCtx, CommandResponse};
+use futures::{future, prelude::*};
+use golem_rpc_api::rpc::*;
 use std::fmt::{self, Debug};
 use structopt::*;
 
@@ -19,6 +21,8 @@ mod tasks;
 mod terms;
 #[cfg(feature = "test_task_cli")]
 mod test_task;
+
+mod acl;
 
 #[derive(StructOpt, Debug)]
 pub enum CommandSection {
@@ -43,6 +47,10 @@ pub enum CommandSection {
     /// Manage network
     #[structopt(name = "network")]
     Network(network::NetworkSection),
+
+    /// Manage peer access control lists
+    #[structopt(name = "acl")]
+    Acl(acl::Section),
 
     /// Display incomes
     #[structopt(name = "incomes")]
@@ -76,6 +84,10 @@ pub enum CommandSection {
     #[cfg(feature = "test_task_cli")]
     #[structopt(name = "test_task")]
     TestTask(test_task::Section),
+
+    /// Trigger graceful shutdown of Golem
+    #[structopt(name = "shutdown")]
+    Shutdown(ShutdownCommand),
 
     #[structopt(name = "_int")]
     #[structopt(raw(setting = "structopt::clap::AppSettings::Hidden"))]
@@ -146,7 +158,8 @@ impl CommandSection {
                 CommandSection::Tasks,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
-
+                CommandSection::Acl,
+                CommandSection::Shutdown,
             }
             async_with_ctx {
                 CommandSection::Account,
@@ -196,5 +209,24 @@ impl InternalSection {
         }
 
         Ok(CommandResponse::NoOutput)
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct ShutdownCommand {}
+
+impl ShutdownCommand {
+    fn run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> impl Future<Item = CommandResponse, Error = crate::context::Error> + 'static {
+        endpoint
+            .as_invoker()
+            .rpc_call("golem.graceful_shutdown", &())
+            .and_then(|ret: u64| {
+                let result = format!("Graceful shutdown triggered result: {}", ret);
+                Ok(CommandResponse::Object(result.into()))
+            })
+            .from_err()
     }
 }

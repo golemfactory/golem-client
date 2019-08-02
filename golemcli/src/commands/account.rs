@@ -15,9 +15,6 @@ pub enum AccountSection {
     /// Display account & financial info
     #[structopt(name = "info")]
     Info,
-    /// Trigger graceful shutdown of your golem
-    #[structopt(name = "shutdown")]
-    Shutdown,
     /// Unlock account, will prompt for your password
     #[structopt(name = "unlock")]
     Unlock,
@@ -45,7 +42,6 @@ impl AccountSection {
         match self {
             AccountSection::Unlock => Box::new(self.account_unlock(endpoint)),
             AccountSection::Info => Box::new(self.account_info(endpoint)),
-            AccountSection::Shutdown => Box::new(self.account_shutdown(endpoint)),
             AccountSection::Withdraw {
                 destination,
                 amount,
@@ -155,20 +151,6 @@ impl AccountSection {
         ).from_err()
     }
 
-    fn account_shutdown(
-        &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_invoker()
-            .rpc_call("golem.graceful_shutdown", &())
-            .and_then(|ret: u64| {
-                let result = format!("Graceful shutdown triggered result: {}", ret);
-                Ok(CommandResponse::Object(result.into()))
-            })
-            .from_err()
-    }
-
     fn withdraw(
         &self,
         ctx: &CliCtx,
@@ -178,6 +160,7 @@ impl AccountSection {
         gas_price: &Option<bigdecimal::BigDecimal>,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        use crate::eth::Currency::ETH;
         let ack = ctx.prompt_for_acceptance("Are you sure?", None, Some("Withdraw cancelled"));
 
         if !ack {
@@ -189,10 +172,12 @@ impl AccountSection {
                 .rpc_call(
                     "pay.withdraw",
                     &(
-                        amount.clone(),
+                        currency.from_user(amount),
                         destination.clone(),
                         currency.clone(),
-                        gas_price.clone(),
+                        gas_price
+                            .as_ref()
+                            .map(|gas_price| ETH.from_user(&gas_price)),
                     ),
                 )
                 .from_err()

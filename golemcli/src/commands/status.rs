@@ -18,8 +18,7 @@ use golem_rpc_api::rpc::AsInvoker;
 use golem_rpc_api::settings::DynamicSetting;
 use golem_rpc_api::{core::AsGolemCore, pay::AsGolemPay, res::AsGolemRes, settings, Map};
 use prettytable::*;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
-use serde_derive::*;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::btree_map::BTreeMap;
 use std::collections::{HashMap, HashSet};
@@ -108,13 +107,15 @@ impl SectionBuilder {
             current_section: Vec::new(),
         }
     }
-    fn new_section(&mut self, title: String) -> &mut Self {
+    fn new_section(&mut self, title: impl Into<String>) -> &mut Self {
+        let title = title.into();
         self.current_section
             .push(SectionEntry::StartSection { title });
         self
     }
 
-    fn new_subsection(&mut self, title: String) -> &mut Self {
+    fn new_subsection(&mut self, title: impl Into<String>) -> &mut Self {
+        let title = title.into();
         self.current_section
             .push(SectionEntry::StartSubSection { title });
         self
@@ -132,10 +133,10 @@ impl SectionBuilder {
         self
     }
 
-    fn entry(&mut self, key: &String, value: &String) -> &mut Self {
+    fn entry(&mut self, key: &str, value: &str) -> &mut Self {
         self.current_section.push(SectionEntry::Entry {
-            key: key.clone(),
-            value: value.clone(),
+            key: key.into(),
+            value: value.into(),
         });
         self
     }
@@ -250,7 +251,7 @@ struct FormattedGeneralStatus {
     net_status: NetworkStatus,
     account_status: AccountStatus,
     provider_status: ProviderStatus,
-    requestor_tasks_progress: Option<String>,
+    requestor_tasks_progress: String,
 }
 
 impl Section {
@@ -443,7 +444,7 @@ impl Section {
     fn get_requestor_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = Option<String>, Error = Error> {
+    ) -> impl Future<Item = String, Error = Error> {
         let active_tasks = vec![
             TaskStatus::Restarted,
             TaskStatus::Computing,
@@ -505,8 +506,8 @@ impl Section {
             })
             .map(
                 |(total_subtasks, finished_subtasks)| match total_subtasks > 0 {
-                    true => Some(format!("{}/{}", finished_subtasks, total_subtasks)),
-                    false => None,
+                    true => format!("{}/{}", finished_subtasks, total_subtasks),
+                    false => String::from("0/0"),
                 },
             )
             .from_err()
@@ -522,40 +523,43 @@ impl FormattedObject for FormattedGeneralStatus {
         let mut section_builder = SectionBuilder::new("  ");
 
         section_builder
-            .new_section(String::from("General"))
+            .new_section("General")
             .entry(
                 &String::from("Process State"),
                 &self.running_status.process_state.to_string(),
             )
             .new_subsection(String::from("Components Status"))
             .entry(
-                &String::from("docker"),
+                "docker",
                 self.running_status
                     .component_statuses
                     .docker_status
                     .as_ref()
-                    .unwrap_or(&String::from("unknown")),
+                    .map(AsRef::as_ref)
+                    .unwrap_or("unknown"),
             )
             .entry(
-                &String::from("hyperdrive"),
+                "hyperdrive",
                 self.running_status
                     .component_statuses
                     .hyperdrive
                     .as_ref()
-                    .unwrap_or(&String::from("unknown")),
+                    .map(AsRef::as_ref)
+                    .unwrap_or("unknown"),
             )
             .entry(
-                &String::from("client"),
+                "client",
                 self.running_status
                     .component_statuses
                     .client
                     .as_ref()
-                    .unwrap_or(&String::from("unknown")),
+                    .map(AsRef::as_ref)
+                    .unwrap_or("unknown"),
             );
 
         if self.running_status.component_statuses.hypervisor.is_some() {
             section_builder.entry(
-                &String::from("hypervisor"),
+                "hypervisor",
                 self.running_status
                     .component_statuses
                     .hypervisor
@@ -564,9 +568,9 @@ impl FormattedObject for FormattedGeneralStatus {
             );
         }
         let connection_status = if self.net_status.is_connected {
-            String::from("ONLINE")
+            "ONLINE"
         } else {
-            String::from("OFFLINE")
+            "OFFLINE"
         };
 
         section_builder
@@ -576,54 +580,29 @@ impl FormattedObject for FormattedGeneralStatus {
                 &self.running_status.golem_version,
             )
             .entry(&String::from("Node name"), &self.running_status.node_name)
-            .entry(
-                &String::from("Network"),
-                &self.running_status.network.to_string(),
-            )
-            .new_subsection(String::from("Disk usage"))
-            .entry(
-                &String::from("Received files"),
-                &self.running_status.disk_usage.received_files,
-            )
-            .entry(
-                &String::from("Distributed files"),
-                &self.running_status.disk_usage.distributed_files,
-            )
-            .end_subsection()
+            .entry("Network", &self.running_status.network.to_string())
+            .entry("Disk usage", &self.running_status.disk_usage.received_files)
             .end_section()
-            .new_section(String::from("Network"))
-            .entry(&String::from("Connection"), &connection_status)
-            .new_subsection(String::from("Port statuses"));
+            .new_section("Network")
+            .entry("Connection", connection_status)
+            .new_subsection("Port statuses");
 
         for (key, value) in self.net_status.port_status.iter() {
-            let key = key.to_string();
             section_builder.entry(&key.to_string(), value);
         }
 
         section_builder
             .end_subsection()
-            .entry(
-                &String::from("Nodes online"),
-                &self.net_status.nodes_online.to_string(),
-            )
+            .entry("Nodes online", &self.net_status.nodes_online.to_string())
             .end_section()
-            .new_section(String::from("Account"))
-            .entry(
-                &String::from("ETH address"),
-                &self.account_status.eth_address,
-            )
-            .entry(
-                &String::from("GNT available"),
-                &self.account_status.gnt_available,
-            )
-            .entry(
-                &String::from("ETH available"),
-                &self.account_status.eth_available,
-            )
+            .new_section("Account")
+            .entry("ETH address", &self.account_status.eth_address)
+            .entry("GNT available", &self.account_status.gnt_available)
+            .entry("ETH available", &self.account_status.eth_available)
             .end_section()
-            .new_section(String::from("Provider Status"))
+            .new_section("Provider Status")
             .entry(
-                &String::from("Subtasks accepted (in session)"),
+                "Subtasks accepted (in session)",
                 &self.provider_status.subtasks_accepted.to_string(),
             )
             .entry(
@@ -649,22 +628,22 @@ impl FormattedObject for FormattedGeneralStatus {
 
         if self.provider_status.provider_state.is_some() {
             section_builder.entry(
-                &String::from("Provider state"),
-                &self.provider_status.provider_state.as_ref().unwrap(),
+                "Provider state",
+                &self
+                    .provider_status
+                    .provider_state
+                    .as_ref()
+                    .map(AsRef::as_ref)
+                    .unwrap_or(""),
             );
         };
 
         section_builder.end_section();
 
-        let requestor_perpective = String::from("0/0");
-        let requestor_status = self
-            .requestor_tasks_progress
-            .as_ref()
-            .unwrap_or(&requestor_perpective);
-        section_builder.new_section(String::from("Requestor status"));
+        section_builder.new_section("Requestor status");
         section_builder.entry(
-            &String::from("all computed subtasks / all subtasks"),
-            &requestor_status,
+            "all computed subtasks / all subtasks",
+            self.requestor_tasks_progress.as_ref(),
         );
         section_builder.end_section();
         section_builder.to_table().printstd();

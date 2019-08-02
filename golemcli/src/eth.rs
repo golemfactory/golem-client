@@ -1,5 +1,6 @@
 use bigdecimal::BigDecimal;
 use ethkey::{Address, PublicKey};
+use num_bigint::{BigInt, ToBigInt};
 use rustc_hex::FromHex;
 use serde::Serialize;
 use structopt::clap::arg_enum;
@@ -45,6 +46,10 @@ fn eth_denoms() -> BigDecimal {
 impl Currency {
     pub fn format_decimal(&self, val: &bigdecimal::BigDecimal) -> String {
         format!("{} {}", val / eth_denoms(), self.as_str())
+    }
+
+    pub fn from_user(&self, val: &bigdecimal::BigDecimal) -> String {
+        format!("{}", (val * eth_denoms()).to_bigint().unwrap())
     }
 
     pub fn as_str(&self) -> &str {

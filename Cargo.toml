@@ -12,7 +12,4 @@ lto=true
 opt-level=3
 panic="abort"
 
-[patch.crates-io]
-rand_core={git = "https://github.com/rust-random/rand.git", branch="0.5"}
-rand={git = "https://github.com/rust-random/rand.git", branch="0.5"}
 
