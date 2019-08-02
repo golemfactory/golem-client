@@ -128,16 +128,16 @@ impl Section {
         file_name: &Path,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         use std::fs;
-/*
- if error:
-            if isinstance(error, dict):
-                error = error['error_msg']
-            if task_id:
-                return CommandResult(error="task {} failed: {}"
-                                     .format(task_id, error))
-            return CommandResult(error=error)
-        return task_id
-*/
+        /*
+         if error:
+                    if isinstance(error, dict):
+                        error = error['error_msg']
+                    if task_id:
+                        return CommandResult(error="task {} failed: {}"
+                                             .format(task_id, error))
+                    return CommandResult(error=error)
+                return task_id
+        */
         fs::OpenOptions::new()
             .read(true)
             .open(file_name)
@@ -145,9 +145,7 @@ impl Section {
             .and_then(|file| Ok(serde_json::from_reader(file)?))
             .from_err()
             .and_then(move |task_spec| endpoint.as_golem_comp().create_task(task_spec).from_err())
-            .and_then(|task_id| {
-                CommandResponse::object(task_id)
-            })
+            .and_then(|task_id| CommandResponse::object(task_id))
     }
 
     fn abort(
