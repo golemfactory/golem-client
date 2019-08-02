@@ -242,7 +242,7 @@ struct ProviderStatus {
     subtasks_computed: u32,
     subtasks_in_network: u32,
     provider_state: Option<String>,
-    pending_payments: BigDecimal,
+    pending_payments: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -430,14 +430,16 @@ impl Section {
                 subtasks_computed: task_stats.subtasks_computed.session,
                 subtasks_in_network: task_stats.in_network,
                 provider_state: task_stats.provider_state.get("status").cloned(),
-                pending_payments: awaiting_incomes
-                    .iter()
-                    .filter(|income| {
-                        mem::discriminant(&income.status)
-                            == mem::discriminant(&PaymentStatus::Awaiting)
-                    })
-                    .map(|x| &x.value)
-                    .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val),
+                pending_payments: crate::eth::Currency::GNT.format_decimal(
+                    &awaiting_incomes
+                        .iter()
+                        .filter(|income| {
+                            mem::discriminant(&income.status)
+                                == mem::discriminant(&PaymentStatus::Awaiting)
+                        })
+                        .map(|x| &x.value)
+                        .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val)
+                )
             })
     }
 
@@ -623,7 +625,7 @@ impl FormattedObject for FormattedGeneralStatus {
             )
             .entry(
                 &String::from("Pending payments"),
-                &self.provider_status.pending_payments.to_string(),
+                &self.provider_status.pending_payments,
             );
 
         if self.provider_status.provider_state.is_some() {
