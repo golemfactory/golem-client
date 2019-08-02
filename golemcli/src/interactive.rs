@@ -9,6 +9,7 @@ use std::cell::{Ref, RefCell};
 use std::iter::Enumerate;
 use std::str::Chars;
 use structopt::{clap, StructOpt};
+use crate::interactive::cmdparse::parse_line;
 
 #[cfg(not(windows))]
 fn after_help() -> String {
@@ -93,7 +94,7 @@ pub fn interactive_shell(ctx: &mut CliCtx) {
             return;
         }
 
-        match LineArgs::from_iter_safe(line.split_ascii_whitespace()) {
+        match LineArgs::from_iter_safe(parse_line(&line).map(|r| r.unwrap().1.into_owned())) {
             Ok(LineArgs {
                 json: _,
                 command: Some(command),
