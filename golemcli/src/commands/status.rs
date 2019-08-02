@@ -438,8 +438,8 @@ impl Section {
                                 == mem::discriminant(&PaymentStatus::Awaiting)
                         })
                         .map(|x| &x.value)
-                        .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val)
-                )
+                        .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val),
+                ),
             })
     }
 

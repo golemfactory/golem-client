@@ -1,4 +1,5 @@
 use crate::context::CliCtx;
+use crate::interactive::cmdparse::parse_line;
 use rustyline::completion::Completer;
 use rustyline::config::Configurer;
 use rustyline::highlight::Highlighter;
@@ -9,7 +10,6 @@ use std::cell::{Ref, RefCell};
 use std::iter::Enumerate;
 use std::str::Chars;
 use structopt::{clap, StructOpt};
-use crate::interactive::cmdparse::parse_line;
 
 #[cfg(not(windows))]
 fn after_help() -> String {
