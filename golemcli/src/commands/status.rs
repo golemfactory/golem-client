@@ -241,7 +241,7 @@ struct ProviderStatus {
     subtasks_failed: u32,
     subtasks_computed: u32,
     subtasks_in_network: u32,
-    provider_state: Option<String>,
+    provider_state: String,
     pending_payments: String,
 }
 
@@ -429,7 +429,7 @@ impl Section {
                 subtasks_failed: task_stats.subtasks_with_errors.session,
                 subtasks_computed: task_stats.subtasks_computed.session,
                 subtasks_in_network: task_stats.in_network,
-                provider_state: task_stats.provider_state.get("status").cloned(),
+                provider_state: task_stats.provider_state.status,
                 pending_payments: crate::eth::Currency::GNT.format_decimal(
                     &awaiting_incomes
                         .iter()
@@ -627,18 +627,13 @@ impl FormattedObject for FormattedGeneralStatus {
                 &String::from("Pending payments"),
                 &self.provider_status.pending_payments,
             );
-
-        if self.provider_status.provider_state.is_some() {
             section_builder.entry(
                 "Provider state",
                 &self
                     .provider_status
                     .provider_state
                     .as_ref()
-                    .map(AsRef::as_ref)
-                    .unwrap_or(""),
             );
-        };
 
         section_builder.end_section();
 
