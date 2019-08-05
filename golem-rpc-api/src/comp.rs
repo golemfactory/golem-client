@@ -68,13 +68,34 @@ rpc_interface! {
         #[id = "comp.task.restart"]
         fn restart_task(&self, task_id: String) -> Result<(Option<String>, Option<String>)>;
 
-        //
+        // TODO:
         #[id = "comp.task.subtasks.frame.restart"]
         fn restart_frame_subtasks(&self, task_id: String, frame: u32) -> Result<()>;
 
-        //
-        #[id = "comp.task.restart_subtasks"]
-        fn restart_subtasks_from_task(&self, task_id: String, subtask_ids: Vec<String>) -> Result<()>;
+        /// Restarts a set of subtasks from the given task. If the specified task is
+        ///  already finished, all failed subtasks will be restarted along with the
+        ///  set provided as a parameter. Finished subtasks will have their results
+        ///  copied over to the newly created task.
+        ///
+        /// ## Parameters
+        ///
+        ///  * `task_id`  the ID of the task which contains the given subtasks.
+        ///  * `subtask_ids` the set of subtask IDs which should be restarted. If this is
+        /// empty and the task is finished, all of the task's subtasks marked as failed will be
+        /// restarted.
+        ///  * `ignore_gas_price` if True, this will ignore long transaction time
+        ///        errors and proceed with the restart.
+        ///  * `disable_concent`  setting this flag to True will result in forcing
+        ///       Concent to be disabled for the task. This only has effect when the task
+        ///        is already finished and needs to be restarted.
+        ///
+        ///  ##Returns
+        ///
+        ///  In case of any errors, returns the representation of the error
+        /// (either a string or a dict). Otherwise, returns None.
+        ///
+        #[id = "comp.task.subtasks.restart"]
+        fn restart_subtasks_from_task(&self, task_id: String, subtask_ids: Vec<String>) -> Result<Value>;
 
         //
         #[id = "comp.tasks.check"]
@@ -309,7 +330,6 @@ pub struct SubtaskStats {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UnsupportInfo {
     pub reason: String,
-
     #[serde(rename = "ntasks")]
     pub n_tasks: u32,
     /// avg (if available) is the current most
