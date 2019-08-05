@@ -27,6 +27,9 @@ rpc_interface! {
         #[id = "golem.version"]
         fn get_version(&self) -> Result<String>;
 
+        #[id = "golem.password.key_exists"]
+        fn key_exists(&self) -> Result<bool>;
+
         #[id = "golem.password.set"]
         fn set_password(&self, password : String) -> Result<bool>;
 
