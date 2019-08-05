@@ -13,7 +13,7 @@ rpc_interface! {
         //   Some(task_id), None,
         //   None, Some(error_message)
         #[id = "comp.task.create"]
-        fn create_task(&self, task_spec: serde_json::Value) -> Result<(Option<String>, Option<String>)>;
+        fn create_task_int(&self, task_spec: serde_json::Value) -> Result<(Option<String>, Option<Value>)>;
 
         #[id = "comp.task"]
         fn get_task(&self, task_id : String) -> Result<Option<TaskInfo>>;
@@ -68,13 +68,34 @@ rpc_interface! {
         #[id = "comp.task.restart"]
         fn restart_task(&self, task_id: String) -> Result<(Option<String>, Option<String>)>;
 
-        //
+        // TODO:
         #[id = "comp.task.subtasks.frame.restart"]
         fn restart_frame_subtasks(&self, task_id: String, frame: u32) -> Result<()>;
 
-        //
-        #[id = "comp.task.restart_subtasks"]
-        fn restart_subtasks_from_task(&self, task_id: String, subtask_ids: Vec<String>) -> Result<()>;
+        /// Restarts a set of subtasks from the given task. If the specified task is
+        ///  already finished, all failed subtasks will be restarted along with the
+        ///  set provided as a parameter. Finished subtasks will have their results
+        ///  copied over to the newly created task.
+        ///
+        /// ## Parameters
+        ///
+        ///  * `task_id`  the ID of the task which contains the given subtasks.
+        ///  * `subtask_ids` the set of subtask IDs which should be restarted. If this is
+        /// empty and the task is finished, all of the task's subtasks marked as failed will be
+        /// restarted.
+        ///  * `ignore_gas_price` if True, this will ignore long transaction time
+        ///        errors and proceed with the restart.
+        ///  * `disable_concent`  setting this flag to True will result in forcing
+        ///       Concent to be disabled for the task. This only has effect when the task
+        ///        is already finished and needs to be restarted.
+        ///
+        ///  ##Returns
+        ///
+        ///  In case of any errors, returns the representation of the error
+        /// (either a string or a dict). Otherwise, returns None.
+        ///
+        #[id = "comp.task.subtasks.restart"]
+        fn restart_subtasks_from_task(&self, task_id: String, subtask_ids: Vec<String>) -> Result<Value>;
 
         //
         #[id = "comp.tasks.check"]
@@ -113,6 +134,43 @@ rpc_interface! {
         #[id = "performance.multiplier"]
         fn perf_mult(&self) -> Result<f64>;
 
+    }
+}
+
+impl<'a, Inner: crate::rpc::wamp::RpcEndpoint + ?Sized + 'static> GolemComp<'a, Inner> {
+    //
+    // map kwarg force
+    // Returns:
+    //   Some(task_id), None,
+    //   None, Some(error_message)
+    pub fn create_task(
+        &self,
+        task_spec: serde_json::Value,
+    ) -> impl Future<Item = String, Error = crate::Error> {
+        fn map_to_error<F: FnOnce(&String) -> String>(
+            err_obj: Value,
+            format_msg: F,
+        ) -> crate::Error {
+            match err_obj {
+                Value::String(err_msg) => crate::Error::Other(format_msg(&err_msg)),
+                Value::Object(err_obj) => match err_obj.get("error_msg") {
+                    Some(Value::String(err_msg)) => crate::Error::Other(format_msg(&err_msg)),
+                    _ => crate::Error::Other(format!("invalid error response: {:?}", err_obj)),
+                },
+                _ => crate::Error::Other(format!("invalid error response: {:?}", err_obj)),
+            }
+        }
+
+        self.create_task_int(task_spec)
+            .from_err()
+            .and_then(|r: (Option<String>, Option<Value>)| match r {
+                (Some(task_id), Some(err_obj)) => Err(map_to_error(err_obj, |err_msg| {
+                    format!("task {} failed: {}", task_id, err_msg)
+                })),
+                (Some(task_id), None) => Ok(task_id),
+                (None, Some(err_obj)) => Err(map_to_error(err_obj, |err_msg| err_msg.to_string())),
+                (None, None) => Err(crate::Error::Other(format!("invalid error response: null"))),
+            })
     }
 }
 
@@ -272,7 +330,7 @@ pub struct SubtaskStats {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UnsupportInfo {
     pub reason: String,
-    #[serde(rename(serialize = "no_of_tasks"))]
+    #[serde(rename = "ntasks")]
     pub n_tasks: u32,
     /// avg (if available) is the current most
     ///  typical corresponding value.  For unsupport reason
@@ -280,7 +338,6 @@ pub struct UnsupportInfo {
     ///  the network. For unsupport reason APP_VERSION avg is
     ///  the most popular app version of all tasks currently observed in the
     ///  network.
-    #[serde(rename(serialize = "avg_for_all_tasks"))]
     pub avg: serde_json::Value,
 }
 

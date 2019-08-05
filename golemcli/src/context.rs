@@ -65,7 +65,6 @@ impl From<ResponseTable> for CommandResponse {
     }
 }
 
-#[derive(Clone)]
 pub struct CliCtx {
     rpc_addr: (String, u16),
     data_dir: PathBuf,
@@ -73,6 +72,7 @@ pub struct CliCtx {
     accept_any_prompt: bool,
     net: Option<Net>,
     interactive: bool,
+    sys: SystemRunner,
 }
 
 impl TryFrom<&CliArgs> for CliCtx {
@@ -85,6 +85,7 @@ impl TryFrom<&CliArgs> for CliCtx {
         let net = value.net.clone();
         let accept_any_prompt = value.accept_any_prompt;
         let interactive = value.interactive;
+        let sys = actix::System::new("golemcli");
 
         Ok(CliCtx {
             rpc_addr,
@@ -93,6 +94,7 @@ impl TryFrom<&CliArgs> for CliCtx {
             accept_any_prompt,
             net,
             interactive,
+            sys,
         })
     }
 }
@@ -111,36 +113,24 @@ fn wait_for_server(
 }
 
 impl CliCtx {
-    pub fn connect_to_app(
+    pub fn block_on<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
+        self.sys.block_on(f)
+    }
+
+    pub fn unlock_app(
         &mut self,
-    ) -> Result<(actix::SystemRunner, impl actix_wamp::RpcEndpoint + Clone), Error> {
-        let mut sys = actix::System::new("golemcli");
-        let (address, port) = &self.rpc_addr;
-
-        let endpoint = sys.block_on(golem_rpc_api::connect_to_app(
-            &self.data_dir,
-            self.net.clone(),
-            Some((address.as_str(), *port)),
-        ))?;
-
-        let is_unlocked = sys.block_on(endpoint.as_golem().is_account_unlocked())?;
+        endpoint: impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone + 'static,
+    ) -> Result<impl actix_wamp::RpcEndpoint + Clone, Error> {
+        let is_unlocked = self.block_on(endpoint.as_golem().is_account_unlocked())?;
         let mut wait_for_start = false;
 
         if !is_unlocked {
             eprintln!("account locked");
-            let password = rpassword::read_password_from_tty(Some(
-                "Unlock your account to start golem\n\
-                 This command will time out in 30 seconds.\n\
-                 Password: ",
-            ))?;
-            let is_valid_password = sys.block_on(endpoint.as_golem().set_password(password))?;
-            if !is_valid_password {
-                return Err(failure::err_msg("invalid password"));
-            }
+            self.block_on(crate::account::account_unlock(endpoint.clone()))?;
             wait_for_start = true;
         }
 
-        let are_terms_accepted = sys.block_on(endpoint.as_golem_terms().are_terms_accepted())?;
+        let are_terms_accepted = self.block_on(endpoint.as_golem_terms().are_terms_accepted())?;
 
         if !are_terms_accepted {
             use crate::terms::*;
@@ -150,7 +140,7 @@ impl CliCtx {
             loop {
                 match TermsQuery::prompt("Accept terms ? [(s)how / (a)ccept / (r)eject]") {
                     TermsQuery::Show => {
-                        eprintln!("{}", sys.block_on(get_terms_text(&endpoint))?);
+                        eprintln!("{}", self.block_on(get_terms_text(&endpoint))?);
                     }
                     TermsQuery::Reject => {
                         return Err(failure::err_msg("terms not accepted"));
@@ -171,7 +161,7 @@ impl CliCtx {
                 Some("talkback will be DISABLED"),
             );
 
-            let _ = sys.block_on(
+            let _ = self.block_on(
                 endpoint
                     .as_golem_terms()
                     .accept_terms(Some(enable_monitor), Some(enable_talkback)),
@@ -180,10 +170,24 @@ impl CliCtx {
         }
 
         if wait_for_start {
-            let _ = sys.block_on(wait_for_server(endpoint.clone()))?;
+            let _ = self.block_on(wait_for_server(endpoint.clone()))?;
         }
 
-        Ok((sys, endpoint))
+        Ok(endpoint)
+    }
+
+    pub fn connect_to_app(
+        &mut self,
+    ) -> Result<impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone, Error> {
+        let (address, port) = &self.rpc_addr;
+
+        let endpoint = self.sys.block_on(golem_rpc_api::connect_to_app(
+            &self.data_dir,
+            self.net.clone(),
+            Some((address.as_str(), *port)),
+        ))?;
+
+        Ok(endpoint)
     }
 
     pub fn message(&mut self, message: &str) {
@@ -318,6 +322,8 @@ fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
     let _ = table.printstd();
 }
 
+use actix::SystemRunner;
+use actix_wamp::PubSubEndpoint;
 use golem_rpc_api::core::AsGolemCore;
 use golem_rpc_api::terms::AsGolemTerms;
 use golem_rpc_api::Net;

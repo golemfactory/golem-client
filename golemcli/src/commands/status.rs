@@ -296,7 +296,7 @@ impl Section {
         status
     }
 
-    fn check_is_golem_run(is_mainnet: bool, ctx: CliCtx) -> bool {
+    fn check_is_golem_run(is_mainnet: bool, ctx: &CliCtx) -> bool {
         let lock_path = ctx.get_golem_lock_path(is_mainnet);
 
         let lock_file_path = lock_path.to_str();
@@ -319,20 +319,19 @@ impl Section {
     fn get_running_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        ctx: &CliCtx,
+        _ctx: &CliCtx,
     ) -> impl Future<Item = RunningStatus, Error = Error> {
         let is_mainnet = endpoint.as_golem().is_mainnet().from_err();
         let server_status = endpoint.as_golem().status().from_err();
         let node_info = endpoint.as_golem_net().get_node().from_err();
         let version = endpoint.as_golem().get_version().from_err();
         let disk_usage = endpoint.as_golem_res().get_res_dirs_sizes().from_err();
-        let ctx_cloned = ctx.clone();
 
         is_mainnet
             .join5(server_status, node_info, version, disk_usage)
             .map(
                 move |(is_mainnet, server_status, node_info, version, disk_usage)| {
-                    let is_golem_running = Section::check_is_golem_run(is_mainnet, ctx_cloned);
+                    let is_golem_running = true; //Section::check_is_golem_run(is_mainnet, ctx);
                     RunningStatus {
                         process_state: match is_golem_running {
                             true => ProcessState::Running,

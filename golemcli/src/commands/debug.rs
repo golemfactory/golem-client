@@ -22,6 +22,7 @@ pub enum Section {
 impl Section {
     pub fn run(
         &self,
+        _: &mut CliCtx,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         match self {
