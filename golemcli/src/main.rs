@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::{thread, time};
 use structopt::*;
 
+pub(crate) mod account;
 pub(crate) mod commands;
 pub(crate) mod context;
 pub(crate) mod eth;

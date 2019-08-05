@@ -13,7 +13,7 @@ rpc_interface! {
         //   Some(task_id), None,
         //   None, Some(error_message)
         #[id = "comp.task.create"]
-        fn create_task(&self, task_spec: serde_json::Value) -> Result<(Option<String>, Option<String>)>;
+        fn create_task_int(&self, task_spec: serde_json::Value) -> Result<(Option<String>, Option<Value>)>;
 
         #[id = "comp.task"]
         fn get_task(&self, task_id : String) -> Result<Option<TaskInfo>>;
@@ -134,6 +134,43 @@ rpc_interface! {
         #[id = "performance.multiplier"]
         fn perf_mult(&self) -> Result<f64>;
 
+    }
+}
+
+impl<'a, Inner: crate::rpc::wamp::RpcEndpoint + ?Sized + 'static> GolemComp<'a, Inner> {
+    //
+    // map kwarg force
+    // Returns:
+    //   Some(task_id), None,
+    //   None, Some(error_message)
+    pub fn create_task(
+        &self,
+        task_spec: serde_json::Value,
+    ) -> impl Future<Item = String, Error = crate::Error> {
+        fn map_to_error<F: FnOnce(&String) -> String>(
+            err_obj: Value,
+            format_msg: F,
+        ) -> crate::Error {
+            match err_obj {
+                Value::String(err_msg) => crate::Error::Other(format_msg(&err_msg)),
+                Value::Object(err_obj) => match err_obj.get("error_msg") {
+                    Some(Value::String(err_msg)) => crate::Error::Other(format_msg(&err_msg)),
+                    _ => crate::Error::Other(format!("invalid error response: {:?}", err_obj)),
+                },
+                _ => crate::Error::Other(format!("invalid error response: {:?}", err_obj)),
+            }
+        }
+
+        self.create_task_int(task_spec)
+            .from_err()
+            .and_then(|r: (Option<String>, Option<Value>)| match r {
+                (Some(task_id), Some(err_obj)) => Err(map_to_error(err_obj, |err_msg| {
+                    format!("task {} failed: {}", task_id, err_msg)
+                })),
+                (Some(task_id), None) => Ok(task_id),
+                (None, Some(err_obj)) => Err(map_to_error(err_obj, |err_msg| err_msg.to_string())),
+                (None, None) => Err(crate::Error::Other(format!("invalid error response: null"))),
+            })
     }
 }
 
@@ -301,7 +338,6 @@ pub struct UnsupportInfo {
     ///  the network. For unsupport reason APP_VERSION avg is
     ///  the most popular app version of all tasks currently observed in the
     ///  network.
-    #[serde(rename(serialize = "avg_for_all_tasks"))]
     pub avg: serde_json::Value,
 }
 
