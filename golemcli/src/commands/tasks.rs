@@ -51,12 +51,6 @@ pub enum Section {
         /// Task identifier
         task_id: String,
     },
-    /// Restart given subtasks from a task
-    #[structopt(name = "restart_subtasks")]
-    RestartSubtasks {
-        task_id: String,
-        subtask_ids: Vec<String>,
-    },
     /// Show task details
     #[structopt(name = "show")]
     Show {
@@ -75,10 +69,7 @@ pub enum Section {
     Stats,
     /// Show sub-tasks
     #[structopt(name = "subtasks")]
-    Subtasks {
-        /// Task or subtask identifier
-        task_or_subtask_id: String,
-    },
+    Subtasks(SubtaskCommand),
     /// Dump a task template
     #[structopt(name = "template")]
     Template {
@@ -88,6 +79,22 @@ pub enum Section {
     /// Show statistics for unsupported tasks
     #[structopt(name = "unsupport")]
     Unsupport { last_days: Option<i32> },
+}
+
+#[derive(StructOpt, Debug)]
+pub enum SubtaskCommand {
+    /// Lists subtasks in given task
+    #[structopt(name = "list")]
+    List { task_id: String },
+    /// Show sub-tasks
+    #[structopt(name = "show")]
+    Show { subtask_id: String },
+    /// Restart given subtasks from a task
+    #[structopt(name = "restart")]
+    Restart {
+        task_id: String,
+        subtask_ids: Vec<String>,
+    },
 }
 
 const TASK_TYPES: &[&str] = &["blender", "wasm", "glambda"];
@@ -104,10 +111,6 @@ impl Section {
             Section::Dump { task_id, out_file } => Box::new(self.dump(endpoint, task_id, out_file)),
             Section::Purge => Box::new(self.purge(endpoint)),
             Section::Restart { task_id } => Box::new(self.restart(endpoint, task_id)),
-            Section::RestartSubtasks {
-                task_id,
-                subtask_ids,
-            } => Box::new(self.restart_subtasks(endpoint, task_id, subtask_ids)),
             Section::Show {
                 task_id,
                 current,
@@ -115,9 +118,8 @@ impl Section {
             } => Box::new(self.show(endpoint, task_id, *current, sort)),
             Section::Template { task_type } => Box::new(self.template(task_type)),
             Section::Stats => Box::new(self.stats(endpoint)),
-            Section::Subtasks { task_or_subtask_id } => {
-                Box::new(self.subtasks(endpoint, task_or_subtask_id))
-            }
+            Section::Subtasks(subtask_command) => subtask_command.run(endpoint),
+
             Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
         }
     }
@@ -193,19 +195,6 @@ impl Section {
             .restart_task(task_id.into())
             .from_err()
             .and_then(|(task_id, err_msg)| CommandResponse::object(task_id.or(err_msg)))
-    }
-
-    fn restart_subtasks(
-        &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        task_id: &str,
-        subtasks_ids: &Vec<String>,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_comp()
-            .restart_subtasks_from_task(task_id.into(), subtasks_ids.clone())
-            .from_err()
-            .and_then(|()| CommandResponse::object("Completed"))
     }
 
     fn dump(
@@ -359,57 +348,6 @@ impl Section {
             })
     }
 
-    fn subtasks(
-        &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        task_or_subtask_id: &String,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let task_id = task_or_subtask_id.clone();
-        let subtask_id = task_or_subtask_id.clone();
-        endpoint
-            .as_golem_comp()
-            .get_subtasks(task_id)
-            .from_err()
-            .and_then(move |subtasks| {
-                if let Some(subtasks) = subtasks {
-                    let columns = vec![
-                        "node".into(),
-                        "subtask id".into(),
-                        "status".into(),
-                        "progress".into(),
-                    ];
-                    let values = subtasks
-                        .into_iter()
-                        .map(|subtask| {
-                            serde_json::json!([
-                                subtask.node_name,
-                                subtask.subtask_id,
-                                subtask.status,
-                                subtask.progress.map(fraction_to_percent),
-                            ])
-                        })
-                        .collect();
-                    futures::future::Either::A(futures::future::ok(
-                        ResponseTable { columns, values }.into(),
-                    ))
-                } else {
-                    // no task with given id, check for subtask
-                    futures::future::Either::B(
-                        endpoint
-                            .as_golem_comp()
-                            .get_subtask(subtask_id)
-                            .from_err()
-                            .and_then(|(subtask, err_msg)| {
-                                subtask.map_or(
-                                    CommandResponse::object(err_msg),
-                                    CommandResponse::object,
-                                )
-                            }),
-                    )
-                }
-            })
-    }
-
     fn unsupport(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
@@ -444,4 +382,86 @@ fn seconds_to_human(time_remaining: f64) -> String {
 
 fn fraction_to_percent(progress: f64) -> String {
     format!("{:.1} %", (progress * 100.0))
+}
+
+impl SubtaskCommand {
+    fn run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+        match self {
+            SubtaskCommand::List { task_id } => Box::new(list_subtasks(endpoint, task_id.into())),
+            SubtaskCommand::Show { subtask_id } => {
+                Box::new(show_subtask(endpoint, subtask_id.into()))
+            }
+            SubtaskCommand::Restart {
+                task_id,
+                subtask_ids,
+            } => Box::new(restart_subtasks(endpoint, task_id, subtask_ids)),
+        }
+    }
+}
+
+fn show_subtask<'a>(
+    endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    subtask_id: String,
+) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    endpoint
+        .as_golem_comp()
+        .get_subtask(subtask_id.into())
+        .from_err()
+        .and_then(|(subtask, err_msg)| {
+            subtask.map_or(CommandResponse::object(err_msg), CommandResponse::object)
+        })
+}
+
+fn list_subtasks(
+    endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    task_id: String,
+) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    endpoint
+        .as_golem_comp()
+        .get_subtasks(task_id)
+        .from_err()
+        .and_then(move |subtasks| {
+            if let Some(subtasks) = subtasks {
+                let columns = vec![
+                    "node".into(),
+                    "subtask id".into(),
+                    "status".into(),
+                    "progress".into(),
+                ];
+                let values = subtasks
+                    .into_iter()
+                    .map(|subtask| {
+                        serde_json::json!([
+                            subtask.node_name,
+                            subtask.subtask_id,
+                            subtask.status,
+                            subtask.progress.map(fraction_to_percent),
+                        ])
+                    })
+                    .collect();
+                Ok(ResponseTable { columns, values }.into())
+            } else {
+                CommandResponse::object("No subtasks")
+            }
+        })
+}
+
+fn restart_subtasks(
+    endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    task_id: &str,
+    subtasks_ids: &Vec<String>,
+) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    endpoint
+        .as_golem_comp()
+        .restart_subtasks_from_task(task_id.into(), subtasks_ids.clone())
+        .from_err()
+        .and_then(|r: serde_json::Value| match r {
+            serde_json::Value::Null => CommandResponse::object("Completed"),
+            serde_json::Value::String(err_msg) => Err(failure::err_msg(err_msg)),
+            serde_json::Value::Object(err) => CommandResponse::object(err),
+            err => CommandResponse::object(err),
+        })
 }
