@@ -72,7 +72,7 @@ pub struct CliCtx {
     accept_any_prompt: bool,
     net: Option<Net>,
     interactive: bool,
-    sys : SystemRunner,
+    sys: SystemRunner,
 }
 
 impl TryFrom<&CliArgs> for CliCtx {
@@ -94,7 +94,7 @@ impl TryFrom<&CliArgs> for CliCtx {
             accept_any_prompt,
             net,
             interactive,
-            sys
+            sys,
         })
     }
 }
@@ -113,26 +113,20 @@ fn wait_for_server(
 }
 
 impl CliCtx {
-
-    pub fn block_on<F : Future>(&mut self, f : F) -> Result<F::Item, F::Error> {
+    pub fn block_on<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
         self.sys.block_on(f)
     }
 
-    pub fn unlock_app(&mut self, endpoint : impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone + 'static) -> Result<impl actix_wamp::RpcEndpoint + Clone, Error> {
+    pub fn unlock_app(
+        &mut self,
+        endpoint: impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone + 'static,
+    ) -> Result<impl actix_wamp::RpcEndpoint + Clone, Error> {
         let is_unlocked = self.block_on(endpoint.as_golem().is_account_unlocked())?;
         let mut wait_for_start = false;
 
         if !is_unlocked {
             eprintln!("account locked");
-            let password = rpassword::read_password_from_tty(Some(
-                "Unlock your account to start golem\n\
-                 This command will time out in 30 seconds.\n\
-                 Password: ",
-            ))?;
-            let is_valid_password = self.block_on(endpoint.as_golem().set_password(password))?;
-            if !is_valid_password {
-                return Err(failure::err_msg("invalid password"));
-            }
+            self.block_on(crate::account::account_unlock(endpoint.clone()))?;
             wait_for_start = true;
         }
 
@@ -187,7 +181,7 @@ impl CliCtx {
     ) -> Result<impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone, Error> {
         let (address, port) = &self.rpc_addr;
 
-        let endpoint = self.block_on(golem_rpc_api::connect_to_app(
+        let endpoint = self.sys.block_on(golem_rpc_api::connect_to_app(
             &self.data_dir,
             self.net.clone(),
             Some((address.as_str(), *port)),
@@ -328,14 +322,14 @@ fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
     let _ = table.printstd();
 }
 
+use actix::SystemRunner;
+use actix_wamp::PubSubEndpoint;
 use golem_rpc_api::core::AsGolemCore;
 use golem_rpc_api::terms::AsGolemTerms;
 use golem_rpc_api::Net;
 use prettytable::{format, format::TableFormat, Table};
 use std::thread::sleep;
 use std::time::Duration;
-use actix::SystemRunner;
-use actix_wamp::PubSubEndpoint;
 lazy_static::lazy_static! {
 
     pub static ref FORMAT_BASIC: TableFormat = format::FormatBuilder::new()

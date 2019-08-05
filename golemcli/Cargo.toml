@@ -44,7 +44,9 @@ serde_yaml = "0.8"
 sha2 = "0.8.0"
 structopt="0.2.15"
 fs2 = "0.4.3"
-# Needed for terams show
+zxcvbn = "1.0.1"
+
+# Needed for terms show
 html2text = "0.1.8"
 chrono = {version = "0.4.6", features=["serde"]}
 
