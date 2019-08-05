@@ -314,8 +314,15 @@ pub struct StatsCounters {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct ProviderState {
+    pub status: String,
+    pub subtask: Option<Map<String, String>>,
+    pub environment: Option<String>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SubtaskStats {
-    pub provider_state: Map<String, String>,
+    pub provider_state: ProviderState,
     #[serde(rename(serialize = "subtasks_in_network"))]
     pub in_network: u32,
     #[serde(rename(serialize = "subtasks_supported"))]
