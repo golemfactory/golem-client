@@ -24,6 +24,8 @@ mod test_task;
 
 mod acl;
 
+mod resources;
+
 #[derive(StructOpt, Debug)]
 pub enum CommandSection {
     /// Manage account
@@ -60,9 +62,13 @@ pub enum CommandSection {
     #[structopt(name = "payments")]
     Payments(payments::Section),
 
-    /// Manage resources
+    /// Manage disc cache
     #[structopt(name = "cache")]
     Cache(cache::Section),
+
+    /// Manage provider resuorces
+    #[structopt(name = "res")]
+    Res(resources::Section),
 
     /// Manage settings
     #[structopt(name = "settings")]
@@ -159,6 +165,7 @@ impl CommandSection {
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
                 CommandSection::Shutdown,
+                CommandSection::Res,
             }
             async_with_ctx {
                 CommandSection::Account,

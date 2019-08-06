@@ -41,6 +41,7 @@ pub fn template() -> GLambdaTaskDef {
         name: "simple glambda".to_string(),
         timeout: Duration::from_secs(600),
         subtask_timeout: Duration::from_secs(400),
+        subtasks_count: 1,
         bid: 0.1,
         resources: vec![],
         concent_enabled: false,
