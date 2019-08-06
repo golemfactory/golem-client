@@ -1,34 +1,46 @@
 use crate::context::*;
+use bigdecimal::BigDecimal;
 use futures::prelude::*;
-use golem_rpc_api::pay::{AsGolemPay, Payment};
+use golem_rpc_api::pay::{AsGolemPay, Payment, PaymentStatus};
+use std::collections::{BTreeMap, HashMap};
 use structopt::StructOpt;
 
 const PAYMENTS_COLUMNS: &[&str] = &["subtask", "payee", "status", "value", "fee"];
 
 #[derive(StructOpt, Debug)]
-pub enum Section {
-    /// Show payments
-    #[structopt(name = "show")]
-    Show {
-        /// Filter by status
-        #[structopt(
-            parse(try_from_str),
-            raw(
-                possible_values = "&[\"awaiting\",\"confirmed\"]",
-                case_insensitive = "true"
-            )
-        )]
-        filter_by: Option<crate::eth::PaymentStatus>,
-        /// Sort payments
-        #[structopt(long = "sort")]
-        #[structopt(
-            parse(try_from_str),
-            raw(possible_values = "PAYMENTS_COLUMNS", case_insensitive = "true")
-        )]
-        sort_by: Option<String>,
-        #[structopt(long)]
-        full: bool,
-    },
+pub struct Section {
+    /// Sort payments
+    #[structopt(long = "sort")]
+    #[structopt(
+        parse(try_from_str),
+        raw(possible_values = "PAYMENTS_COLUMNS", case_insensitive = "true")
+    )]
+    sort_by: Option<String>,
+    #[structopt(long)]
+    full: bool,
+
+    #[structopt(subcommand)]
+    command: SectionCommand,
+}
+
+#[derive(StructOpt, Debug)]
+enum SectionCommand {
+    #[structopt(name = "all")]
+    All,
+    #[structopt(name = "awaiting")]
+    Awaiting,
+    #[structopt(name = "confirmed")]
+    Confirmed,
+}
+
+impl SectionCommand {
+    fn to_payment_status(&self) -> Option<crate::eth::PaymentStatus> {
+        match self {
+            SectionCommand::All => None,
+            SectionCommand::Awaiting => Some(crate::eth::PaymentStatus::Awaiting),
+            SectionCommand::Confirmed => Some(crate::eth::PaymentStatus::Confirmed),
+        }
+    }
 }
 
 impl Section {
@@ -36,13 +48,12 @@ impl Section {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        match self {
-            Section::Show {
-                filter_by,
-                sort_by,
-                full,
-            } => Box::new(self.show(endpoint, filter_by, sort_by, full)),
-        }
+        Box::new(self.show(
+            endpoint,
+            &self.command.to_payment_status(),
+            &self.sort_by,
+            &self.full,
+        ))
     }
 
     pub fn show(
@@ -62,6 +73,10 @@ impl Section {
             .from_err()
             .and_then(move |payments: Vec<Payment>| {
                 let columns = PAYMENTS_COLUMNS.iter().map(|&name| name.into()).collect();
+                let mut total_value = BigDecimal::from(0u32);
+                let mut total_fee = BigDecimal::from(0u32);
+                let mut total_for_status: BTreeMap<PaymentStatus, BigDecimal> = BTreeMap::new();
+                let mut fee_for_status: BTreeMap<PaymentStatus, BigDecimal> = BTreeMap::new();
                 let values = payments
                     .into_iter()
                     .filter(|payment| {
@@ -70,6 +85,23 @@ impl Section {
                             .unwrap_or(true)
                     })
                     .map(|payment: Payment| {
+                        total_value += &payment.value;
+
+                        if let Some(mut total) = total_for_status.get_mut(&payment.status) {
+                            *total = total.clone() + payment.value.clone();
+                        } else {
+                            total_for_status.insert(payment.status.clone(), payment.value.clone());
+                        }
+
+                        if let Some(fee) = &payment.fee {
+                            total_fee += fee;
+                            if let Some(mut status_fee) = fee_for_status.get_mut(&payment.status) {
+                                *status_fee = status_fee.clone() + fee;
+                            } else {
+                                fee_for_status.insert(payment.status.clone(), fee.clone());
+                            }
+                        }
+
                         let subtask = payment.subtask;
                         let payer = if full || payment.payee.len() == 42 {
                             payment.payee
@@ -85,7 +117,29 @@ impl Section {
                         serde_json::json!([subtask, payer, status, value, fee])
                     })
                     .collect();
-                Ok(ResponseTable { columns, values }.sort_by(&sort_by).into())
+
+                let mut summary = Vec::new();
+                for (k, v) in total_for_status {
+                    let fee = fee_for_status.get(&k);
+                    summary.push(serde_json::json!([
+                        "",
+                        "",
+                        k,
+                        crate::eth::Currency::GNT.format_decimal(&v),
+                        fee.map(|fee| crate::eth::Currency::ETH.format_decimal(&fee))
+                    ]));
+                }
+                summary.push(serde_json::json!([
+                    "",
+                    "",
+                    "",
+                    crate::eth::Currency::GNT.format_decimal(&total_value),
+                    crate::eth::Currency::ETH.format_decimal(&total_fee)
+                ]));
+
+                Ok(ResponseTable { columns, values }
+                    .sort_by(&sort_by)
+                    .with_summary(summary))
             })
     }
 }
