@@ -34,7 +34,7 @@ rpc_interface! {
         fn create_hw_preset(&self, preset : HwPreset) -> Result<HwPreset>;
 
         #[id = "env.hw.preset.update"]
-        fn update_hw_preset(&self, preset_update : HwPresetUpdate) -> Result<HwPreset>;
+        fn update_hw_preset(&self, preset_update : HwPreset) -> Result<HwPreset>;
 
         #[id = "env.hw.preset.delete"]
         fn delete_hw_preset(&self, name : String) -> Result<bool>;
@@ -83,19 +83,5 @@ pub struct HwCaps {
 pub struct HwPreset {
     #[serde(flatten)]
     pub caps: HwCaps,
-    pub name: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct HwPresetUpdate {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cpu_cores: Option<u32>,
-    /// disk in Kb
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub disk: Option<f64>,
-    /// memory in kb
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory: Option<u64>,
-
     pub name: String,
 }
