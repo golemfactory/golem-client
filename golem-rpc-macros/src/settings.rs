@@ -318,6 +318,10 @@ pub fn gen_settings(mut f: syn::File) -> Fallible<TokenStream> {
                 (ConversionType::Bool, _) => quote! {
                     bool_from_value(#val)
                 },
+                (ConversionType::Nat, _) => quote! {
+                    usize_from_value(#val)
+                },
+
                 _ => quote! {
                     Ok(serde_json::from_value(#val.clone())?)
                 }

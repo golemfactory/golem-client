@@ -4,6 +4,7 @@ use golem_rpc_macros::gen_settings;
 use num_traits::cast::FromPrimitive;
 use serde_json::Value;
 use std::any::{Any, TypeId};
+use std::convert::TryInto;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -177,6 +178,19 @@ fn bool_from_value(value: &Value) -> Result<bool, Error> {
             "false" | "0" | "False" => Ok(false),
             _ => Err(()),
         },
+        _ => Err(()),
+    })
+    .map_err(|()| Error::Other(format!("invalid bool: '{:?}'", value)))
+}
+
+fn usize_from_value(value: &Value) -> Result<usize, Error> {
+    (match value {
+        Value::Bool(b) => Err(()),
+        Value::Number(n) => n
+            .as_u64()
+            .ok_or(())
+            .and_then(|v| v.try_into().map_err(|_| ())),
+        Value::String(s) => s.parse().map_err(|_| ()),
         _ => Err(()),
     })
     .map_err(|()| Error::Other(format!("invalid bool: '{:?}'", value)))
