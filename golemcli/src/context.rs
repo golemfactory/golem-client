@@ -183,6 +183,8 @@ impl CliCtx {
             let _ = self.block_on(wait_for_server(endpoint.clone()))?;
         }
 
+        let _ = PROMPT_FLAG.store(self.accept_any_prompt, std::sync::atomic::Ordering::Relaxed);
+
         Ok(endpoint)
     }
 
@@ -361,6 +363,9 @@ fn print_table(
 
 use actix::SystemRunner;
 use actix_wamp::PubSubEndpoint;
+use failure::_core::cell::RefCell;
+use failure::_core::cmp::Ordering;
+use failure::_core::sync::atomic::AtomicBool;
 use golem_rpc_api::core::AsGolemCore;
 use golem_rpc_api::terms::AsGolemTerms;
 use golem_rpc_api::Net;
@@ -399,4 +404,13 @@ pub fn format_key(s: &str, full: bool) -> String {
     } else {
         format!("{}...{}", &s[..16], &s[(key_size - 16)..])
     }
+}
+
+static PROMPT_FLAG: AtomicBool = AtomicBool::new(false);
+
+pub fn prompt_for_acceptance(msg: &str) -> bool {
+    if PROMPT_FLAG.load(std::sync::atomic::Ordering::Relaxed) {
+        return true;
+    }
+    promptly::prompt_default(msg, true)
 }
