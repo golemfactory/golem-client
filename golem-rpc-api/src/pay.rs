@@ -31,7 +31,7 @@ rpc_interface! {
 }
 
 /// The status of a payment.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 #[repr(u8)]
 #[serde(rename_all = "lowercase")]
 pub enum PaymentStatus {

@@ -32,6 +32,14 @@ impl ResponseTable {
             .sort_by_key(|v| Some(v.as_array()?.get(idx)?.to_string()));
         self
     }
+
+    pub fn with_summary(self, summary: Vec<serde_json::Value>) -> CommandResponse {
+        CommandResponse::Table {
+            columns: self.columns,
+            values: self.values,
+            summary,
+        }
+    }
 }
 
 pub trait FormattedObject {
@@ -46,6 +54,7 @@ pub enum CommandResponse {
     Table {
         columns: Vec<String>,
         values: Vec<serde_json::Value>,
+        summary: Vec<serde_json::Value>,
     },
     FormattedObject(Box<dyn FormattedObject>),
 }
@@ -61,6 +70,7 @@ impl From<ResponseTable> for CommandResponse {
         CommandResponse::Table {
             columns: table.columns,
             values: table.values,
+            summary: Vec::new(),
         }
     }
 }
@@ -199,7 +209,11 @@ impl CliCtx {
     pub fn output(&self, resp: CommandResponse) {
         match resp {
             CommandResponse::NoOutput => {}
-            CommandResponse::Table { columns, values } => {
+            CommandResponse::Table {
+                columns,
+                values,
+                summary,
+            } => {
                 if self.json_output {
                     println!(
                         "{}",
@@ -210,7 +224,7 @@ impl CliCtx {
                         .unwrap()
                     )
                 } else {
-                    print_table(columns, values);
+                    print_table(columns, values, summary);
                 }
             }
             CommandResponse::Object(v) => {
@@ -287,7 +301,11 @@ pub fn create_table<'a>(columns: impl IntoIterator<Item = &'a str>) -> prettytab
     table
 }
 
-fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
+fn print_table(
+    columns: Vec<String>,
+    values: Vec<serde_json::Value>,
+    summary: Vec<serde_json::Value>,
+) {
     use prettytable::*;
     let mut table = Table::new();
     //table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
@@ -319,6 +337,25 @@ fn print_table(columns: Vec<String>, values: Vec<serde_json::Value>) {
                 })
                 .collect();
             table.add_row(row_strings);
+        }
+    }
+    if !summary.is_empty() {
+        table.add_empty_row();
+        table.add_empty_row();
+        for row in summary {
+            if let Some(row_items) = row.as_array() {
+                use serde_json::Value;
+
+                let row_strings = row_items
+                    .iter()
+                    .map(|v| match v {
+                        Value::String(s) => s.to_string(),
+                        Value::Null => "".into(),
+                        v => v.to_string(),
+                    })
+                    .collect();
+                table.add_row(row_strings);
+            }
         }
     }
     let _ = table.printstd();
