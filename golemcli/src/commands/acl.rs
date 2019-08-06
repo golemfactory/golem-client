@@ -138,7 +138,7 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         default_rule: AclRule,
         exceptions: &Vec<GolemIdPattern>,
-        ctx: &mut CliCtx
+        ctx: &mut CliCtx,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         let ack = ctx.prompt_for_acceptance("Are you sure?", None, None);
         if !ack {
@@ -174,27 +174,28 @@ impl Section {
             },
         );
         future::Either::B(
-        crate::utils::resolve_from_list(
-            known_peers.join3(connected_peers, current_acl).and_then(
-                |(mut l1, mut l2, mut l3): (
-                    BTreeSet<String>,
-                    BTreeSet<String>,
-                    BTreeSet<String>,
-                )| {
-                    l1.append(&mut l2);
-                    l1.append(&mut l3);
-                    Ok(l1.into_iter().collect::<Vec<_>>())
-                },
-            ),
-            exceptions.clone(),
+            crate::utils::resolve_from_list(
+                known_peers.join3(connected_peers, current_acl).and_then(
+                    |(mut l1, mut l2, mut l3): (
+                        BTreeSet<String>,
+                        BTreeSet<String>,
+                        BTreeSet<String>,
+                    )| {
+                        l1.append(&mut l2);
+                        l1.append(&mut l3);
+                        Ok(l1.into_iter().collect::<Vec<_>>())
+                    },
+                ),
+                exceptions.clone(),
+            )
+            .and_then(move |nodes| {
+                endpoint
+                    .as_golem_net()
+                    .acl_setup(default_rule, nodes)
+                    .from_err()
+            })
+            .and_then(|()| CommandResponse::object("ACL reset")),
         )
-        .and_then(move |nodes| {
-            endpoint
-                .as_golem_net()
-                .acl_setup(default_rule, nodes)
-                .from_err()
-        })
-        .and_then(|()| CommandResponse::object("ACL reset")))
     }
 
     fn deny(
