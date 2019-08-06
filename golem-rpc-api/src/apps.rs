@@ -20,6 +20,8 @@ pub struct TaskDef<Options: TaskDefOptions> {
     bid: f64,
     resources: Vec<String>,
     concent_enabled: bool,
+    #[serde(default)]
+    subtasks_count: u64,
     options: Options,
 }
 
