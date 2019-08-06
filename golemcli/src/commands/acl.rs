@@ -79,6 +79,7 @@ pub enum Setup {
 impl Section {
     pub fn run(
         &self,
+        ctx: &mut CliCtx,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
@@ -88,10 +89,10 @@ impl Section {
             }
             Section::Allow { ip, node } => Box::new(self.allow(endpoint, ip, node)),
             Section::Setup(Setup::AllExcept { nodes }) => {
-                Box::new(self.setup(endpoint, AclRule::Allow, nodes))
+                Box::new(self.setup(endpoint, AclRule::Allow, nodes, ctx))
             }
             Section::Setup(Setup::OnlyListed { nodes }) => {
-                Box::new(self.setup(endpoint, AclRule::Deny, nodes))
+                Box::new(self.setup(endpoint, AclRule::Deny, nodes, ctx))
             }
         }
     }
@@ -137,7 +138,13 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         default_rule: AclRule,
         exceptions: &Vec<GolemIdPattern>,
+        ctx: &mut CliCtx
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        let ack = ctx.prompt_for_acceptance("Are you sure?", None, None);
+        if !ack {
+            return future::Either::A(future::ok(CommandResponse::NoOutput));
+        }
+
         let exceptions = exceptions.clone();
 
         let known_peers = endpoint
@@ -166,7 +173,7 @@ impl Section {
                     .collect::<BTreeSet<_>>())
             },
         );
-
+        future::Either::B(
         crate::utils::resolve_from_list(
             known_peers.join3(connected_peers, current_acl).and_then(
                 |(mut l1, mut l2, mut l3): (
@@ -187,7 +194,7 @@ impl Section {
                 .acl_setup(default_rule, nodes)
                 .from_err()
         })
-        .and_then(|()| CommandResponse::object("ACL reset"))
+        .and_then(|()| CommandResponse::object("ACL reset")))
     }
 
     fn deny(

@@ -158,11 +158,11 @@ impl CommandSection {
                 CommandSection::Tasks,
                 #[cfg(feature = "test_task_cli")]
                 CommandSection::TestTask,
-                CommandSection::Acl,
                 CommandSection::Shutdown,
             }
             async_with_ctx {
                 CommandSection::Account,
+                CommandSection::Acl,
                 CommandSection::Terms,
                 CommandSection::Status,
                 #[cfg(feature = "debug_cli")]
