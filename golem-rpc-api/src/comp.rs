@@ -314,9 +314,23 @@ pub struct StatsCounters {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct SubtasksInfo {
+    pub frames: Vec<u32>,
+    pub outfilebasename: String,
+    pub output_format: String,
+    pub progress: f64,
+    pub running_time_seconds: f64,
+    pub scene_file: String,
+    pub seconds_to_timeout: f64,
+    pub start_task: u32,
+    pub subtask_id: String,
+    pub total_tasks: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ProviderState {
     pub status: String,
-    pub subtask: Option<Map<String, String>>,
+    pub subtask: Option<SubtasksInfo>,
     pub environment: Option<String>
 }
 
