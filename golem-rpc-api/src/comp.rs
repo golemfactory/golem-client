@@ -3,6 +3,7 @@ use crate::rpc::*;
 use bigdecimal::BigDecimal;
 use serde::*;
 use serde_json::Value;
+use std::collections::HashMap;
 
 rpc_interface! {
 
@@ -315,16 +316,9 @@ pub struct StatsCounters {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubtasksInfo {
-    pub frames: Vec<u32>,
-    pub outfilebasename: String,
-    pub output_format: String,
     pub progress: f64,
-    pub running_time_seconds: f64,
-    pub scene_file: String,
-    pub seconds_to_timeout: f64,
-    pub start_task: u32,
-    pub subtask_id: String,
-    pub total_tasks: u32,
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
