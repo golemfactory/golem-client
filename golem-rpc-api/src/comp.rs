@@ -331,7 +331,7 @@ pub struct SubtasksInfo {
 pub struct ProviderState {
     pub status: String,
     pub subtask: Option<SubtasksInfo>,
-    pub environment: Option<String>
+    pub environment: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

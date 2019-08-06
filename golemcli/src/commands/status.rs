@@ -626,13 +626,10 @@ impl FormattedObject for FormattedGeneralStatus {
                 &String::from("Pending payments"),
                 &self.provider_status.pending_payments,
             );
-            section_builder.entry(
-                "Provider state",
-                &self
-                    .provider_status
-                    .provider_state
-                    .as_ref()
-            );
+        section_builder.entry(
+            "Provider state",
+            &self.provider_status.provider_state.as_ref(),
+        );
 
         section_builder.end_section();
 
