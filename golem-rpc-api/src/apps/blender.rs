@@ -29,6 +29,7 @@ pub fn template() -> BlenderTaskDef {
         name: "simple blender".to_string(),
         timeout: Duration::from_secs(600),
         subtask_timeout: Duration::from_secs(400),
+        subtasks_count: 1,
         bid: 0.1,
         resources: vec!["/Users/tworec/git/golem/gu-gateway/golem/gugateway/horse.blend".into()],
         concent_enabled: false,
