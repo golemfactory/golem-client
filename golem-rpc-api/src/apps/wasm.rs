@@ -35,6 +35,7 @@ pub fn template() -> WasmTaskDef {
         name: "simple wasm".to_string(),
         timeout: Duration::from_secs(600),
         subtask_timeout: Duration::from_secs(400),
+        subtasks_count: 1,
         bid: 0.1,
         resources: vec![],
         concent_enabled: false,

@@ -3,6 +3,7 @@ use crate::rpc::*;
 use bigdecimal::BigDecimal;
 use serde::*;
 use serde_json::Value;
+use std::collections::HashMap;
 
 rpc_interface! {
 
@@ -314,8 +315,22 @@ pub struct StatsCounters {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct SubtasksInfo {
+    pub progress: f64,
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProviderState {
+    pub status: String,
+    pub subtask: Option<SubtasksInfo>,
+    pub environment: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SubtaskStats {
-    pub provider_state: Map<String, String>,
+    pub provider_state: ProviderState,
     #[serde(rename(serialize = "subtasks_in_network"))]
     pub in_network: u32,
     #[serde(rename(serialize = "subtasks_supported"))]
