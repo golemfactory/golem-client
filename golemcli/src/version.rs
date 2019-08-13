@@ -16,7 +16,7 @@ pub fn print() {
         TRAVIS_OS_NAME,
     ) {
         (Some(commit), Some(build_number), Some(tag), Some(os)) => println!(
-            "(BUILD_NO={}, COMMIT={}, TAG={}, OS={})",
+            " (BUILD_NO={}, COMMIT={}, TAG={}, OS={})",
             build_number, commit, tag, os
         ),
         _ => println!(),
