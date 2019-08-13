@@ -16,9 +16,9 @@ pub(crate) mod account;
 pub(crate) mod commands;
 pub(crate) mod context;
 pub(crate) mod eth;
+pub(crate) mod formaters;
 pub(crate) mod terms;
 pub(crate) mod utils;
-pub(crate) mod formaters;
 
 #[macro_use]
 pub(crate) mod component_response;

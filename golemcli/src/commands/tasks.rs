@@ -460,23 +460,16 @@ fn restart_subtasks(
         })
 }
 
-
 // TODO: read it though rpc; requires exposing such RPC from Brass
-pub fn template(
-    task_type: &str,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+pub fn template(task_type: &str) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
     (|| -> Result<CommandResponse, Error> {
         let template = match task_type {
-            "blender" => {
-                serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?
-            }
+            "blender" => serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?,
             "wasm" => serde_json::to_string_pretty(&golem_rpc_api::apps::wasm::template())?,
-            "glambda" => {
-                serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?
-            }
+            "glambda" => serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?,
             _ => failure::bail!("Invalid Option"),
         };
         CommandResponse::object(template)
     })()
-        .into_future()
+    .into_future()
 }

@@ -12,7 +12,6 @@ pub enum Section {
     /// Accept terms of use
     #[structopt(name = "accept")]
     Accept,
-
 }
 
 impl Section {

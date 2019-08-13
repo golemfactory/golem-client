@@ -357,10 +357,9 @@ fn print_table(
                                 v => v.to_string(),
                             });
 
-                            if idx == l-1 {
+                            if idx == l - 1 {
                                 c.with_style(Attr::Bold)
-                            }
-                            else {
+                            } else {
                                 c
                             }
                         })

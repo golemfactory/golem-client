@@ -1,8 +1,8 @@
 use crate::context::*;
+use futures::future::Either;
 use futures::prelude::*;
 use golem_rpc_api::comp::{AsGolemComp, CompEnvStatus};
 use structopt::StructOpt;
-use futures::future::Either;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -37,8 +37,6 @@ pub enum Section {
         /// Multiplier; float value within range [0, 100]
         multiplier: f64,
     },
-
-
 }
 
 impl Section {
@@ -139,19 +137,18 @@ fn show(
                 .into_iter()
                 .map(|e| {
                     serde_json::json!([
-                            e.id,
-                            e.supported,
-                            e.accepted,
-                            e.performance,
-                            e.min_accepted,
-                            e.description
-                        ])
+                        e.id,
+                        e.supported,
+                        e.accepted,
+                        e.performance,
+                        e.min_accepted,
+                        e.description
+                    ])
                 })
                 .collect();
             Ok(ResponseTable { columns, values }.into())
         })
 }
-
 
 fn perf_mult(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
@@ -161,9 +158,6 @@ fn perf_mult(
         .perf_mult()
         .from_err()
         .and_then(|multiplier| {
-            CommandResponse::object(format!(
-                "minimal performance multiplier is: {}",
-                multiplier
-            ))
+            CommandResponse::object(format!("minimal performance multiplier is: {}", multiplier))
         })
 }

@@ -53,14 +53,13 @@ impl Section {
         }
     }
 
-
     pub fn set(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         key: &str,
         value: &str,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        let setting : &'static dyn DynamicSetting = settings::from_name(key).unwrap();
+        let setting: &'static dyn DynamicSetting = settings::from_name(key).unwrap();
 
         Box::new(
             endpoint
@@ -69,14 +68,16 @@ impl Section {
                 .from_err()
                 .and_then(move |()| endpoint.as_golem().get_settings().from_err())
                 .and_then(move |s| {
-                    CommandResponse::object(
-                        match s.get(setting.name()) {
-                            Some(s) =>
-                                Some(format!("{} [{}] = {}", setting.description(), setting.name(),
-                                             setting.display_value(s)?)),
-                            None => None
-                        })
-                })
+                    CommandResponse::object(match s.get(setting.name()) {
+                        Some(s) => Some(format!(
+                            "{} [{}] = {}",
+                            setting.description(),
+                            setting.name(),
+                            setting.display_value(s)?
+                        )),
+                        None => None,
+                    })
+                }),
         )
     }
 }
@@ -93,17 +94,15 @@ pub fn show(
                 if basic || provider || requestor {
                     let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
 
-                    let mut add_settings = |list: Vec<
-                        &'static (dyn DynamicSetting + 'static),
-                    >|
-                                            -> Result<(), Error> {
-                        for setting in list {
-                            if let Some(value) = settings.get(setting.name()) {
-                                filtered_settings.insert(setting.name().into(), value.clone());
+                    let mut add_settings =
+                        |list: Vec<&'static (dyn DynamicSetting + 'static)>| -> Result<(), Error> {
+                            for setting in list {
+                                if let Some(value) = settings.get(setting.name()) {
+                                    filtered_settings.insert(setting.name().into(), value.clone());
+                                }
                             }
-                        }
-                        Ok(())
-                    };
+                            Ok(())
+                        };
 
                     if basic {
                         add_settings(settings::general::list().collect())?;
@@ -123,7 +122,6 @@ pub fn show(
         },
     ))
 }
-
 
 struct FormattedSettings(Map<String, Value>);
 

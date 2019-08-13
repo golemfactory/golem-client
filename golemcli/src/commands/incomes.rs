@@ -121,10 +121,10 @@ impl Section {
                 if total_for_status.len() > 1 {
                     for (k, v) in total_for_status {
                         summary.push(serde_json::json!([
-                        "",
-                        k,
-                        crate::eth::Currency::GNT.format_decimal(&v)
-                    ]));
+                            "",
+                            k,
+                            crate::eth::Currency::GNT.format_decimal(&v)
+                        ]));
                     }
                 }
                 summary.push(serde_json::json!([

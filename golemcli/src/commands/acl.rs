@@ -6,7 +6,10 @@ use golem_rpc_api::net::{AclRule, AclRuleItem, AclStatus, AsGolemNet, NodeInfo, 
 use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::net::IpAddr;
-use structopt::{clap::{ArgSettings, AppSettings}, StructOpt};
+use structopt::{
+    clap::{AppSettings, ArgSettings},
+    StructOpt,
+};
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -367,7 +370,6 @@ impl FormattedObject for AclListOutput {
     }
 }
 
-
 fn list(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     full: bool,
@@ -386,7 +388,7 @@ fn list(
                         ips: Some(ip_acl.rules),
                         full,
                     }
-                        .to_response())
+                    .to_response())
                 }),
         )
     } else {
@@ -397,7 +399,7 @@ fn list(
                     ips: None,
                     full,
                 }
-                    .to_response())
+                .to_response())
             },
         ))
     }

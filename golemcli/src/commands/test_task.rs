@@ -27,7 +27,6 @@ pub enum Section {
     /// Abort a task. It will delete a task details
     #[structopt(name = "abort")]
     Abort,
-
 }
 
 impl Section {
@@ -39,7 +38,7 @@ impl Section {
             Section::Run { task_file } => Box::new(self.do_run(endpoint, task_file)),
             Section::Abort => Box::new(self.abort(endpoint)),
             Section::Status => Box::new(self.status(endpoint)),
-            Section::Template { task_type} => Box::new(super::tasks::template(task_type)),
+            Section::Template { task_type } => Box::new(super::tasks::template(task_type)),
         }
     }
 

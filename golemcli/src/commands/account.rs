@@ -1,5 +1,6 @@
 use crate::context::*;
 use crate::eth::Currency;
+use crate::formaters::*;
 use actix::fut::Either;
 use bigdecimal::BigDecimal;
 use failure::Fallible;
@@ -10,7 +11,6 @@ use golem_rpc_api::pay::{AsGolemPay, Balance, DepositBalance};
 use golem_rpc_api::rpc::*;
 use serde::{Deserialize, Serialize};
 use structopt::{clap, StructOpt};
-use crate::formaters::*;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
@@ -123,12 +123,12 @@ impl AccountSection {
 
 #[derive(Serialize)]
 struct AccountInfo {
-    #[serde(rename="Golem_ID")]
-    golem_id : String,
-    node_name : String,
-    requestor_reputation : u64,
-    provider_reputation : u64,
-    finances : serde_json::Value
+    #[serde(rename = "Golem_ID")]
+    golem_id: String,
+    node_name: String,
+    requestor_reputation: u64,
+    provider_reputation: u64,
+    finances: serde_json::Value,
 }
 
 fn account_info(
@@ -203,4 +203,3 @@ enum DepositStatus {
     Unlocking,
     Unlocked,
 }
-

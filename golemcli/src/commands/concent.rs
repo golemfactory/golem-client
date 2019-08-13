@@ -1,11 +1,11 @@
 use crate::context::*;
+use crate::formaters::*;
 use futures::{future, Future};
 use golem_rpc_api::concent::*;
 use golem_rpc_api::net::AsGolemNet;
 use golem_rpc_api::pay::{AsGolemPay, DepositPayment};
 use std::str::FromStr;
 use structopt::{clap::arg_enum, StructOpt};
-use crate::formaters::*;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -28,7 +28,6 @@ pub enum Section {
     /// Terms of Use
     #[structopt(name = "terms")]
     Terms(Terms),
-
 }
 
 #[derive(StructOpt, Debug)]
@@ -54,7 +53,6 @@ const DEPOSIT_COLUMNS: &[&str] = &["tx", "status", "value", "fee"];
 
 #[derive(StructOpt, Debug)]
 enum DepositCommands {
-
     /// Display
     #[structopt(name = "payments")]
     Payments {

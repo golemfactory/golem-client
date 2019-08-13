@@ -4,7 +4,6 @@ pub trait Humanize {
     type Output;
 
     fn humanize(self) -> Self::Output;
-
 }
 
 impl Humanize for DepositBalance {

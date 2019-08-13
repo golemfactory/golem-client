@@ -128,12 +128,12 @@ impl Section {
                     for (k, v) in total_for_status {
                         let fee = fee_for_status.get(&k);
                         summary.push(serde_json::json!([
-                        "",
-                        "",
-                        k,
-                        crate::eth::Currency::GNT.format_decimal(&v),
-                        fee.map(|fee| crate::eth::Currency::ETH.format_decimal(&fee))
-                    ]));
+                            "",
+                            "",
+                            k,
+                            crate::eth::Currency::GNT.format_decimal(&v),
+                            fee.map(|fee| crate::eth::Currency::ETH.format_decimal(&fee))
+                        ]));
                     }
                 }
                 summary.push(serde_json::json!([
