@@ -25,6 +25,7 @@ pub(crate) mod component_response;
 
 #[cfg(feature = "interactive_cli")]
 mod interactive;
+mod version;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]
@@ -71,6 +72,10 @@ struct CliArgs {
 
     #[structopt(subcommand)]
     command: Option<commands::CommandSection>,
+
+    /// Prints version information
+    #[structopt(long, short="V")]
+    version: bool,
 }
 
 impl CliArgs {
@@ -131,6 +136,11 @@ impl CliArgs {
 
 fn main() -> failure::Fallible<()> {
     let args = CliArgs::from_args();
+
+    if args.version {
+        version::print();
+        return Ok(());
+    }
 
     flexi_logger::Logger::with_env_or_str("error")
         .start()
