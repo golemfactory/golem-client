@@ -11,15 +11,6 @@ use structopt::{clap, StructOpt};
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-    /// Change settings
-    #[structopt(name = "set")]
-    Set {
-        /// Setting name
-        #[structopt(raw(possible_values = "settings::NAMES",))]
-        key: String,
-        /// Setting value
-        value: String,
-    },
     /// Show current settings
     #[structopt(name = "show")]
     //#[structopt(raw(group = "show_opt_group()"))]
@@ -36,6 +27,15 @@ pub enum Section {
         #[structopt(long)]
         requestor: bool,
     },
+    /// Change settings
+    #[structopt(name = "set")]
+    Set {
+        /// Setting name
+        #[structopt(raw(possible_values = "settings::NAMES",))]
+        key: String,
+        /// Setting value
+        value: String,
+    },
 }
 
 impl Section {
@@ -48,54 +48,11 @@ impl Section {
                 basic,
                 provider,
                 requestor,
-            } => self.show(endpoint, basic, provider, requestor),
+            } => show(endpoint, basic, provider, requestor),
             Section::Set { key, value } => self.set(endpoint, key, value),
         }
     }
 
-    pub fn show(
-        &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        basic: bool,
-        provider: bool,
-        requestor: bool,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        Box::new(endpoint.as_golem().get_settings().from_err().and_then(
-            move |settings: Map<String, Value>| {
-                Ok(CommandResponse::FormattedObject({
-                    if basic || provider || requestor {
-                        let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
-
-                        let mut add_settings = |list: Vec<
-                            &'static (dyn DynamicSetting + 'static),
-                        >|
-                         -> Result<(), Error> {
-                            for setting in list {
-                                if let Some(value) = settings.get(setting.name()) {
-                                    filtered_settings.insert(setting.name().into(), value.clone());
-                                }
-                            }
-                            Ok(())
-                        };
-
-                        if basic {
-                            add_settings(settings::general::list().collect())?;
-                        }
-                        if provider {
-                            add_settings(settings::provider::list().collect())?;
-                        }
-                        if requestor {
-                            add_settings(settings::requestor::list().collect())?;
-                        }
-
-                        Box::new(FormattedSettings(filtered_settings))
-                    } else {
-                        Box::new(FormattedSettings(settings))
-                    }
-                }))
-            },
-        ))
-    }
 
     pub fn set(
         &self,
@@ -103,17 +60,70 @@ impl Section {
         key: &str,
         value: &str,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        let key = settings::from_name(key).unwrap();
+        let setting : &'static dyn DynamicSetting = settings::from_name(key).unwrap();
 
         Box::new(
             endpoint
                 .as_golem()
-                .update_setting_dyn(key, value)
+                .update_setting_dyn(setting, value)
                 .from_err()
-                .and_then(|()| CommandResponse::object("Updated")),
+                .and_then(move |()| endpoint.as_golem().get_settings().from_err())
+                .and_then(move |s| {
+                    CommandResponse::object(
+                        match s.get(setting.name()) {
+                            Some(s) =>
+                                Some(format!("{} [{}] = {}", setting.description(), setting.name(),
+                                             setting.display_value(s)?)),
+                            None => None
+                        })
+                })
         )
     }
 }
+
+pub fn show(
+    endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    basic: bool,
+    provider: bool,
+    requestor: bool,
+) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    Box::new(endpoint.as_golem().get_settings().from_err().and_then(
+        move |settings: Map<String, Value>| {
+            Ok(CommandResponse::FormattedObject({
+                if basic || provider || requestor {
+                    let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
+
+                    let mut add_settings = |list: Vec<
+                        &'static (dyn DynamicSetting + 'static),
+                    >|
+                                            -> Result<(), Error> {
+                        for setting in list {
+                            if let Some(value) = settings.get(setting.name()) {
+                                filtered_settings.insert(setting.name().into(), value.clone());
+                            }
+                        }
+                        Ok(())
+                    };
+
+                    if basic {
+                        add_settings(settings::general::list().collect())?;
+                    }
+                    if provider {
+                        add_settings(settings::provider::list().collect())?;
+                    }
+                    if requestor {
+                        add_settings(settings::requestor::list().collect())?;
+                    }
+
+                    Box::new(FormattedSettings(filtered_settings))
+                } else {
+                    Box::new(FormattedSettings(settings))
+                }
+            }))
+        },
+    ))
+}
+
 
 struct FormattedSettings(Map<String, Value>);
 

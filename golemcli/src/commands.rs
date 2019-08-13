@@ -30,68 +30,81 @@ mod resources;
 pub enum CommandSection {
     /// Manage account
     #[structopt(name = "account")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
     Account(account::AccountSection),
+
+    /// Display general status
+    #[structopt(name = "status")]
+    Status(status::Section),
+
+    /// Display incomes
+    #[structopt(name = "incomes")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Incomes(incomes::Section),
+
+    /// Display payments
+    #[structopt(name = "payments")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Payments(payments::Section),
+
+    /// Manage network
+    #[structopt(name = "network")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Network(network::NetworkSection),
+
+    /// Manage settings
+    #[structopt(name = "settings")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Settings(settings::Section),
+
+    /// Manage provider resuorces
+    #[structopt(name = "res")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Res(resources::Section),
+
+    /// Manage tasks
+    #[structopt(name = "tasks")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Tasks(tasks::Section),
+
+    /// Manage testing tasks
+    #[cfg(feature = "test_task_cli")]
+    #[structopt(name = "test_task")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    TestTask(test_task::Section),
+
+    /// Manage peer access control lists
+    #[structopt(name = "acl")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Acl(acl::Section),
+
+    /// Manage environments
+    #[structopt(name = "envs")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Envs(envs::Section),
 
     /// Concent Service
     #[cfg(feature = "concent_cli")]
     #[structopt(name = "concent")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
     Concent(concent::Section),
+
+    /// Manage disc cache
+    #[structopt(name = "cache")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Cache(cache::Section),
 
     /// Debug RPC
     #[cfg(feature = "debug_cli")]
     #[structopt(name = "debug")]
     Debug(debug::Section),
 
-    /// Manage environments
-    #[structopt(name = "envs")]
-    Envs(envs::Section),
-
-    /// Manage network
-    #[structopt(name = "network")]
-    Network(network::NetworkSection),
-
-    /// Manage peer access control lists
-    #[structopt(name = "acl")]
-    Acl(acl::Section),
-
-    /// Display incomes
-    #[structopt(name = "incomes")]
-    Incomes(incomes::Section),
-
-    /// Display payments
-    #[structopt(name = "payments")]
-    Payments(payments::Section),
-
-    /// Manage disc cache
-    #[structopt(name = "cache")]
-    Cache(cache::Section),
-
-    /// Manage provider resuorces
-    #[structopt(name = "res")]
-    Res(resources::Section),
-
-    /// Manage settings
-    #[structopt(name = "settings")]
-    Settings(settings::Section),
-
-    /// Manage tasks
-    #[structopt(name = "tasks")]
-    Tasks(tasks::Section),
-
-    /// Display general status
-    #[structopt(name = "status")]
-    Status(status::Section),
-
     /// Show and accept terms of use
     #[structopt(name = "terms")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
     Terms(terms::Section),
 
-    /// Manage testing tasks
-    #[cfg(feature = "test_task_cli")]
-    #[structopt(name = "test_task")]
-    TestTask(test_task::Section),
-
-    /// Trigger graceful shutdown of Golem
+    /// Quit after finishing ongoing tasks
     #[structopt(name = "shutdown")]
     Shutdown(ShutdownCommand),
 

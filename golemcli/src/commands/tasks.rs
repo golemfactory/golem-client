@@ -15,18 +15,56 @@ use crate::context::*;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-    /// Abort a task
-    #[structopt(name = "abort")]
-    Abort {
+    /// Lists current tasks + task_id show task details
+    #[structopt(name = "show")]
+    Show {
         /// Task identifier
-        task_id: String,
+        task_id: Option<String>,
+        /// Show only current tasks
+        #[structopt(long)]
+        current: bool,
+
+        /// Sort tasks
+        #[structopt(long)]
+        sort: Option<String>,
     },
+    /// Lists current tasks
+    #[structopt(name = "list")]
+    List {
+        /// Show only current tasks
+        #[structopt(long)]
+        current: bool,
+        /// Sort tasks
+        #[structopt(long)]
+        sort: Option<String>,
+    },
+
+    /// Dump a task template
+    #[structopt(name = "template")]
+    Template {
+        #[structopt(raw(possible_values = "TASK_TYPES",))]
+        task_type: String,
+    },
+
     /// Create a task from file. Note: no client-side validation is performed yet.
     /// This will change in the future
     #[structopt(name = "create")]
     Create {
         /// Task file
         file_name: PathBuf,
+    },
+    /// Restart a task
+    #[structopt(name = "restart")]
+    Restart {
+        /// Task identifier
+        task_id: String,
+    },
+
+    /// Abort a task
+    #[structopt(name = "abort")]
+    Abort {
+        /// Task identifier
+        task_id: String,
     },
     /// Delete a task
     #[structopt(name = "delete")]
@@ -45,38 +83,14 @@ pub enum Section {
     /// Deletes all tasks
     #[structopt(name = "purge")]
     Purge,
-    /// Restart a task
-    #[structopt(name = "restart")]
-    Restart {
-        /// Task identifier
-        task_id: String,
-    },
-    /// Show task details
-    #[structopt(name = "show")]
-    Show {
-        /// Task identifier
-        task_id: Option<String>,
-        /// Show only current tasks
-        #[structopt(long)]
-        current: bool,
-
-        /// Sort tasks
-        #[structopt(long)]
-        sort: Option<String>,
-    },
     /// Show statistics for tasks
     #[structopt(name = "stats")]
     Stats,
     /// Show sub-tasks
     #[structopt(name = "subtasks")]
     Subtasks(SubtaskCommand),
-    /// Dump a task template
-    #[structopt(name = "template")]
-    Template {
-        #[structopt(raw(possible_values = "TASK_TYPES",))]
-        task_type: String,
-    },
-    /// Show statistics for unsupported tasks
+
+    /// Show statistics of all unsupported subtasks
     #[structopt(name = "unsupport")]
     Unsupport { last_days: Option<i32> },
 }
@@ -97,7 +111,7 @@ pub enum SubtaskCommand {
     },
 }
 
-const TASK_TYPES: &[&str] = &["blender", "wasm", "glambda"];
+pub const TASK_TYPES: &[&str] = &["blender", "wasm", "glambda"];
 
 impl Section {
     pub fn run(
@@ -111,12 +125,13 @@ impl Section {
             Section::Dump { task_id, out_file } => Box::new(self.dump(endpoint, task_id, out_file)),
             Section::Purge => Box::new(self.purge(endpoint)),
             Section::Restart { task_id } => Box::new(self.restart(endpoint, task_id)),
+            Section::List { current, sort } => Box::new(self.show(endpoint, &None, *current, sort)),
             Section::Show {
                 task_id,
                 current,
                 sort,
             } => Box::new(self.show(endpoint, task_id, *current, sort)),
-            Section::Template { task_type } => Box::new(self.template(task_type)),
+            Section::Template { task_type } => Box::new(template(task_type)),
             Section::Stats => Box::new(self.stats(endpoint)),
             Section::Subtasks(subtask_command) => subtask_command.run(endpoint),
 
@@ -270,27 +285,6 @@ impl Section {
                 },
             ))
         }
-    }
-
-    // TODO: read it though rpc; requires exposing such RPC from Brass
-    fn template(
-        &self,
-        task_type: &str,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        (|| -> Result<CommandResponse, Error> {
-            let template = match task_type {
-                "blender" => {
-                    serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?
-                }
-                "wasm" => serde_json::to_string_pretty(&golem_rpc_api::apps::wasm::template())?,
-                "glambda" => {
-                    serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?
-                }
-                _ => failure::bail!("Invalid Option"),
-            };
-            CommandResponse::object(template)
-        })()
-        .into_future()
     }
 
     fn stats(
@@ -464,4 +458,25 @@ fn restart_subtasks(
             serde_json::Value::Object(err) => CommandResponse::object(err),
             err => CommandResponse::object(err),
         })
+}
+
+
+// TODO: read it though rpc; requires exposing such RPC from Brass
+pub fn template(
+    task_type: &str,
+) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    (|| -> Result<CommandResponse, Error> {
+        let template = match task_type {
+            "blender" => {
+                serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?
+            }
+            "wasm" => serde_json::to_string_pretty(&golem_rpc_api::apps::wasm::template())?,
+            "glambda" => {
+                serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?
+            }
+            _ => failure::bail!("Invalid Option"),
+        };
+        CommandResponse::object(template)
+    })()
+        .into_future()
 }

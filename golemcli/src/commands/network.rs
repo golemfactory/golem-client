@@ -6,13 +6,20 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum NetworkSection {
-    /// Connect to a node
-    #[structopt(name = "connect")]
-    Connect {
-        /// Remote IP address
-        ip: String,
-        /// Remote TCP port
-        port: u16,
+    /// Show client status
+    #[structopt(name = "status")]
+    Status,
+    /// Show connected nodes
+    #[structopt(name = "show")]
+    Show {
+        /// Show full table contents
+        #[structopt(long)]
+        full: bool,
+
+        /// Sort nodes
+        /// ip, port, id, name
+        #[structopt(long)]
+        sort: Option<String>,
     },
     /// Show known nodes
     #[structopt(name = "dht")]
@@ -26,21 +33,14 @@ pub enum NetworkSection {
         #[structopt(long)]
         sort: Option<String>,
     },
-    /// Show connected nodes
-    #[structopt(name = "show")]
-    Show {
-        /// Show full table contents
-        #[structopt(long)]
-        full: bool,
-
-        /// Sort nodes
-        /// ip, port, id, name
-        #[structopt(long)]
-        sort: Option<String>,
+    /// Connect to a node
+    #[structopt(name = "connect")]
+    Connect {
+        /// Remote IP address
+        ip: String,
+        /// Remote TCP port
+        port: u16,
     },
-    /// Show client status
-    #[structopt(name = "status")]
-    Status,
 }
 
 impl NetworkSection {

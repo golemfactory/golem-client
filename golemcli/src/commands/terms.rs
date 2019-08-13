@@ -5,12 +5,14 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-    /// Accept terms of use
-    #[structopt(name = "accept")]
-    Accept,
     /// Show terms of use
     #[structopt(name = "show")]
     Show,
+
+    /// Accept terms of use
+    #[structopt(name = "accept")]
+    Accept,
+
 }
 
 impl Section {

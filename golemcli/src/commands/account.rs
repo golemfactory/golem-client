@@ -6,19 +6,18 @@ use failure::Fallible;
 use futures::{future, prelude::*};
 use golem_rpc_api::core::AsGolemCore;
 use golem_rpc_api::net::AsGolemNet;
-use golem_rpc_api::pay::{AsGolemPay, Balance};
+use golem_rpc_api::pay::{AsGolemPay, Balance, DepositBalance};
 use golem_rpc_api::rpc::*;
 use serde::{Deserialize, Serialize};
-use structopt::StructOpt;
+use structopt::{clap, StructOpt};
+use crate::formaters::*;
 
 #[derive(StructOpt, Debug)]
+#[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
 pub enum AccountSection {
     /// Display account & financial info
     #[structopt(name = "info")]
     Info,
-    /// Unlock account, will prompt for your password
-    #[structopt(name = "unlock")]
-    Unlock,
 
     /// Withdraw GNT/ETH (withdrawals are not available for the testnet)
     #[structopt(name = "withdraw")]
@@ -32,6 +31,9 @@ pub enum AccountSection {
         /// Gas price in wei (not gwei)
         gas_price: Option<bigdecimal::BigDecimal>,
     },
+    /// Unlock account, will prompt for your password
+    #[structopt(name = "unlock")]
+    Unlock,
 }
 
 impl AccountSection {
@@ -119,12 +121,23 @@ impl AccountSection {
     }
 }
 
+#[derive(Serialize)]
+struct AccountInfo {
+    #[serde(rename="Golem_ID")]
+    golem_id : String,
+    node_name : String,
+    requestor_reputation : u64,
+    provider_reputation : u64,
+    finances : serde_json::Value
+}
+
 fn account_info(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
 ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
     endpoint
         .as_golem_net()
         .get_node()
+        .from_err()
         .and_then(move |node: golem_rpc_api::net::NodeInfo| {
             let query = {
                 let node_id = node.key.to_string();
@@ -136,13 +149,13 @@ fn account_info(
                     .rpc_call("rep.requesting", &(node_id,));
                 let payment_address = endpoint.as_golem_pay().get_pay_ident().from_err();
                 let balance = endpoint.as_golem_pay().get_pay_balance().from_err();
-                let deposit_balance = endpoint.as_invoker().rpc_call("pay.deposit_balance", &());
+                let deposit_balance = endpoint.as_golem_pay().get_deposit_balance();
 
                 computing_trust.join5(requesting_trust, payment_address, balance, deposit_balance)
             };
 
             // TODO: deposit_balance formating
-            query.and_then(
+            query.from_err().and_then(
                 move |(
                     computing_trust,
                     requesting_trust,
@@ -162,21 +175,21 @@ fn account_info(
                     let gnt_unadopted = Currency::GNT.format_decimal(&balance.gnt_nonconverted);
                     let gnt_locked = Currency::GNT.format_decimal(&balance.gnt_lock);
 
-                    Ok(CommandResponse::Object(serde_json::json!({
-                        "node_name": node.node_name,
-                        "Golem_ID": node.key,
-                        "requestor_reputation": (requesting_trust.unwrap_or_default()*100.0) as u64,
-                        "provider_reputation": (computing_trust.unwrap_or_default()*100.0) as u64,
-                        "finances": {
+                    CommandResponse::object(AccountInfo {
+                        node_name: node.node_name,
+                        golem_id: node.key,
+                        requestor_reputation: (requesting_trust.unwrap_or_default()*100.0) as u64,
+                        provider_reputation: (computing_trust.unwrap_or_default()*100.0) as u64,
+                        finances: serde_json::json!({
                             "eth_address": payment_address,
                             "eth_available": eth_available,
                             "eth_locked": eth_locked,
                             "gnt_available": gnt_available,
                             "gnt_locked": gnt_locked,
                             "gnt_unadopted": gnt_unadopted,
-                            "deposit_balance": deposit_balance
-                        }
-                    })))
+                            "deposit_balance": deposit_balance.map(|b : golem_rpc_api::pay::DepositBalance| b.humanize())
+                        })
+                    })
                 },
             )
         })
@@ -191,9 +204,3 @@ enum DepositStatus {
     Unlocked,
 }
 
-#[derive(Deserialize, Serialize)]
-struct DepositBalance {
-    value: String,
-    status: DepositStatus,
-    timelock: String,
-}

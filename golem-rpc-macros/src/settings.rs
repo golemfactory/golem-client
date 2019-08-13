@@ -435,7 +435,7 @@ pub fn gen_settings(mut f: syn::File) -> Fallible<TokenStream> {
     Ok((quote! {
         #(#sections_q )*
 
-        pub fn from_name(setting_name : &str) -> Option<&DynamicSetting> {
+        pub fn from_name(setting_name : &str) -> Option<&'static DynamicSetting> {
             match setting_name {
                 #(#from_name_rules)*
                 _ => None

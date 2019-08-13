@@ -17,6 +17,8 @@ pub struct Section {
     )]
     sort_by: Option<String>,
     #[structopt(long)]
+    #[structopt(raw(set = "structopt::clap::ArgSettings::Hidden"))]
+    #[structopt(raw(set = "structopt::clap::ArgSettings::Global"))]
     full: bool,
 
     #[structopt(subcommand)]
@@ -25,10 +27,13 @@ pub struct Section {
 
 #[derive(StructOpt, Debug)]
 enum SectionCommand {
+    /// Display all payments
     #[structopt(name = "all")]
     All,
+    /// Display awaiting payments
     #[structopt(name = "awaiting")]
     Awaiting,
+    /// Display confirmed payments
     #[structopt(name = "confirmed")]
     Confirmed,
 }
@@ -119,20 +124,22 @@ impl Section {
                     .collect();
 
                 let mut summary = Vec::new();
-                for (k, v) in total_for_status {
-                    let fee = fee_for_status.get(&k);
-                    summary.push(serde_json::json!([
+                if total_for_status.len() > 1 {
+                    for (k, v) in total_for_status {
+                        let fee = fee_for_status.get(&k);
+                        summary.push(serde_json::json!([
                         "",
                         "",
                         k,
                         crate::eth::Currency::GNT.format_decimal(&v),
                         fee.map(|fee| crate::eth::Currency::ETH.format_decimal(&fee))
                     ]));
+                    }
                 }
                 summary.push(serde_json::json!([
                     "",
                     "",
-                    "",
+                    "total",
                     crate::eth::Currency::GNT.format_decimal(&total_value),
                     crate::eth::Currency::ETH.format_decimal(&total_fee)
                 ]));

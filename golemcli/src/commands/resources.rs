@@ -9,6 +9,10 @@ pub enum Section {
     #[structopt(name = "_list")]
     #[structopt(raw(setting = "AppSettings::Hidden"))]
     ListPresets,
+    /// Display shared resources info
+    #[structopt(name = "show")]
+    Show,
+    /// Change your provider resources
     #[structopt(name = "update")]
     UpdatePresets {
         #[structopt(long = "cores")]
@@ -20,8 +24,6 @@ pub enum Section {
         #[structopt(long)]
         apply: bool,
     },
-    #[structopt(name = "show")]
-    Show,
 }
 
 impl Section {

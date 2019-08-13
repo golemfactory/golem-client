@@ -7,19 +7,27 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-    // Abort testing task
-    #[structopt(name = "abort")]
-    Abort,
-
     /// Run testing task. It accepts a file like 'tasks create'.
     #[structopt(name = "run")]
     Run {
         /// Task file
         task_file: PathBuf,
     },
+    /// Dump a task template
+    #[structopt(name = "template")]
+    Template {
+        #[structopt(raw(possible_values = "super::tasks::TASK_TYPES",))]
+        task_type: String,
+    },
 
+    /// Show test_task status
     #[structopt(name = "status")]
     Status,
+
+    /// Abort a task. It will delete a task details
+    #[structopt(name = "abort")]
+    Abort,
+
 }
 
 impl Section {
@@ -31,6 +39,7 @@ impl Section {
             Section::Run { task_file } => Box::new(self.do_run(endpoint, task_file)),
             Section::Abort => Box::new(self.abort(endpoint)),
             Section::Status => Box::new(self.status(endpoint)),
+            Section::Template { task_type} => Box::new(super::tasks::template(task_type)),
         }
     }
 

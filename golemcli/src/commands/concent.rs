@@ -5,28 +5,30 @@ use golem_rpc_api::net::AsGolemNet;
 use golem_rpc_api::pay::{AsGolemPay, DepositPayment};
 use std::str::FromStr;
 use structopt::{clap::arg_enum, StructOpt};
+use crate::formaters::*;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
-    /// Turns concent on
+    /// Shows Concent Service status
+    #[structopt(name = "status")]
+    Status,
+
+    /// Turns Concent Service on
     #[structopt(name = "on")]
     On,
 
-    /// Turns concent off
+    /// Turns Concent Service off
     #[structopt(name = "off")]
     Off,
 
-    /// Shows concesnt status
-    #[structopt(name = "status")]
-    Status,
+    /// Display deposit status
+    #[structopt(name = "deposit")]
+    Deposit(Deposit),
 
     /// Terms of Use
     #[structopt(name = "terms")]
     Terms(Terms),
 
-    /// Display deposit payments
-    #[structopt(name = "deposit")]
-    Deposit(Deposit),
 }
 
 #[derive(StructOpt, Debug)]
@@ -52,6 +54,8 @@ const DEPOSIT_COLUMNS: &[&str] = &["tx", "status", "value", "fee"];
 
 #[derive(StructOpt, Debug)]
 enum DepositCommands {
+
+    /// Display
     #[structopt(name = "payments")]
     Payments {
         /// Filter by status
@@ -129,7 +133,7 @@ impl Section {
             .as_golem_pay()
             .get_deposit_balance()
             .from_err()
-            .and_then(|balance_info| CommandResponse::object(balance_info))
+            .and_then(|balance_info| CommandResponse::object(balance_info.map(Humanize::humanize)))
     }
 
     fn deposit_payments(

@@ -43,6 +43,7 @@ lazy_static::lazy_static! {
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::VersionlessSubcommands"))]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::NoBinaryName"))]
 #[structopt(raw(after_help = "AFTER_HELP.as_ref()"))]
+#[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
 struct LineArgs {
     /// Return results in JSON format
     #[structopt(long)]

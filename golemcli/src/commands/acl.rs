@@ -6,12 +6,11 @@ use golem_rpc_api::net::{AclRule, AclRuleItem, AclStatus, AsGolemNet, NodeInfo, 
 use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::net::IpAddr;
-use structopt::{clap::ArgSettings, StructOpt};
+use structopt::{clap::{ArgSettings, AppSettings}, StructOpt};
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
     /// Show current access list status
-    #[structopt(raw(display_order = "490"))]
     #[structopt(name = "list")]
     List {
         ///
@@ -22,10 +21,28 @@ pub enum Section {
         full: bool,
     },
 
+    /// Creates new acl list with given configuration.
+    #[structopt(name = "setup")]
+    Setup(Setup),
+
+    /// Allows interaction with given nodes.
+    /// Removes from blacklist or adds to whitelist.
+    #[structopt(name = "allow")]
+    #[structopt(raw(setting = "AppSettings::ArgRequiredElseHelp"))]
+    Allow {
+        /// IPv4/IPv6 address, will be added to ip deny list.
+        #[structopt(long)]
+        #[structopt(raw(hidden = "true"))]
+        ip: Vec<IpAddr>,
+
+        /// GOLEM node id. it can be pattern in form <prefix>...<suffix>
+        #[structopt(required = true)]
+        node: Vec<GolemIdPattern>,
+    },
     /// Deny interaction with given nodes.
     /// Adds for blacklist or removes from whitelist.
-    #[structopt(raw(display_order = "500"))]
     #[structopt(name = "deny")]
+    #[structopt(raw(setting = "AppSettings::ArgRequiredElseHelp"))]
     Deny {
         /// IPv4/IPv6 address, will be added to ip deny list.
         #[structopt(long)]
@@ -33,27 +50,13 @@ pub enum Section {
         ip: Vec<IpAddr>,
 
         /// GOLEM node id. it can be pattern in form <prefix>...<suffix>
+        #[structopt(required = true)]
         node: Vec<GolemIdPattern>,
 
         /// Sets temporaty rule for given number of seconds.
         #[structopt(short = "s", long = "for-secs")]
         for_secs: Option<u32>,
     },
-
-    /// Allows interaction with given nodes.
-    /// Removes from blacklist or adds to whitelist.
-    #[structopt(raw(display_order = "500"))]
-    #[structopt(name = "allow")]
-    Allow {
-        #[structopt(long)]
-        #[structopt(raw(hidden = "true"))]
-        ip: Vec<IpAddr>,
-        node: Vec<GolemIdPattern>,
-    },
-
-    /// Creates new acl list with given configuration.
-    #[structopt(name = "setup")]
-    Setup(Setup),
 }
 
 #[derive(StructOpt, Debug)]
@@ -83,7 +86,7 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
-            Section::List { full, ip, .. } => Box::new(self.list(endpoint, *full, *ip)),
+            Section::List { full, ip, .. } => Box::new(list(endpoint, *full, *ip)),
             Section::Deny { ip, node, for_secs } => {
                 Box::new(self.deny(endpoint, ip, node, for_secs.map(|s| s as i32).unwrap_or(-1)))
             }
@@ -94,42 +97,6 @@ impl Section {
             Section::Setup(Setup::OnlyListed { nodes }) => {
                 Box::new(self.setup(endpoint, AclRule::Deny, nodes, ctx))
             }
-        }
-    }
-
-    fn list(
-        &self,
-        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        full: bool,
-        ip: bool,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        if ip {
-            future::Either::A(
-                endpoint
-                    .as_golem_net()
-                    .acl_status()
-                    .join(endpoint.as_golem_net().acl_ip_status())
-                    .from_err()
-                    .and_then(move |(node_acl, ip_acl)| {
-                        Ok(AclListOutput {
-                            nodes: node_acl,
-                            ips: Some(ip_acl.rules),
-                            full,
-                        }
-                        .to_response())
-                    }),
-            )
-        } else {
-            future::Either::B(endpoint.as_golem_net().acl_status().from_err().and_then(
-                move |node_acl| {
-                    Ok(AclListOutput {
-                        nodes: node_acl,
-                        ips: None,
-                        full,
-                    }
-                    .to_response())
-                },
-            ))
         }
     }
 
@@ -217,6 +184,7 @@ impl Section {
                 .collect::<Vec<_>>(),
         );
 
+        let list_ep = endpoint.clone();
         let nodes = nodes.clone();
         let block_nodes = endpoint
             .as_golem_net()
@@ -258,7 +226,7 @@ impl Section {
         block_ips
             .from_err()
             .join(block_nodes)
-            .and_then(|(_ips, _nodes)| CommandResponse::object("Updated"))
+            .and_then(move |(_ips, _nodes)| list(list_ep, false, false))
     }
 
     fn allow(
@@ -267,6 +235,8 @@ impl Section {
         ips: &Vec<IpAddr>,
         nodes: &Vec<GolemIdPattern>,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        let list_ep = endpoint.clone();
+
         let allow_ips = future::join_all(
             ips.into_iter()
                 .cloned()
@@ -318,7 +288,7 @@ impl Section {
         allow_ips
             .join(allow_nodes)
             .from_err()
-            .and_then(|(_ips, _nodes)| CommandResponse::object("Updated"))
+            .and_then(move |(_ips, _nodes)| list(list_ep, false, false))
     }
 }
 
@@ -394,5 +364,41 @@ impl FormattedObject for AclListOutput {
         table.printstd();
 
         Ok(())
+    }
+}
+
+
+fn list(
+    endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+    full: bool,
+    ip: bool,
+) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    if ip {
+        future::Either::A(
+            endpoint
+                .as_golem_net()
+                .acl_status()
+                .join(endpoint.as_golem_net().acl_ip_status())
+                .from_err()
+                .and_then(move |(node_acl, ip_acl)| {
+                    Ok(AclListOutput {
+                        nodes: node_acl,
+                        ips: Some(ip_acl.rules),
+                        full,
+                    }
+                        .to_response())
+                }),
+        )
+    } else {
+        future::Either::B(endpoint.as_golem_net().acl_status().from_err().and_then(
+            move |node_acl| {
+                Ok(AclListOutput {
+                    nodes: node_acl,
+                    ips: None,
+                    full,
+                }
+                    .to_response())
+            },
+        ))
     }
 }

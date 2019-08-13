@@ -18,6 +18,7 @@ pub(crate) mod context;
 pub(crate) mod eth;
 pub(crate) mod terms;
 pub(crate) mod utils;
+pub(crate) mod formaters;
 
 #[macro_use]
 pub(crate) mod component_response;
@@ -29,6 +30,7 @@ mod interactive;
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::VersionlessSubcommands"))]
 #[structopt(raw(global_setting = "structopt::clap::AppSettings::DisableVersion"))]
+#[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
 struct CliArgs {
     #[cfg(feature = "interactive_cli")]
     /// Enter interactive mode

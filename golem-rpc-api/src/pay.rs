@@ -18,7 +18,7 @@ rpc_interface! {
         fn get_deposit_payments_list(&self, #[kwarg] _limit : Option<usize>, #[kwarg] _offset : Option<usize>) -> Result<Option<Vec<DepositPayment>>>;
 
         #[id = "pay.deposit_balance"]
-        fn get_deposit_balance(&self) -> Result<DepositBalance>;
+        fn get_deposit_balance(&self) -> Result<Option<DepositBalance>>;
 
         #[id = "pay.balance"]
         fn get_pay_balance(&self) -> Result<Balance>;

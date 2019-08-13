@@ -340,20 +340,32 @@ fn print_table(
         }
     }
     if !summary.is_empty() {
+        table.add_row(Row::empty());
         table.add_empty_row();
-        table.add_empty_row();
-        for row in summary {
+        let l = summary.len();
+        for (idx, row) in summary.into_iter().enumerate() {
             if let Some(row_items) = row.as_array() {
                 use serde_json::Value;
 
-                let row_strings = row_items
-                    .iter()
-                    .map(|v| match v {
-                        Value::String(s) => s.to_string(),
-                        Value::Null => "".into(),
-                        v => v.to_string(),
-                    })
-                    .collect();
+                let row_strings = Row::new(
+                    row_items
+                        .iter()
+                        .map(|v| {
+                            let c = Cell::new(&match v {
+                                Value::String(s) => s.to_string(),
+                                Value::Null => "".into(),
+                                v => v.to_string(),
+                            });
+
+                            if idx == l-1 {
+                                c.with_style(Attr::Bold)
+                            }
+                            else {
+                                c
+                            }
+                        })
+                        .collect(),
+                );
                 table.add_row(row_strings);
             }
         }
@@ -372,6 +384,7 @@ use golem_rpc_api::Net;
 use prettytable::{format, format::TableFormat, Table};
 use std::thread::sleep;
 use std::time::Duration;
+
 lazy_static::lazy_static! {
 
     pub static ref FORMAT_BASIC: TableFormat = format::FormatBuilder::new()
@@ -412,5 +425,6 @@ pub fn prompt_for_acceptance(msg: &str) -> bool {
     if PROMPT_FLAG.load(std::sync::atomic::Ordering::Relaxed) {
         return true;
     }
+    eprintln!();
     promptly::prompt_default(msg, true)
 }
