@@ -74,7 +74,7 @@ struct CliArgs {
     command: Option<commands::CommandSection>,
 
     /// Prints version information
-    #[structopt(long, short="V")]
+    #[structopt(long, short = "V")]
     version: bool,
 }
 
