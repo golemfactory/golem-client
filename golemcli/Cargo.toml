@@ -1,6 +1,7 @@
 [package]
 name = "golemcli"
 version = "0.1.8"
+description = "Command line interface for Brass Golem Node"
 authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
 
