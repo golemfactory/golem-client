@@ -132,13 +132,14 @@ pub struct AclStatus<Identity> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AclRuleItem<Identity>(
-    pub Identity,
-    pub AclRule,
+pub struct AclRuleItem<Identity> {
+    pub node_id: Identity,
+    pub node_name: String,
+    pub rule: AclRule,
     #[serde(default)]
     #[serde(with = "opt_ts_seconds")]
-    pub Option<chrono::DateTime<chrono::Utc>>,
-);
+    pub deadline: Option<chrono::DateTime<chrono::Utc>>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
