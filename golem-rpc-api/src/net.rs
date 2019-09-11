@@ -133,7 +133,7 @@ pub struct AclStatus<Identity> {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AclRuleItem<Identity> {
-    pub node_id: Identity,
+    pub identity: Identity,
     pub node_name: String,
     pub rule: AclRule,
     #[serde(default)]
