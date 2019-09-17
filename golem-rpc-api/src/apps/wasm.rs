@@ -4,7 +4,7 @@
 
 use super::{ComputeOn, TaskDef, TaskDefOptions};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WasmOptions {
@@ -12,7 +12,7 @@ pub struct WasmOptions {
     pub wasm_name: String,
     pub input_dir: String,
     pub output_dir: String,
-    pub subtasks: Vec<SubtaskDef>,
+    pub subtasks: HashMap<String, SubtaskDef>,
 }
 
 impl TaskDefOptions for WasmOptions {
@@ -21,7 +21,6 @@ impl TaskDefOptions for WasmOptions {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubtaskDef {
-    pub name: String,
     pub exec_args: Vec<String>,
     pub output_file_paths: Vec<String>,
 }
@@ -29,7 +28,7 @@ pub struct SubtaskDef {
 pub type WasmTaskDef = TaskDef<WasmOptions>;
 
 pub fn template() -> WasmTaskDef {
-    TaskDef {
+    let mut task_def = TaskDef {
         task_type: WasmOptions::TASK_TYPE.to_string(),
         compute_on: ComputeOn::CPU,
         name: "simple wasm".to_string(),
@@ -44,11 +43,16 @@ pub fn template() -> WasmTaskDef {
             wasm_name: "".to_string(),
             input_dir: "".to_string(),
             output_dir: "".to_string(),
-            subtasks: vec![SubtaskDef {
-                name: "".into(),
-                exec_args: vec![],
-                output_file_paths: vec![],
-            }],
+            subtasks: HashMap::new(),
         },
-    }
+    };
+    task_def.options.subtasks.insert(
+        "subtask1".into(),
+        SubtaskDef {
+            exec_args: vec![],
+            output_file_paths: vec![],
+        },
+    );
+
+    task_def
 }
