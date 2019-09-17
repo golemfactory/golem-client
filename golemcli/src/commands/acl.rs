@@ -139,7 +139,14 @@ impl Section {
                 Ok(status
                     .rules
                     .into_iter()
-                    .map(|AclRuleItem(key, _, _)| key)
+                    .map(
+                        |AclRuleItem {
+                             identity,
+                             node_name: _,
+                             rule: _,
+                             deadline: _,
+                         }| identity,
+                    )
                     .collect::<BTreeSet<_>>())
             },
         );
@@ -204,7 +211,14 @@ impl Section {
                             status
                                 .rules
                                 .into_iter()
-                                .map(|AclRuleItem(node_id, _, _)| node_id)
+                                .map(
+                                    |AclRuleItem {
+                                         identity,
+                                         node_name: _,
+                                         rule: _,
+                                         deadline: _,
+                                     }| identity,
+                                )
                                 .collect::<Vec<_>>(),
                         ),
                         nodes,
@@ -214,10 +228,10 @@ impl Section {
                     future::join_all(
                         nodes
                             .into_iter()
-                            .map(|node_id: String| {
+                            .map(|identity: String| {
                                 endpoint
                                     .as_golem_net()
-                                    .block_node(node_id, timeout)
+                                    .block_node(identity, timeout)
                                     .from_err()
                             })
                             .collect::<Vec<_>>(),
@@ -269,7 +283,14 @@ impl Section {
                             status
                                 .rules
                                 .into_iter()
-                                .map(|AclRuleItem(node_id, _, _)| node_id)
+                                .map(
+                                    |AclRuleItem {
+                                         identity,
+                                         node_name: _,
+                                         rule: _,
+                                         deadline: _,
+                                     }| identity,
+                                )
                                 .collect::<Vec<_>>(),
                         ),
                         nodes,
@@ -279,8 +300,8 @@ impl Section {
                     future::join_all(
                         nodes
                             .into_iter()
-                            .map(|node_id: String| {
-                                endpoint.as_golem_net().allow_node(node_id, -1).from_err()
+                            .map(|identity: String| {
+                                endpoint.as_golem_net().allow_node(identity, -1).from_err()
                             })
                             .collect::<Vec<_>>(),
                     )
@@ -328,11 +349,17 @@ impl FormattedObject for AclListOutput {
             if ips.is_empty() {
                 table.add_row(row!["", ""]);
             }
-            for AclRuleItem(ip, _, valid_to) in ips {
+            for AclRuleItem {
+                identity: ip,
+                node_name: _,
+                rule: _,
+                deadline,
+            } in ips
+            {
                 table.add_row(Row::new(vec![
                     Cell::new(&ip.to_string()),
                     Cell::new(
-                        &valid_to
+                        &deadline
                             .map(|d| format!("{}", d.with_timezone(&chrono::Local)))
                             .unwrap_or_default(),
                     ),
@@ -353,11 +380,17 @@ impl FormattedObject for AclListOutput {
             table.add_row(row!["", ""]);
         }
 
-        for AclRuleItem(node, _, valid_to) in &self.nodes.rules {
+        for AclRuleItem {
+            identity,
+            node_name: _,
+            rule: _,
+            deadline,
+        } in &self.nodes.rules
+        {
             table.add_row(Row::new(vec![
-                Cell::new(&format_key(node, full)),
+                Cell::new(&format_key(identity, full)),
                 Cell::new(
-                    &valid_to
+                    &deadline
                         .map(|d| format!("{}", d.with_timezone(&chrono::Local)))
                         .unwrap_or_else(|| "forever".to_string()),
                 ),
