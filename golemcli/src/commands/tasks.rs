@@ -52,13 +52,10 @@ pub enum Section {
     Create {
         /// Task file
         file_name: PathBuf,
-    },
-    /// dry-run creating a task and return task dict
-    #[structopt(name = "create_dry_run")]
-    CreateDryRun {
-        /// Task file
-        file_name: PathBuf,
+        #[structopt(long = "dry-run", short = "n")]
+        dry_run: bool,
         ///  Output file
+        #[structopt(short, long = "out-file")]
         out_file: Option<PathBuf>,
     },
     /// Restart a task
@@ -128,11 +125,17 @@ impl Section {
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
             Section::Abort { task_id } => Box::new(self.abort(endpoint, task_id)),
-            Section::Create { file_name } => Box::new(self.create(endpoint, file_name)),
-            Section::CreateDryRun {
+            Section::Create {
                 file_name,
+                dry_run,
                 out_file,
-            } => Box::new(self.create_dry_run(endpoint, file_name, out_file)),
+            } => {
+                if *dry_run {
+                    Box::new(self.create_dry_run(endpoint, file_name, out_file))
+                } else {
+                    Box::new(self.create(endpoint, &file_name, out_file))
+                }
+            }
             Section::Delete { task_id } => Box::new(self.delete(endpoint, task_id)),
             Section::Dump { task_id, out_file } => Box::new(self.dump(endpoint, task_id, out_file)),
             Section::Purge => Box::new(self.purge(endpoint)),
@@ -155,6 +158,7 @@ impl Section {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         file_name: &Path,
+        out_file: &Option<PathBuf>,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         use std::fs;
         /*
@@ -167,6 +171,9 @@ impl Section {
                     return CommandResult(error=error)
                 return task_id
         */
+
+        let out_file = out_file.clone();
+
         fs::OpenOptions::new()
             .read(true)
             .open(file_name)
@@ -174,7 +181,14 @@ impl Section {
             .and_then(|file| Ok(serde_json::from_reader(file)?))
             .from_err()
             .and_then(move |task_spec| endpoint.as_golem_comp().create_task(task_spec).from_err())
-            .and_then(|task_id| CommandResponse::object(task_id))
+            .and_then(move |task_id| {
+                if let Some(out_file) = out_file {
+                    fs::write(out_file, task_id)?;
+                    Ok(CommandResponse::NoOutput)
+                } else {
+                    CommandResponse::object(task_id)
+                }
+            })
     }
 
     fn create_dry_run(
@@ -208,10 +222,10 @@ impl Section {
                             .open(out_file)?,
                         &v,
                     )?;
+                    Ok(CommandResponse::NoOutput)
                 } else {
-                    println!("{}", serde_json::to_string_pretty(&v)?)
+                    CommandResponse::object(v)
                 }
-                Ok(CommandResponse::NoOutput)
             })
     }
 
