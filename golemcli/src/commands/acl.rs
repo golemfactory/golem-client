@@ -139,7 +139,14 @@ impl Section {
                 Ok(status
                     .rules
                     .into_iter()
-                    .map(|AclRuleItem{identity, node_name: _, rule: _, deadline: _}| identity)
+                    .map(
+                        |AclRuleItem {
+                             identity,
+                             node_name: _,
+                             rule: _,
+                             deadline: _,
+                         }| identity,
+                    )
                     .collect::<BTreeSet<_>>())
             },
         );
@@ -204,7 +211,14 @@ impl Section {
                             status
                                 .rules
                                 .into_iter()
-                                .map(|AclRuleItem{identity, node_name: _, rule: _, deadline: _}| identity)
+                                .map(
+                                    |AclRuleItem {
+                                         identity,
+                                         node_name: _,
+                                         rule: _,
+                                         deadline: _,
+                                     }| identity,
+                                )
                                 .collect::<Vec<_>>(),
                         ),
                         nodes,
@@ -269,7 +283,14 @@ impl Section {
                             status
                                 .rules
                                 .into_iter()
-                                .map(|AclRuleItem{identity, node_name: _, rule: _, deadline: _}| identity)
+                                .map(
+                                    |AclRuleItem {
+                                         identity,
+                                         node_name: _,
+                                         rule: _,
+                                         deadline: _,
+                                     }| identity,
+                                )
                                 .collect::<Vec<_>>(),
                         ),
                         nodes,
@@ -328,7 +349,13 @@ impl FormattedObject for AclListOutput {
             if ips.is_empty() {
                 table.add_row(row!["", ""]);
             }
-            for AclRuleItem{identity: ip, node_name: _, rule: _, deadline} in ips {
+            for AclRuleItem {
+                identity: ip,
+                node_name: _,
+                rule: _,
+                deadline,
+            } in ips
+            {
                 table.add_row(Row::new(vec![
                     Cell::new(&ip.to_string()),
                     Cell::new(
@@ -353,7 +380,13 @@ impl FormattedObject for AclListOutput {
             table.add_row(row!["", ""]);
         }
 
-        for AclRuleItem{identity, node_name: _, rule: _, deadline} in &self.nodes.rules {
+        for AclRuleItem {
+            identity,
+            node_name: _,
+            rule: _,
+            deadline,
+        } in &self.nodes.rules
+        {
             table.add_row(Row::new(vec![
                 Cell::new(&format_key(identity, full)),
                 Cell::new(
