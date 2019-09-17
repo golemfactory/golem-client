@@ -46,12 +46,17 @@ pub enum Section {
         task_type: String,
     },
 
-    /// Create a task from file. Note: no client-side validation is performed yet.
+    /// Create a task from file. Note: Some client-side validation is performed, but might be incomplete.
     /// This will change in the future
     #[structopt(name = "create")]
     Create {
         /// Task file
         file_name: PathBuf,
+        #[structopt(long = "dry-run", short = "n")]
+        dry_run: bool,
+        ///  Output file
+        #[structopt(short, long = "out-file")]
+        out_file: Option<PathBuf>,
     },
     /// Restart a task
     #[structopt(name = "restart")]
@@ -120,7 +125,17 @@ impl Section {
     ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
         match self {
             Section::Abort { task_id } => Box::new(self.abort(endpoint, task_id)),
-            Section::Create { file_name } => Box::new(self.create(endpoint, file_name)),
+            Section::Create {
+                file_name,
+                dry_run,
+                out_file,
+            } => {
+                if *dry_run {
+                    Box::new(self.create_dry_run(endpoint, file_name, out_file))
+                } else {
+                    Box::new(self.create(endpoint, &file_name, out_file))
+                }
+            }
             Section::Delete { task_id } => Box::new(self.delete(endpoint, task_id)),
             Section::Dump { task_id, out_file } => Box::new(self.dump(endpoint, task_id, out_file)),
             Section::Purge => Box::new(self.purge(endpoint)),
@@ -143,6 +158,7 @@ impl Section {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         file_name: &Path,
+        out_file: &Option<PathBuf>,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
         use std::fs;
         /*
@@ -155,6 +171,9 @@ impl Section {
                     return CommandResult(error=error)
                 return task_id
         */
+
+        let out_file = out_file.clone();
+
         fs::OpenOptions::new()
             .read(true)
             .open(file_name)
@@ -162,7 +181,52 @@ impl Section {
             .and_then(|file| Ok(serde_json::from_reader(file)?))
             .from_err()
             .and_then(move |task_spec| endpoint.as_golem_comp().create_task(task_spec).from_err())
-            .and_then(|task_id| CommandResponse::object(task_id))
+            .and_then(move |task_id| {
+                if let Some(out_file) = out_file {
+                    fs::write(out_file, task_id)?;
+                    Ok(CommandResponse::NoOutput)
+                } else {
+                    CommandResponse::object(task_id)
+                }
+            })
+    }
+
+    fn create_dry_run(
+        &self,
+        endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
+        file_name: &Path,
+        out_file: &Option<PathBuf>,
+    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+        use std::fs;
+        let out_file = out_file.clone();
+
+        fs::OpenOptions::new()
+            .read(true)
+            .open(file_name)
+            .into_future()
+            .and_then(|file| Ok(serde_json::from_reader(file)?))
+            .from_err()
+            .and_then(move |task_spec| {
+                endpoint
+                    .as_golem_comp()
+                    .create_dry_run(task_spec)
+                    .from_err()
+            })
+            .and_then(move |v| {
+                if let Some(out_file) = out_file {
+                    serde_json::to_writer_pretty(
+                        OpenOptions::new()
+                            .write(true)
+                            .truncate(true)
+                            .create(true)
+                            .open(out_file)?,
+                        &v,
+                    )?;
+                    Ok(CommandResponse::NoOutput)
+                } else {
+                    CommandResponse::object(v)
+                }
+            })
     }
 
     fn abort(

@@ -16,6 +16,9 @@ rpc_interface! {
         #[id = "comp.task.create"]
         fn create_task_int(&self, task_spec: serde_json::Value) -> Result<(Option<String>, Option<Value>)>;
 
+        #[id = "comp.task.create.dry_run"]
+        fn create_dry_run_int(&self, task_spec: serde_json::Value) -> Result<(Option<TaskInfo>, Option<Value>)>;
+
         #[id = "comp.task"]
         fn get_task(&self, task_id : String) -> Result<Option<TaskInfo>>;
 
@@ -172,6 +175,19 @@ impl<'a, Inner: crate::rpc::wamp::RpcEndpoint + ?Sized + 'static> GolemComp<'a, 
                 (None, Some(err_obj)) => Err(map_to_error(err_obj, |err_msg| err_msg.to_string())),
                 (None, None) => Err(crate::Error::Other(format!("invalid error response: null"))),
             })
+    }
+
+    pub fn create_dry_run(
+        &self,
+        task_spec: serde_json::Value,
+    ) -> impl Future<Item = TaskInfo, Error = crate::Error> {
+        self.create_dry_run_int(task_spec).from_err().and_then(
+            |r: (Option<TaskInfo>, Option<Value>)| match r {
+                (Some(task_info), None) => Ok(task_info),
+                (None, Some(err)) => Err(crate::Error::Other(err.to_string())),
+                _ => Err(crate::Error::Other(format!("invalid response"))),
+            },
+        )
     }
 }
 
