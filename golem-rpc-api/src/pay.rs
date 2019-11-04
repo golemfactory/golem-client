@@ -131,5 +131,4 @@ mod test {
 
         eprintln!("income = {:?}", income);
     }
-
 }
