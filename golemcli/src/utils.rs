@@ -197,5 +197,4 @@ mod test {
         assert!(p2.match_to(key).unwrap());
         assert!(p3.match_to(key).unwrap());
     }
-
 }

@@ -57,7 +57,7 @@ pub enum CommandSection {
     #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
     Settings(settings::Section),
 
-    /// Manage provider resuorces
+    /// Manage provider resources
     #[structopt(name = "res")]
     #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
     Res(resources::Section),
@@ -197,7 +197,7 @@ impl CommandSection {
 
 #[derive(StructOpt)]
 pub enum InternalSection {
-    /// Generates autocomplete script fro given shell
+    /// Generates autocomplete script from given shell
     #[structopt(name = "complete")]
     Complete {
         /// Describes which shell to produce a completions file for
