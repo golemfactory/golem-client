@@ -106,7 +106,7 @@ fn format_nodes(
     let values = peers
         .into_iter()
         .map(|p: NodeInfo| {
-            let port = p.p2p_pub_port.unwrap_or(p.p2p_prv_port);
+            let port = p.p2p_pub_port.unwrap_or(p.p2p_prv_port.unwrap_or(0));
 
             serde_json::json!([p.pub_addr, port, format_key(&p.key, full), p.node_name])
         })
