@@ -122,7 +122,6 @@ pub mod opt_ts_seconds {
             super::ts_seconds::deserialize(deserializer).map(|v| Some(v))
         }
     }
-
 }
 
 pub mod duration {

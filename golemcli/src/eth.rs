@@ -87,5 +87,4 @@ mod test {
         let address = public_to_addres(public);
         assert_eq!("0x005b3bcf82085eededd551f50de7892471ffb272", address);
     }
-
 }
