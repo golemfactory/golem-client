@@ -49,10 +49,8 @@ impl SessionBuilder {
         Transport: futures::Sink<
                 SinkItem = actix_http::ws::Message,
                 SinkError = actix_http::ws::ProtocolError,
-            > + futures::Stream<
-                Item = actix_http::ws::Frame,
-                Error = actix_http::ws::ProtocolError,
-            > + 'static,
+            > + futures::Stream<Item = actix_http::ws::Frame, Error = actix_http::ws::ProtocolError>
+            + 'static,
     {
         use futures::prelude::*;
 
