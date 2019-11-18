@@ -92,14 +92,14 @@ impl<Endpoint: wamp::RpcEndpoint> AsGolemNet for Endpoint {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NodeInfo {
-    pub node_name: String,
+    pub node_name: Option<String>,
     pub key: String,
-    pub prv_port: u16,
+    pub prv_port: Option<u16>,
     pub pub_port: Option<u16>,
-    pub p2p_prv_port: u16,
+    pub p2p_prv_port: Option<u16>,
     pub p2p_pub_port: Option<u16>,
-    pub prv_addr: String,
-    pub pub_addr: String,
+    pub prv_addr: Option<String>,
+    pub pub_addr: Option<String>,
     pub prv_addresses: Vec<String>,
     pub nat_type: Vec<String>, // - TODO enum
 }

@@ -1,19 +1,24 @@
 use crate::rpc::*;
-use crate::serde::ts_seconds;
+use crate::serde::{opt_ts_seconds, ts_seconds};
 use bigdecimal::BigDecimal;
+use failure::_core::str::FromStr;
 use serde::*;
 
 rpc_interface! {
     trait GolemPay {
+        #[id = "pay.operations"]
+        fn get_operations(&self, operation_type: Option<WalletOperationType>, direction: Option<WalletOperationDirection>, page: usize, per_page: usize) -> Result<(u32, Vec<WalletOperation>)>;
+
+        //#[deprecated(since="0.2.2", note="please use `get_operations` instead")]
         #[id = "pay.incomes"]
         fn get_incomes_list(&self) -> Result<Vec<Income>>;
 
-        //
+        //#[deprecated(since="0.2.2", note="please use `get_operations` instead")]
         #[id = "pay.payments"]
         fn get_payments_list(&self, #[kwarg] _num: Option<u32>, #[kwarg] _last_seconds: Option<u32>) -> Result<Vec<Payment>>;
 
-        //
         // TODO: kwargs limit=1000, offset=0
+        //#[deprecated(since="0.2.2", note="please use `get_operations` instead")]
         #[id = "pay.deposit_payments"]
         fn get_deposit_payments_list(&self, #[kwarg] _limit : Option<usize>, #[kwarg] _offset : Option<usize>) -> Result<Option<Vec<DepositPayment>>>;
 
@@ -111,6 +116,119 @@ pub struct Balance {
     pub gnt_nonconverted: BigDecimal,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct TaskPayment {
+    pub node: crate::net::NodeInfo,
+    pub task_id: String,
+    pub subtask_id: String,
+    pub charged_from_deposit: Option<bool>,
+    #[serde(with = "opt_ts_seconds")]
+    pub accepted_ts: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(with = "opt_ts_seconds")]
+    pub settled_ts: Option<chrono::DateTime<chrono::Utc>>,
+    pub missing_amount: BigDecimal,
+    #[serde(with = "ts_seconds")]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(with = "ts_seconds")]
+    pub modified: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum WalletOperationDirection {
+    Incoming,
+    Outgoing,
+}
+
+impl FromStr for WalletOperationDirection {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "incoming" => Ok(Self::Incoming),
+            "outgoing" => Ok(Self::Outgoing),
+            _ => Err(format!("invalid value {}", s)),
+        }
+    }
+}
+
+impl WalletOperationDirection {
+    pub fn variants() -> &'static [&'static str] {
+        &["incoming", "outgoing"]
+    }
+}
+
+//arg_enum! {
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum WalletOperationType {
+    Transfer,
+    DepositTransfer,
+    TaskPayment,
+    DepositPayment,
+}
+//}
+
+impl FromStr for WalletOperationType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "transfer" => Self::Transfer,
+            "deposit_transfer" => Self::DepositTransfer,
+            "task_payment" => Self::TaskPayment,
+            "deposit_payment" => Self::DepositPayment,
+            _ => return Err(format!("invalid value {}", s)),
+        })
+    }
+}
+
+impl WalletOperationType {
+    pub fn variants() -> &'static [&'static str] {
+        &[
+            "transfer",
+            "deposit_transfer",
+            "task_payment",
+            "deposit_payment",
+        ]
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub enum WalletOperationCurrency {
+    ETH,
+    GNT,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WalletOperationStatus {
+    Awaiting,
+    Sent,
+    Confirmed,
+    Overdue,
+    Failed,
+    ArbitragedByConcent,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct WalletOperation {
+    pub task_payment: Option<TaskPayment>,
+    pub transaction_hash: Option<String>,
+    pub direction: WalletOperationDirection,
+    pub operation_type: WalletOperationType,
+    pub status: WalletOperationStatus,
+    pub sender_address: String,
+    pub recipient_address: String,
+    pub amount: BigDecimal,
+    pub currency: WalletOperationCurrency,
+    pub gas_cost: Option<BigDecimal>,
+    #[serde(with = "ts_seconds")]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(with = "ts_seconds")]
+    pub modified: chrono::DateTime<chrono::Utc>,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -130,5 +248,44 @@ mod test {
         let income: Income = serde_json::from_str(str).unwrap();
 
         eprintln!("income = {:?}", income);
+    }
+
+    #[test]
+    fn test_parse_wallet() {
+        let str = r#"[
+            13045, [
+                {
+                "task_payment": {
+                    "node": {"node_name": "R03 Laughing Octopus", "key": "b7da70a8bbb439e8f1cdf7494ce163294a884ccaf9f117023e3cad5e5d4cb60655aec697c859fdeb9880ef94e3705ee0a2dd44eba7d68cabcd90e7972b48d00f", "prv_port": 40201, "pub_port": 40201, "p2p_prv_port": 40200, "p2p_pub_port": 40200, "prv_addr": "10.30.8.60", "pub_addr": "5.226.70.4", "prv_addresses": ["10.30.8.60", "172.16.136.1", "172.16.80.1", "172.17.0.1"], "hyperdrive_prv_port": 3282, "hyperdrive_pub_port": 3282, "port_statuses": {"40200": "timeout", "40201": "timeout", "3282": "timeout"}, "nat_type": []}, 
+                    "task_id": "", 
+                    "subtask_id": "02b2e4de-4184-11e8-8132-b7da70a8bbb4", 
+                    "charged_from_deposit": null, 
+                    "accepted_ts": 1535984463, 
+                    "settled_ts": null, 
+                    "missing_amount": "0", 
+                    "created": 1540406987.388191, 
+                    "modified": 1573816279
+                    }, 
+                "transaction_hash": "0x2a2dc7ac2044fd33d00131d9b4171e3ca8768c7f8f16c9de23d6f4329c1aec05", 
+                "direction": "incoming", 
+                "operation_type": "task_payment", 
+                "status": "confirmed", 
+                "sender_address": "", 
+                "recipient_address": "0x0x5C49Ed170D0860273b39CCa561758523148d2bAe", 
+                "amount": "790277777777777778", 
+                "currency": "GNT", 
+                "gas_cost": "0", 
+                "created": 1540406987.388191, 
+                "modified": 1573816279}
+                ]
+            ]"#;
+        let result: (i32, Vec<WalletOperation>) = serde_json::from_str(str).unwrap();
+    }
+
+    #[test]
+    fn test_variants() {
+        for v in WalletOperationType::variants() {
+            let _: WalletOperationType = v.parse().unwrap();
+        }
     }
 }
