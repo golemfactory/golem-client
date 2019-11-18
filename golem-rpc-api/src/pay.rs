@@ -1,7 +1,7 @@
-use clap::arg_enum;
 use crate::rpc::*;
-use crate::serde:: {ts_seconds, opt_ts_seconds};
+use crate::serde::{opt_ts_seconds, ts_seconds};
 use bigdecimal::BigDecimal;
+use clap::arg_enum;
 use serde::*;
 
 rpc_interface! {
@@ -240,5 +240,4 @@ mod test {
             ]"#;
         let result: (i32, Vec<WalletOperation>) = serde_json::from_str(str).unwrap();
     }
-
 }

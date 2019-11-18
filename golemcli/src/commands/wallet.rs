@@ -1,6 +1,9 @@
 use crate::context::*;
 use futures::prelude::*;
-use golem_rpc_api::pay::{AsGolemPay, WalletOperation, WalletOperationCurrency, WalletOperationDirection, WalletOperationType};
+use golem_rpc_api::pay::{
+    AsGolemPay, WalletOperation, WalletOperationCurrency, WalletOperationDirection,
+    WalletOperationType,
+};
 use structopt::StructOpt;
 
 const WALLET_COLUMNS: &[&str] = &["type", "status", "amount", "fee (ETH)", "task_id"];
@@ -43,10 +46,14 @@ impl Section {
         operation_type: &Option<WalletOperationType>,
         direction: &Option<WalletOperationDirection>,
     ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-
         endpoint
             .as_golem_pay()
-            .get_operations(operation_type.clone(), direction.clone(), page.unwrap_or(1), per_page.unwrap_or(20))
+            .get_operations(
+                operation_type.clone(),
+                direction.clone(),
+                page.unwrap_or(1),
+                per_page.unwrap_or(20),
+            )
             .from_err()
             .and_then(move |result: (u32, Vec<WalletOperation>)| {
                 let (total, operations) = result;
@@ -58,8 +65,12 @@ impl Section {
                         let status = operation.status;
                         let amount: String;
                         match operation.currency {
-                            WalletOperationCurrency::GNT => amount = crate::eth::Currency::GNT.format_decimal(&operation.amount),
-                            WalletOperationCurrency::ETH => amount = crate::eth::Currency::ETH.format_decimal(&operation.amount),
+                            WalletOperationCurrency::GNT => {
+                                amount = crate::eth::Currency::GNT.format_decimal(&operation.amount)
+                            }
+                            WalletOperationCurrency::ETH => {
+                                amount = crate::eth::Currency::ETH.format_decimal(&operation.amount)
+                            }
                         }
                         let amount_str: String;
                         match operation.direction {

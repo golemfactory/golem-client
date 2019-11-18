@@ -19,9 +19,9 @@ mod settings;
 mod status;
 mod tasks;
 mod terms;
-mod wallet;
 #[cfg(feature = "test_task_cli")]
 mod test_task;
+mod wallet;
 
 mod acl;
 
@@ -104,7 +104,6 @@ pub enum CommandSection {
     #[structopt(name = "terms")]
     #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
     Terms(terms::Section),
-
 
     /// Wallet operations
     #[structopt(name = "wallet")]
