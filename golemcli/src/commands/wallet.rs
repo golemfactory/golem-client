@@ -13,11 +13,28 @@ pub enum Section {
     /// Show payments
     #[structopt(name = "show")]
     Show {
-        #[structopt(long)]
+        #[structopt(long = "operation-type")]
+        #[structopt(
+            parse(try_from_str),
+            raw(
+                possible_values = "WalletOperationType::variants()",
+                case_insensitive = "true"
+            )
+        )]
+        /// Operation type
         operation_type: Option<WalletOperationType>,
         #[structopt(long)]
+        #[structopt(
+            parse(try_from_str),
+            raw(
+                possible_values = "WalletOperationDirection::variants()",
+                case_insensitive = "true"
+            )
+        )]
+        /// Operation direction
         direction: Option<WalletOperationDirection>,
-        #[structopt(long)]
+        #[structopt(long = "per-page")]
+        /// How many records per page
         per_page: Option<usize>,
         page: Option<usize>,
     },
@@ -55,42 +72,30 @@ impl Section {
                 per_page.unwrap_or(20),
             )
             .from_err()
-            .and_then(move |result: (u32, Vec<WalletOperation>)| {
-                let (total, operations) = result;
+            .and_then(move |(total, operations)| {
                 let columns = WALLET_COLUMNS.iter().map(|&name| name.into()).collect();
                 let values = operations
                     .into_iter()
                     .map(|operation: WalletOperation| {
-                        let type_ = operation.operation_type;
+                        let operation_type = operation.operation_type;
                         let status = operation.status;
-                        let amount: String;
-                        match operation.currency {
-                            WalletOperationCurrency::GNT => {
-                                amount = crate::eth::Currency::GNT.format_decimal(&operation.amount)
-                            }
-                            WalletOperationCurrency::ETH => {
-                                amount = crate::eth::Currency::ETH.format_decimal(&operation.amount)
-                            }
-                        }
-                        let amount_str: String;
-                        match operation.direction {
-                            WalletOperationDirection::Incoming => {
-                                amount_str = format!("+{}", amount);
-                            }
-                            WalletOperationDirection::Outgoing => {
-                                amount_str = format!("-{}", amount);
-                            }
+                        let amount = crate::eth::Currency::from(operation.currency)
+                            .format_decimal(&operation.amount);
+
+                        let amount_str = match operation.direction {
+                            WalletOperationDirection::Incoming => format!("+{}", amount),
+                            WalletOperationDirection::Outgoing => format!("-{}", amount),
                         };
                         let fee = operation
                             .gas_cost
                             .map(|gas_cost| crate::eth::Currency::ETH.format_decimal(&gas_cost));
 
-                        let task_id: String;
-                        match operation.task_payment {
-                            None => task_id = "".to_string(),
-                            Some(task_payment) => task_id = task_payment.task_id,
+                        let task_id = if let Some(task_payment) = operation.task_payment {
+                            task_payment.task_id
+                        } else {
+                            "".into()
                         };
-                        serde_json::json!([type_, status, amount_str, fee, task_id])
+                        serde_json::json!([operation_type, status, amount_str, fee, task_id])
                     })
                     .collect();
                 Ok(ResponseTable { columns, values }.into())

@@ -1,5 +1,6 @@
 use bigdecimal::BigDecimal;
 use ethkey::{Address, PublicKey};
+use golem_rpc_api::pay::WalletOperationCurrency;
 use num_bigint::{BigInt, ToBigInt};
 use rustc_hex::FromHex;
 use serde::Serialize;
@@ -56,6 +57,15 @@ impl Currency {
         match self {
             Currency::GNT => "GNT",
             Currency::ETH => "ETH",
+        }
+    }
+}
+
+impl From<WalletOperationCurrency> for Currency {
+    fn from(currency: WalletOperationCurrency) -> Self {
+        match currency {
+            WalletOperationCurrency::GNT => Currency::GNT,
+            WalletOperationCurrency::ETH => Currency::ETH,
         }
     }
 }

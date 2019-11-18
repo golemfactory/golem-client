@@ -1,7 +1,7 @@
 use crate::rpc::*;
 use crate::serde::{opt_ts_seconds, ts_seconds};
 use bigdecimal::BigDecimal;
-use clap::arg_enum;
+use failure::_core::str::FromStr;
 use serde::*;
 
 rpc_interface! {
@@ -133,23 +133,64 @@ pub struct TaskPayment {
     pub modified: chrono::DateTime<chrono::Utc>,
 }
 
-arg_enum! {
-    #[derive(Deserialize, Serialize, Debug, Clone)]
-    #[serde(rename_all = "snake_case")]
-    pub enum WalletOperationDirection {
-        Incoming,
-        Outgoing,
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum WalletOperationDirection {
+    Incoming,
+    Outgoing,
+}
+
+impl FromStr for WalletOperationDirection {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "incoming" => Ok(Self::Incoming),
+            "outgoing" => Ok(Self::Outgoing),
+            _ => Err(format!("invalid value {}", s)),
+        }
     }
 }
 
-arg_enum! {
-    #[derive(Deserialize, Serialize, Debug, Clone)]
-    #[serde(rename_all = "snake_case")]
-    pub enum WalletOperationType {
-        Transfer,
-        DepositTransfer,
-        TaskPayment,
-        DepositPayment,
+impl WalletOperationDirection {
+    pub fn variants() -> &'static [&'static str] {
+        &["incoming", "outgoing"]
+    }
+}
+
+//arg_enum! {
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum WalletOperationType {
+    Transfer,
+    DepositTransfer,
+    TaskPayment,
+    DepositPayment,
+}
+//}
+
+impl FromStr for WalletOperationType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "transfer" => Self::Transfer,
+            "deposit_transfer" => Self::DepositTransfer,
+            "task_payment" => Self::TaskPayment,
+            "deposit_payment" => Self::DepositPayment,
+            _ => return Err(format!("invalid value {}", s)),
+        })
+    }
+}
+
+impl WalletOperationType {
+    pub fn variants() -> &'static [&'static str] {
+        &[
+            "transfer",
+            "deposit_transfer",
+            "task_payment",
+            "deposit_payment",
+        ]
     }
 }
 
@@ -239,5 +280,12 @@ mod test {
                 ]
             ]"#;
         let result: (i32, Vec<WalletOperation>) = serde_json::from_str(str).unwrap();
+    }
+
+    #[test]
+    fn test_variants() {
+        for v in WalletOperationType::variants() {
+            let _: WalletOperationType = v.parse().unwrap();
+        }
     }
 }
