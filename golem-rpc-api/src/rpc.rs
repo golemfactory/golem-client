@@ -54,7 +54,7 @@ impl<'a, Inner: RpcEndpoint + ?Sized> Invoker<'a, Inner> {
     ) -> impl Future<Item = Ret, Error = Error> + 'static {
         let uri = uri.into().to_owned();
         let request = match RpcCallRequest::with_va_args(uri.clone(), va_args) {
-            Ok(resuest) => resuest,
+            Ok(request) => request,
             Err(e) => return future::Either::B(future::err(e)),
         };
         future::Either::A(self.0.rpc_call(request).and_then(

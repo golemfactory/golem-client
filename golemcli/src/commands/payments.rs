@@ -92,7 +92,7 @@ impl Section {
                     .map(|payment: Payment| {
                         total_value += &payment.value;
 
-                        if let Some(mut total) = total_for_status.get_mut(&payment.status) {
+                        if let Some(total) = total_for_status.get_mut(&payment.status) {
                             *total = total.clone() + payment.value.clone();
                         } else {
                             total_for_status.insert(payment.status.clone(), payment.value.clone());
@@ -100,7 +100,7 @@ impl Section {
 
                         if let Some(fee) = &payment.fee {
                             total_fee += fee;
-                            if let Some(mut status_fee) = fee_for_status.get_mut(&payment.status) {
+                            if let Some(status_fee) = fee_for_status.get_mut(&payment.status) {
                                 *status_fee = status_fee.clone() + fee;
                             } else {
                                 fee_for_status.insert(payment.status.clone(), fee.clone());
