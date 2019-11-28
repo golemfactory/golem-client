@@ -1,14 +1,18 @@
 [package]
 name = "actix-wamp"
 version = "0.1.0"
-description = "Asynchronous WAMP client with rRPC and PubSub support and Challenge-Response authentication using MessagePack serialization"
+description = "Asynchronous client library for WAMP"
+readme = "README.md"
+keywords = ["actix", "WAMP", "client"]
 authors = ["Przemysław K. Rekucki <przemyslaw.rekucki@golem.network>"]
-homepage = "https://github.com/golemfactory/golem-unlimited/tree/ethkey/ethkey"
-repository = "https://github.com/golemfactory/golem-unlimited"
-documentation = "https://docs.rs/crate/ethkey"
-
+homepage = "https://github.com/golemfactory/golem-client/tree/master/actix-wamp"
+repository = "https://github.com/golemfactory/golem-client.git"
+documentation = "https://docs.rs/actix-wamp"
 license = "GPL-3.0"
 edition = "2018"
+
+[badges]
+travis-ci = { repository = "golemfactory/golem-client", branch = "master" }
 
 [features]
 default=["crypto-mac/std"]
