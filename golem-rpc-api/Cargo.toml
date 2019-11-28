@@ -1,8 +1,17 @@
 [package]
 name = "golem-rpc-api"
 version = "0.1.0"
+description = "Typesafe binding for Brass Golem RPC services"
+keywords = ["Golem", "Brass", "RPC", "API"]
 authors = ["Przemysław K. Rekucki <przemyslaw.rekucki@golem.network>"]
+homepage = "https://github.com/golemfactory/golem-client/tree/master/golem-rpc-api"
+repository = "https://github.com/golemfactory/golem-client.git"
+documentation = "https://docs.rs/golem-rpc-api"
+license = "GPL-3.0"
 edition = "2018"
+
+[badges]
+travis-ci = { repository = "golemfactory/golem-client", branch = "master" }
 
 [dependencies]
 serde = { version = "~1.0.80", features=["derive"] }

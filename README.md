@@ -1,16 +1,21 @@
-# golem-client
-[![build-status-travis]][travis] 
+# golem-client [![build-status-travis]][travis] 
 
 [build-status-travis]: https://travis-ci.org/golemfactory/golem-client.svg?branch=master
 [travis]: https://travis-ci.org/golemfactory/golem-client
+
+Client for Brass Golem Network.
 
 [Project roadmap](https://docs.google.com/document/d/1h1pUB-LT6YwozfqX9rAO7vrgzM5CaGGr9WsePeZ95C8) 
 
 ## Subprojects
 
-* actix-wamp ([api docs](https://golemfactory.github.io/golem-client/latest/actix_wamp/index.html)) - Web Application Messaging Protocol implementation. 
-* golem-rpc-api ([api docs](https://golemfactory.github.io/golem-client/latest/golem_rpc_api/index.html)) - Typesafe binding for golemapp rpc services. 
-* golemcli - command line interface for golem. reimplementation.
+* actix-wamp ([api docs](
+https://golemfactory.github.io/golem-client/latest/actix_wamp/index.html
+)) - Asynchronous client library for [WAMP](https://wamp-proto.org/). 
+* golem-rpc-api ([api docs](
+https://golemfactory.github.io/golem-client/latest/golem_rpc_api/index.html
+)) - Typesafe binding for Brass Golem RPC services. 
+* golemcli - command line interface for Brass Golem (re)implemented in Rust.
 
 ## GolemCLI
 
