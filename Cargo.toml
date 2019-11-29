@@ -1,8 +1,9 @@
 [workspace]
 members = [
-    'golem-rpc-api',
-    'golemcli',
-    'actix-wamp'
+    "actix-wamp",
+    "golem-rpc-api",
+    "golem-rpc-macros",
+    "golemcli",
 ]
 
 [profile.release]
@@ -11,4 +12,7 @@ lto = true
 opt-level = 3
 panic = "abort"
 
-
+[patch.crates-io]
+actix-wamp = { path = "actix-wamp" }
+golem-rpc-api = { path = "golem-rpc-api" }
+golem-rpc-macros = { path = "golem-rpc-macros" }

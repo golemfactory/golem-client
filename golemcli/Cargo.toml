@@ -13,8 +13,8 @@ interactive_cli = ["rustyline", "atty", "ansi_term"]
 test_task_cli = []
 
 [dependencies]
-actix-wamp = { path = "../actix-wamp" }
-golem-rpc-api = { path = "../golem-rpc-api", features = ['settings'] }
+actix-wamp = "0.1.0"
+golem-rpc-api = { versions = "0.1.0", features = ['settings'] }
 
 actix = "0.8.1"
 actix-http = "0.2"
