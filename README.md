@@ -3,9 +3,7 @@
 [build-status-travis]: https://travis-ci.org/golemfactory/golem-client.svg?branch=master
 [travis]: https://travis-ci.org/golemfactory/golem-client
 
-Client for Brass Golem Network.
-
-[Project roadmap](https://docs.google.com/document/d/1h1pUB-LT6YwozfqX9rAO7vrgzM5CaGGr9WsePeZ95C8) 
+Client for [Brass Golem](https://github.com/golemfactory/golem) Network.
 
 ## Subprojects
 
