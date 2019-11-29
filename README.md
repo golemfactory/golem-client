@@ -12,7 +12,9 @@ https://golemfactory.github.io/golem-client/latest/actix_wamp/index.html
 )) - Asynchronous client library for [WAMP](https://wamp-proto.org/). 
 * golem-rpc-api ([api docs](
 https://golemfactory.github.io/golem-client/latest/golem_rpc_api/index.html
-)) - Typesafe binding for Brass Golem RPC services. 
+)) - Typesafe binding for Brass Golem RPC services.
+* golem-rpc-api-macro - Procedural macros for binding Brass Golem RPC endpoints. 
+ 
 * golemcli - command line interface for Brass Golem (re)implemented in Rust.
 
 ## GolemCLI
