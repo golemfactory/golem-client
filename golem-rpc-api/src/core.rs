@@ -9,37 +9,37 @@ rpc_interface! {
 
     trait GolemCore {
         /// Get Golem node settings described in appconfig.ini file
-        #[id = "env.opts"]
+        #[rpc_uri = "env.opts"]
         fn get_settings(&self) -> Result<Map<String, Value>>;
 
-        #[id = "env.opt"]
+        #[rpc_uri = "env.opt"]
         fn raw_get_setting(&self, key : String) -> Result<Value>;
 
-        #[id = "env.opt.update"]
+        #[rpc_uri = "env.opt.update"]
         fn raw_update_setting(&self, key : String, value : Value) -> Result<()>;
 
-        #[id = "env.opts.update"]
+        #[rpc_uri = "env.opts.update"]
         fn update_settings(&self, settings_dict : Map<String, Value>) -> Result<()>;
 
-        #[id = "env.datadir"]
+        #[rpc_uri = "env.datadir"]
         fn get_datadir(&self) -> Result<String>;
 
-        #[id = "golem.version"]
+        #[rpc_uri = "golem.version"]
         fn get_version(&self) -> Result<String>;
 
-        #[id = "golem.password.key_exists"]
+        #[rpc_uri = "golem.password.key_exists"]
         fn key_exists(&self) -> Result<bool>;
 
-        #[id = "golem.password.set"]
+        #[rpc_uri = "golem.password.set"]
         fn set_password(&self, password : String) -> Result<bool>;
 
-        #[id = "golem.password.unlocked"]
+        #[rpc_uri = "golem.password.unlocked"]
         fn is_account_unlocked(&self) -> Result<bool>;
 
-        #[id = "golem.mainnet"]
+        #[rpc_uri = "golem.mainnet"]
         fn is_mainnet(&self) -> Result<bool>;
 
-        #[id = "golem.status"]
+        #[rpc_uri = "golem.status"]
         fn status(&self) -> Result<ServerStatus>;
 
     }

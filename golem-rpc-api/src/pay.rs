@@ -5,25 +5,25 @@ use serde::*;
 
 rpc_interface! {
     trait GolemPay {
-        #[id = "pay.incomes"]
+        #[rpc_uri = "pay.incomes"]
         fn get_incomes_list(&self) -> Result<Vec<Income>>;
 
         //
-        #[id = "pay.payments"]
+        #[rpc_uri = "pay.payments"]
         fn get_payments_list(&self, #[kwarg] _num: Option<u32>, #[kwarg] _last_seconds: Option<u32>) -> Result<Vec<Payment>>;
 
         //
         // TODO: kwargs limit=1000, offset=0
-        #[id = "pay.deposit_payments"]
+        #[rpc_uri = "pay.deposit_payments"]
         fn get_deposit_payments_list(&self, #[kwarg] _limit : Option<usize>, #[kwarg] _offset : Option<usize>) -> Result<Option<Vec<DepositPayment>>>;
 
-        #[id = "pay.deposit_balance"]
+        #[rpc_uri = "pay.deposit_balance"]
         fn get_deposit_balance(&self) -> Result<Option<DepositBalance>>;
 
-        #[id = "pay.balance"]
+        #[rpc_uri = "pay.balance"]
         fn get_pay_balance(&self) -> Result<Balance>;
 
-        #[id = "pay.ident"]
+        #[rpc_uri = "pay.ident"]
         fn get_pay_ident(&self) -> Result<String>;
     }
 

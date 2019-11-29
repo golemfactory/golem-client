@@ -1,15 +1,14 @@
 [workspace]
-members= [
+members = [
     'golem-rpc-api',
-    'golem-rpc-macros',
     'golemcli',
     'actix-wamp'
 ]
 
 [profile.release]
 codegen-units = 1
-lto=true
-opt-level=3
-panic="abort"
+lto = true
+opt-level = 3
+panic = "abort"
 
 
