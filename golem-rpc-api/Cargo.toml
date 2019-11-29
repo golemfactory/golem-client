@@ -18,8 +18,8 @@ default = ["settings"]
 settings = []
 
 [dependencies]
-actix-wamp = { path = "../actix-wamp" }
-golem-rpc-macros = { path = "../golem-rpc-macros" }
+actix-wamp = "0.1.0"
+golem-rpc-macros = "0.1.0"
 
 bigdecimal = { version = "0.1.0", features = ["serde"] }
 chrono = { version = "0.4.6", features = ["serde"] }
