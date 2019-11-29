@@ -1,45 +1,41 @@
 [package]
 name = "actix-wamp"
 version = "0.1.0"
+description = "Asynchronous client library for WAMP"
+readme = "README.md"
+keywords = ["actix", "WAMP", "client"]
 authors = ["Przemysław K. Rekucki <przemyslaw.rekucki@golem.network>"]
+homepage = "https://github.com/golemfactory/golem-client/tree/master/actix-wamp"
+repository = "https://github.com/golemfactory/golem-client.git"
+documentation = "https://docs.rs/actix-wamp"
+license = "GPL-3.0"
 edition = "2018"
 
+[badges]
+travis-ci = { repository = "golemfactory/golem-client", branch = "master" }
+
 [features]
-default=["crypto-mac/std"]
+default = ["crypto-mac/std"]
 
 [dependencies]
 actix = "0.8.1"
-actix-http = { version = "0.2.0", features=["fail"] }
-failure="0.1"
-log = "0.4.6"
-rmp-serde = "0.13.7"
-rmp = "0.8.7"
-
-futures="0.1"
-hmac = "0.7.0"
-sha2 = "0.8.0"
-crypto-mac={version="0.7", features=["std"]}
-serde_json = "1.0.39"
-serde="1.0"
-serde_derive="1.0"
+actix-http = { version = "0.2.0", features = ["fail"] }
+awc = { version = "0.2.1", default-features = false, features = ['ssl'] }
 base64 = "0.10.1"
+crypto-mac = { version = "0.7", features = ["std"] }
+failure = "0.1"
+futures = "0.1"
+hmac = "0.7.0"
+log = "0.4.6"
+openssl = "0.10.20"
 rand = "0.6"
-
-[dependencies.awc]
-version = "0.2.1"
-default-features=false
-features = ['ssl']
-
-#[dependencies.actix-web]
-#version = "1.0.0"
-#features = ['ssl']
-
-[dependencies.openssl]
-version="0.10.20"
-
-[dependencies.rmpv]
-version="0.4"
-features=["with-serde"]
+rmp = "0.8.7"
+rmp-serde = "0.13.7"
+rmpv = { version = "0.4", features = ["with-serde"] }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0.39"
+sha2 = "0.8.0"
 
 
 

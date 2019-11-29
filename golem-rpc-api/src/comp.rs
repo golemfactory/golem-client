@@ -13,13 +13,13 @@ rpc_interface! {
         // Returns:
         //   Some(task_id), None,
         //   None, Some(error_message)
-        #[id = "comp.task.create"]
+        #[rpc_uri = "comp.task.create"]
         fn create_task_int(&self, task_spec: serde_json::Value) -> Result<(Option<String>, Option<Value>)>;
 
-        #[id = "comp.task.create.dry_run"]
+        #[rpc_uri = "comp.task.create.dry_run"]
         fn create_dry_run_int(&self, task_spec: serde_json::Value) -> Result<(Option<TaskInfo>, Option<Value>)>;
 
-        #[id = "comp.task"]
+        #[rpc_uri = "comp.task"]
         fn get_task(&self, task_id : String) -> Result<Option<TaskInfo>>;
 
         //
@@ -27,7 +27,7 @@ rpc_interface! {
         // uri comp.tasks has optional argument task_id. with task_id
         // it works as get_task. We do not need this variant.
         //
-        #[id = "comp.tasks"]
+        #[rpc_uri = "comp.tasks"]
         fn get_tasks(&self) -> Result<Vec<TaskInfo>>;
 
         /// Show statistics for unsupported tasks.
@@ -40,7 +40,7 @@ rpc_interface! {
         ///
         /// Vec of UnsupportInfo. With stats for each reason.
         ///
-        #[id = "comp.tasks.unsupport"]
+        #[rpc_uri = "comp.tasks.unsupport"]
         fn get_tasks_unsupported(&self, last_days: i32) -> Result<Vec<UnsupportInfo>>;
 
         /// Abort task with given id.
@@ -49,31 +49,31 @@ rpc_interface! {
         ///
         /// * `task_id` - Task id to abort.
         ///
-        #[id = "comp.task.abort"]
+        #[rpc_uri = "comp.task.abort"]
         fn abort_task(&self, task_id : String) -> Result<()>;
 
-        #[id = "comp.task.delete"]
+        #[rpc_uri = "comp.task.delete"]
         fn delete_task(&self, taks_id : String) -> Result<()>;
 
-        #[id = "comp.task.subtask.restart"]
+        #[rpc_uri = "comp.task.subtask.restart"]
         fn restart_subtask(&self, subtask_id : String) -> Result<()>;
 
-        #[id = "comp.task.subtask"]
+        #[rpc_uri = "comp.task.subtask"]
         fn get_subtask(&self, subtask_id : String) -> Result<(Option<SubtaskInfo>, Option<String>)>;
 
-        #[id = "comp.task.subtasks"]
+        #[rpc_uri = "comp.task.subtasks"]
         fn get_subtasks(&self, task_id : String) -> Result<Option<Vec<SubtaskInfo>>>;
 
-        #[id = "comp.task.purge"]
+        #[rpc_uri = "comp.task.purge"]
         fn purge_tasks(&self) -> Result<()>;
 
         //
         // (new_task_id, None) on success; (None, error_message) on failure
-        #[id = "comp.task.restart"]
+        #[rpc_uri = "comp.task.restart"]
         fn restart_task(&self, task_id: String) -> Result<(Option<String>, Option<String>)>;
 
         // TODO:
-        #[id = "comp.task.subtasks.frame.restart"]
+        #[rpc_uri = "comp.task.subtasks.frame.restart"]
         fn restart_frame_subtasks(&self, task_id: String, frame: u32) -> Result<()>;
 
         /// Restarts a set of subtasks from the given task. If the specified task is
@@ -98,44 +98,44 @@ rpc_interface! {
         ///  In case of any errors, returns the representation of the error
         /// (either a string or a dict). Otherwise, returns None.
         ///
-        #[id = "comp.task.subtasks.restart"]
+        #[rpc_uri = "comp.task.subtasks.restart"]
         fn restart_subtasks_from_task(&self, task_id: String, subtask_ids: Vec<String>) -> Result<Value>;
 
         //
-        #[id = "comp.tasks.check"]
+        #[rpc_uri = "comp.tasks.check"]
         fn run_test_task(&self, task_spec: serde_json::Value) -> Result<bool>;
 
-        #[id = "comp.task.test.status"]
+        #[rpc_uri = "comp.task.test.status"]
         fn check_test_status(&self) -> Result<TaskTestResult>;
 
         /// Returns true if there was task to cancel
-        #[id = "comp.tasks.check.abort"]
+        #[rpc_uri = "comp.tasks.check.abort"]
         fn abort_test_task(&self) -> Result<bool>;
 
-        #[id = "comp.tasks.stats"]
+        #[rpc_uri = "comp.tasks.stats"]
         fn get_tasks_stats(&self) -> Result<SubtaskStats>;
 
-        #[id = "comp.environments"]
+        #[rpc_uri = "comp.environments"]
         fn get_environments(&self) -> Result<Vec<CompEnvStatus>>;
 
         /// Enables enviroment
         /// Returns None or Error message.
-        #[id = "comp.environment.enable"]
+        #[rpc_uri = "comp.environment.enable"]
         fn enable_environment(&self, env_id : String) -> Result<Option<String>>;
 
         /// Enables enviroment
         /// Returns None or Error message.
-        #[id = "comp.environment.disable"]
+        #[rpc_uri = "comp.environment.disable"]
         fn disable_environment(&self, env_id : String) -> Result<Option<String>>;
 
-        #[id = "comp.environment.benchmark"]
+        #[rpc_uri = "comp.environment.benchmark"]
         fn run_benchmark(&self, env_id : String) -> Result<Value>;
 
         // timeout=3s
-        #[id = "performance.multiplier.update"]
+        #[rpc_uri = "performance.multiplier.update"]
         fn perf_mult_set(&self, multiplier : f64) -> Result<()>;
 
-        #[id = "performance.multiplier"]
+        #[rpc_uri = "performance.multiplier"]
         fn perf_mult(&self) -> Result<f64>;
 
     }

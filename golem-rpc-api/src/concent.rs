@@ -4,20 +4,20 @@ rpc_interface! {
 
     trait GolemConcent {
         /// Returns true if concent is on
-        #[id = "golem.concent.switch"]
+        #[rpc_uri = "golem.concent.switch"]
         fn is_on(&self) -> Result<bool>;
 
         /// Turns concent on/off
-        #[id = "golem.concent.switch.turn"]
+        #[rpc_uri = "golem.concent.switch.turn"]
         fn turn(&self, on : bool) -> Result<()>;
 
-        #[id = "golem.concent.terms"]
+        #[rpc_uri = "golem.concent.terms"]
         fn is_terms_accepted(&self) -> Result<bool>;
 
-        #[id = "golem.concent.terms.accept"]
+        #[rpc_uri = "golem.concent.terms.accept"]
         fn accept_terms(&self) -> Result<()>;
 
-        #[id = "golem.concent.terms.show"]
+        #[rpc_uri = "golem.concent.terms.show"]
         fn show_terms(&self) -> Result<String>;
 
     }
