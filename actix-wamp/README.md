@@ -14,7 +14,4 @@ It features:
  - Challenge-Response authentication
  - MessagePack for message serialization
 
-For usage example look at 
-[golem-rpc-api](https://github.com/golemfactory/golem-client/tree/master/golem-rpc-api)
-and
-[golemcli](https://github.com/golemfactory/golem-client/tree/master/golemcli).
+For usage example look at [golem-rpc-api](../golem-rpc-api) and [golemcli](../golemcli).

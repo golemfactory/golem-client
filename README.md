@@ -8,10 +8,10 @@ Client for [Brass Golem](https://github.com/golemfactory/golem) Network.
 ## Subprojects
 
 * actix-wamp ([api docs](
-https://golemfactory.github.io/golem-client/latest/actix_wamp/index.html
+https://docs.rs/actix-wamp/latest/actix_wamp
 )) - Asynchronous client library for [WAMP](https://wamp-proto.org/). 
 * golem-rpc-api ([api docs](
-https://golemfactory.github.io/golem-client/latest/golem_rpc_api/index.html
+https://docs.rs/golem-rpc-api/latest/golem_rpc_api/
 )) - Typesafe binding for Brass Golem RPC services.
 * golem-rpc-api-macro - Procedural macros for binding Brass Golem RPC endpoints. 
  

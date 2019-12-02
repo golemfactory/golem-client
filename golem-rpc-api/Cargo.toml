@@ -15,11 +15,11 @@ travis-ci = { repository = "golemfactory/golem-client", branch = "master" }
 
 [features]
 default = ["settings"]
-settings = []
+settings = ["golem-rpc-macros"]
 
 [dependencies]
 actix-wamp = "0.1.0"
-golem-rpc-macros = "0.1.0"
+golem-rpc-macros = { version = "0.1.0", optional = true }
 
 bigdecimal = { version = "0.1.0", features = ["serde"] }
 chrono = { version = "0.4.6", features = ["serde"] }
