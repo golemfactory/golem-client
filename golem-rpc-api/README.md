@@ -11,6 +11,4 @@ https://github.com/golemfactory/golem-client/search?q=rpc_uri
 https://github.com/golemfactory/golem/search?q=rpc_utils.expose
 ).
 
-For usage example look at [golemcli](
-https://github.com/golemfactory/golem-client/tree/master/golemcli
-).
+For usage example look at [golemcli](../golemcli).
