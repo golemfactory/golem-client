@@ -8,7 +8,7 @@ Client for [Brass Golem](https://github.com/golemfactory/golem) Network.
 ## Subprojects
 
 * actix-wamp ([api docs](
-https://docs.rs/actix_wamp/latest/actix_wamp
+https://docs.rs/actix-wamp/latest/actix_wamp
 )) - Asynchronous client library for [WAMP](https://wamp-proto.org/). 
 * golem-rpc-api ([api docs](
 https://docs.rs/golem-rpc-api/latest/golem_rpc_api/
