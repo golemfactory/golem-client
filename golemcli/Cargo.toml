@@ -4,6 +4,7 @@ version = "0.2.1"
 description = "Command line interface for Brass Golem Node"
 authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
+license = "GPL-3.0"
 
 [features]
 default = ['interactive_cli', 'debug_cli', 'concent_cli', 'test_task_cli']
