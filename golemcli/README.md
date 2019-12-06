@@ -7,7 +7,11 @@ Command line interface for Brass Golem (re)implemented in Rust.
 
 ### Install or Upgrade
 
-On Unix:
+```
+cargo install golemcli
+```
+
+on Unix also:
 
 ```
 curl -sSf https://golemfactory.github.io/golem-client/install/golemcli-update.sh | bash
