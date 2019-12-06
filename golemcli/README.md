@@ -1,4 +1,4 @@
-# GolemCLI [![build-status-travis]][travis][![crates.io-version]][crates.io]
+# GolemCLI [![build-status-travis]][travis] [![crates.io-version]][crates.io]
 
 [build-status-travis]: https://travis-ci.org/golemfactory/golem-client.svg?branch=master
 [travis]: https://travis-ci.org/golemfactory/golem-client
