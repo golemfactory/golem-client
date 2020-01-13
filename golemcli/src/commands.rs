@@ -161,7 +161,10 @@ macro_rules! dispatch_subcommand {
 }
 
 impl CommandSection {
-    pub async fn run_command(&self, ctx: &mut CliCtx) -> Result<CommandResponse, crate::context::Error> {
+    pub async fn run_command(
+        &self,
+        ctx: &mut CliCtx,
+    ) -> Result<CommandResponse, crate::context::Error> {
         dispatch_subcommand! {
             on (self, ctx);
             async {
@@ -237,17 +240,16 @@ impl InternalSection {
 pub struct ShutdownCommand {}
 
 impl ShutdownCommand {
-    fn run(
+    async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = crate::context::Error> + 'static {
-        endpoint
+    ) -> Result<CommandResponse, crate::context::Error> {
+        let ret = endpoint
             .as_invoker()
             .rpc_call("golem.graceful_shutdown", &())
-            .and_then(|ret: u64| {
-                let result = format!("Graceful shutdown triggered result: {}", ret);
-                Ok(CommandResponse::Object(result.into()))
-            })
-            .from_err()
+            .await?;
+
+        let result = format!("Graceful shutdown triggered result: {}", ret);
+        Ok(CommandResponse::Object(result.into()))
     }
 }
