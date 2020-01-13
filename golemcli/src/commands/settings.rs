@@ -49,7 +49,7 @@ impl Section {
                 basic,
                 provider,
                 requestor,
-            } => show(endpoint, basic, provider, requestor),
+            } => show(endpoint, basic, provider, requestor).await,
             Section::Set { key, value } => self.set(endpoint, key, value).await,
         }
     }
@@ -60,7 +60,8 @@ impl Section {
         key: &str,
         value: &str,
     ) -> Fallible<CommandResponse> {
-        let setting: &'static dyn DynamicSetting = settings::from_name(key)?;
+        let setting: &'static dyn DynamicSetting =
+            settings::from_name(key).ok_or(failure::err_msg("no such setting"))?;
         endpoint
             .as_golem()
             .update_setting_dyn(setting, value)
@@ -87,7 +88,7 @@ pub async fn show(
 ) -> Fallible<CommandResponse> {
     let settings = endpoint.as_golem().get_settings().await?;
 
-    Ok(CommandResponse::FormattedObject(Box::new(
+    Ok(CommandResponse::FormattedObject(
         if basic || provider || requestor {
             let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
 
@@ -115,7 +116,7 @@ pub async fn show(
         } else {
             Box::new(FormattedSettings(settings))
         },
-    )))
+    ))
 }
 
 struct FormattedSettings(Map<String, Value>);
