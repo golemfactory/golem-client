@@ -136,9 +136,9 @@ macro_rules! dispatch_subcommand {
                 $(
                       $(#[$async_meta])*
                       $async_command(command) => {
-                         let endpoint = $ctx.connect_to_app()?;
-                         let endpoint = $ctx.unlock_app(endpoint)?;
-                         $ctx.block_on(command.run(endpoint))
+                         let endpoint = $ctx.connect_to_app().await?;
+                         let endpoint = $ctx.unlock_app(endpoint).await?;
+                         command.run(endpoint).await
                       }
                 )*
             )?,
@@ -151,9 +151,8 @@ macro_rules! dispatch_subcommand {
                 $(
                     $(#[$async_with_context_meta])*
                     $async_with_context_command(command) => {
-                         let endpoint = $ctx.connect_to_app()?;
-                         let eval = command.run($ctx, endpoint);
-                         $ctx.block_on(eval)
+                         let endpoint = $ctx.connect_to_app().await?;
+                         command.run($ctx, endpoint).await
                     }
                 )*
             )?
@@ -162,7 +161,7 @@ macro_rules! dispatch_subcommand {
 }
 
 impl CommandSection {
-    pub fn run_command(&self, ctx: &mut CliCtx) -> Result<CommandResponse, crate::context::Error> {
+    pub async fn run_command(&self, ctx: &mut CliCtx) -> Result<CommandResponse, crate::context::Error> {
         dispatch_subcommand! {
             on (self, ctx);
             async {

@@ -82,7 +82,6 @@ pub struct CliCtx {
     accept_any_prompt: bool,
     net: Option<Net>,
     interactive: bool,
-    sys: SystemRunner,
 }
 
 impl TryFrom<&CliArgs> for CliCtx {
@@ -95,7 +94,6 @@ impl TryFrom<&CliArgs> for CliCtx {
         let net = value.net.clone();
         let accept_any_prompt = value.accept_any_prompt;
         let interactive = value.interactive;
-        let sys = actix::System::new("golemcli");
 
         Ok(CliCtx {
             rpc_addr,
@@ -104,7 +102,6 @@ impl TryFrom<&CliArgs> for CliCtx {
             accept_any_prompt,
             net,
             interactive,
-            sys,
         })
     }
 }
@@ -123,24 +120,20 @@ fn wait_for_server(
 }
 
 impl CliCtx {
-    pub fn block_on<F: Future>(&mut self, fut: F) -> Result<F::Item, F::Error> {
-        self.sys.block_on(fut)
-    }
-
-    pub fn unlock_app(
+    pub async fn unlock_app(
         &mut self,
         endpoint: impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone + 'static,
     ) -> Result<impl actix_wamp::RpcEndpoint + Clone, Error> {
-        let is_unlocked = self.block_on(endpoint.as_golem().is_account_unlocked())?;
+        let is_unlocked = endpoint.as_golem().is_account_unlocked().await?;
         let mut wait_for_start = false;
 
         if !is_unlocked {
             eprintln!("account locked");
-            self.block_on(crate::account::account_unlock(endpoint.clone()))?;
+            crate::account::account_unlock(endpoint.clone()).await?;
             wait_for_start = true;
         }
 
-        let are_terms_accepted = self.block_on(endpoint.as_golem_terms().are_terms_accepted())?;
+        let are_terms_accepted = endpoint.as_golem_terms().are_terms_accepted().await?;
 
         if !are_terms_accepted {
             use crate::terms::*;
@@ -150,7 +143,7 @@ impl CliCtx {
             loop {
                 match TermsQuery::prompt("Accept terms ? [(s)how / (a)ccept / (r)eject]") {
                     TermsQuery::Show => {
-                        eprintln!("{}", self.block_on(get_terms_text(&endpoint))?);
+                        eprintln!("{}", get_terms_text(&endpoint).await?);
                     }
                     TermsQuery::Reject => {
                         return Err(failure::err_msg("terms not accepted"));
@@ -171,16 +164,14 @@ impl CliCtx {
                 Some("talkback will be DISABLED"),
             );
 
-            let _ = self.block_on(
-                endpoint
+            let _ = endpoint
                     .as_golem_terms()
-                    .accept_terms(Some(enable_monitor), Some(enable_talkback)),
-            )?;
+                    .accept_terms(Some(enable_monitor), Some(enable_talkback)).await?;
             wait_for_start = true;
         }
 
         if wait_for_start {
-            let _ = self.block_on(wait_for_server(endpoint.clone()))?;
+            let _ = wait_for_server(endpoint.clone()).await?;
         }
 
         let _ = PROMPT_FLAG.store(self.accept_any_prompt, std::sync::atomic::Ordering::Relaxed);
@@ -188,16 +179,16 @@ impl CliCtx {
         Ok(endpoint)
     }
 
-    pub fn connect_to_app(
+    pub async fn connect_to_app(
         &mut self,
     ) -> Result<impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone, Error> {
         let (address, port) = &self.rpc_addr;
 
-        let endpoint = self.block_on(golem_rpc_api::connect_to_app(
+        let endpoint = golem_rpc_api::connect_to_app(
             &self.data_dir,
             self.net.clone(),
             Some((address.as_str(), *port)),
-        ))?;
+        ).await?;
 
         Ok(endpoint)
     }
