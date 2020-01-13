@@ -120,20 +120,25 @@ async fn account_info(
 ) -> Fallible<CommandResponse> {
     let node_info = endpoint.as_golem_net().get_node().await?;
 
-    let node_id = node_info.node_key.to_string();
-    let (computing_trust, requesting_trust, payment_address, balance, deposit_balance) =
-        future::try_join5(
-            endpoint
-                .as_invoker()
-                .rpc_call("rep.comp", &(node_id.clone(),)),
-            endpoint
-                .as_invoker()
-                .rpc_call("rep.requesting", &(node_id,)),
-            endpoint.as_golem_pay().get_pay_ident(),
-            endpoint.as_golem_pay().get_pay_balance(),
-            endpoint.as_golem_pay().get_deposit_balance(),
-        )
-        .await?;
+    let node_id = node_info.key.to_string();
+    let (computing_trust, requesting_trust, payment_address, balance, deposit_balance): (
+        Option<f64>,
+        Option<f64>,
+        _,
+        _,
+        _,
+    ) = future::try_join5(
+        endpoint
+            .as_invoker()
+            .rpc_call("rep.comp", &(node_id.clone(),)),
+        endpoint
+            .as_invoker()
+            .rpc_call("rep.requesting", &(node_id,)),
+        endpoint.as_golem_pay().get_pay_ident(),
+        endpoint.as_golem_pay().get_pay_balance(),
+        endpoint.as_golem_pay().get_deposit_balance(),
+    )
+    .await?;
 
     let eth_available = Currency::ETH.format_decimal(&balance.eth);
     let eth_locked = Currency::ETH.format_decimal(&balance.eth_lock);
@@ -143,7 +148,7 @@ async fn account_info(
 
     CommandResponse::object(AccountInfo {
         node_name: node_info.node_name,
-        golem_id: node_info.node_key,
+        golem_id: node_info.key,
         requestor_reputation: (requesting_trust.unwrap_or_default() * 100.0) as u64,
         provider_reputation: (computing_trust.unwrap_or_default() * 100.0) as u64,
         finances: serde_json::json!({
