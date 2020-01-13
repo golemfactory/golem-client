@@ -45,8 +45,8 @@ impl AccountSection {
         match self {
             AccountSection::Unlock => self.account_unlock(endpoint).await,
             AccountSection::Info => {
-                let endpoint = ctx.unlock_app(endpoint)?;
-                account_info(endpoint).await
+                let endpoint = ctx.unlock_app(endpoint).await?;
+                    account_info(endpoint).await
             }
             AccountSection::Withdraw {
                 destination,
