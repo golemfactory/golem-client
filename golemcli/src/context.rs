@@ -165,8 +165,9 @@ impl CliCtx {
             );
 
             let _ = endpoint
-                    .as_golem_terms()
-                    .accept_terms(Some(enable_monitor), Some(enable_talkback)).await?;
+                .as_golem_terms()
+                .accept_terms(Some(enable_monitor), Some(enable_talkback))
+                .await?;
             wait_for_start = true;
         }
 
@@ -188,7 +189,8 @@ impl CliCtx {
             &self.data_dir,
             self.net.clone(),
             Some((address.as_str(), *port)),
-        ).await?;
+        )
+        .await?;
 
         Ok(endpoint)
     }
