@@ -162,7 +162,6 @@ impl Section {
     ) -> Fallible<CommandResponse> {
         use std::fs;
 
-
         let out_file = out_file.clone();
 
         Ok(fs::OpenOptions::new()
@@ -237,9 +236,7 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         task_id: &str,
     ) -> Fallible<CommandResponse> {
-        endpoint
-            .as_golem_comp()
-            .delete_task(task_id.into()).await?;
+        endpoint.as_golem_comp().delete_task(task_id.into()).await?;
         CommandResponse::object("Completed")
     }
 
@@ -247,9 +244,7 @@ impl Section {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Fallible<CommandResponse> {
-        endpoint
-            .as_golem_comp()
-            .purge_tasks().await?;
+        endpoint.as_golem_comp().purge_tasks().await?;
         CommandResponse::object("Completed")
     }
 
@@ -271,10 +266,7 @@ impl Section {
         task_id: &str,
         out_file: &Option<PathBuf>,
     ) -> Fallible<CommandResponse> {
-        let v = endpoint
-            .as_golem_comp()
-            .get_task(task_id.into())
-            .await?;
+        let v = endpoint.as_golem_comp().get_task(task_id.into()).await?;
 
         if let Some(out_file) = out_file {
             serde_json::to_writer_pretty(
@@ -432,94 +424,88 @@ impl SubtaskCommand {
     async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> fa
+    ) -> failure::Fallible<CommandResponse> {
         match self {
-            SubtaskCommand::List { task_id } => Box::new(list_subtasks(endpoint, task_id.into())),
-            SubtaskCommand::Show { subtask_id } => {
-                Box::new(show_subtask(endpoint, subtask_id.into()))
-            }
+            SubtaskCommand::List { task_id } => list_subtasks(endpoint, task_id.into()).await,
+            SubtaskCommand::Show { subtask_id } => show_subtask(endpoint, subtask_id.into()).await,
             SubtaskCommand::Restart {
                 task_id,
                 subtask_ids,
-            } => Box::new(restart_subtasks(endpoint, task_id, subtask_ids)),
+            } => restart_subtasks(endpoint, task_id, subtask_ids).await,
         }
     }
 }
 
-fn show_subtask<'a>(
+async fn show_subtask<'a>(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     subtask_id: String,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-    endpoint
+) -> failure::Fallible<CommandResponse> {
+    let (subtask, err_msg) = endpoint
         .as_golem_comp()
         .get_subtask(subtask_id.into())
-        .from_err()
-        .and_then(|(subtask, err_msg)| {
-            subtask.map_or(CommandResponse::object(err_msg), CommandResponse::object)
-        })
+        .await?;
+
+    if subtask.is_some() {
+        CommandResponse::object(subtask)
+    } else {
+        CommandResponse::object(err_msg)
+    }
 }
 
-fn list_subtasks(
+async fn list_subtasks(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     task_id: String,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-    endpoint
-        .as_golem_comp()
-        .get_subtasks(task_id)
-        .from_err()
-        .and_then(move |subtasks| {
-            if let Some(subtasks) = subtasks {
-                let columns = vec![
-                    "node".into(),
-                    "subtask id".into(),
-                    "status".into(),
-                    "progress".into(),
-                ];
-                let values = subtasks
-                    .into_iter()
-                    .map(|subtask| {
-                        serde_json::json!([
-                            subtask.node_name,
-                            subtask.subtask_id,
-                            subtask.status,
-                            subtask.progress.map(fraction_to_percent),
-                        ])
-                    })
-                    .collect();
-                Ok(ResponseTable { columns, values }.into())
-            } else {
-                CommandResponse::object("No subtasks")
-            }
-        })
+) -> failure::Fallible<CommandResponse> {
+    let subtasks = endpoint.as_golem_comp().get_subtasks(task_id).await?;
+
+    if let Some(subtasks) = subtasks {
+        let columns = vec![
+            "node".into(),
+            "subtask id".into(),
+            "status".into(),
+            "progress".into(),
+        ];
+        let values = subtasks
+            .into_iter()
+            .map(|subtask| {
+                serde_json::json!([
+                    subtask.node_name,
+                    subtask.subtask_id,
+                    subtask.status,
+                    subtask.progress.map(fraction_to_percent),
+                ])
+            })
+            .collect();
+        Ok(ResponseTable { columns, values }.into())
+    } else {
+        CommandResponse::object("No subtasks")
+    }
 }
 
-fn restart_subtasks(
+async fn restart_subtasks(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     task_id: &str,
     subtasks_ids: &Vec<String>,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-    endpoint
+) -> failure::Fallible<CommandResponse> {
+    match endpoint
         .as_golem_comp()
         .restart_subtasks_from_task(task_id.into(), subtasks_ids.clone())
-        .from_err()
-        .and_then(|r: serde_json::Value| match r {
-            serde_json::Value::Null => CommandResponse::object("Completed"),
-            serde_json::Value::String(err_msg) => Err(failure::err_msg(err_msg)),
-            serde_json::Value::Object(err) => CommandResponse::object(err),
-            err => CommandResponse::object(err),
-        })
+        .await?
+    {
+        serde_json::Value::Null => CommandResponse::object("Completed"),
+        serde_json::Value::String(err_msg) => Err(failure::err_msg(err_msg)),
+        serde_json::Value::Object(err) => CommandResponse::object(err),
+        err => CommandResponse::object(err),
+    }
 }
 
 // TODO: read it though rpc; requires exposing such RPC from Brass
-pub fn template(task_type: &str) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-    (|| -> Result<CommandResponse, Error> {
-        let template = match task_type {
-            "blender" => serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?,
-            "wasm" => serde_json::to_string_pretty(&golem_rpc_api::apps::wasm::template())?,
-            "glambda" => serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?,
-            _ => failure::bail!("Invalid Option"),
-        };
-        CommandResponse::object(template)
-    })()
-    .into_future()
+pub async fn template(task_type: &str) -> failure::Fallible<CommandResponse> {
+    let template = match task_type {
+        "blender" => serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?,
+        "wasm" => serde_json::to_string_pretty(&golem_rpc_api::apps::wasm::template())?,
+        "glambda" => serde_json::to_string_pretty(&golem_rpc_api::apps::glambda::template())?,
+        _ => failure::bail!("Invalid Option"),
+    };
+    CommandResponse::object(template)
 }
