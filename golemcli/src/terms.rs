@@ -2,6 +2,7 @@ use actix_wamp::RpcEndpoint;
 use futures::Future;
 use golem_rpc_api::terms::AsGolemTerms;
 use promptly::{Promptable, Prompter};
+use std::io;
 
 pub enum TermsQuery {
     Show,
@@ -40,15 +41,11 @@ impl Promptable for TermsQuery {
     }
 }
 
-pub fn get_terms_text(
+pub async fn get_terms_text(
     endpoint: &(impl RpcEndpoint + 'static),
-) -> impl Future<Item = String, Error = actix_wamp::Error> {
-    endpoint
-        .as_golem_terms()
-        .show_terms()
-        .from_err()
-        .and_then(|html| {
-            let text = html2text::from_read(std::io::Cursor::new(html), 78);
-            Ok(text)
-        })
+) -> Result<String, actix_wamp::Error> {
+    Ok(html2text::from_read(
+        io::Cursor::new(endpoint.as_golem_terms().show_terms().await?),
+        78,
+    ))
 }

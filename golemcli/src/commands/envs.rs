@@ -1,9 +1,9 @@
 use crate::context::*;
+use failure::Fallible;
 use futures::future::Either;
 use futures::prelude::*;
 use golem_rpc_api::comp::{AsGolemComp, CompEnvStatus};
 use structopt::StructOpt;
-use failure::Fallible;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -108,10 +108,7 @@ impl Section {
 async fn show(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
 ) -> Fallible<CommandResponse> {
-    let envs: Vec<CompEnvStatus> =
-        endpoint
-            .as_golem_comp()
-            .get_environments().await?;
+    let envs: Vec<CompEnvStatus> = endpoint.as_golem_comp().get_environments().await?;
     let columns = vec![
         "name".into(),
         "supported".into(),
@@ -124,13 +121,13 @@ async fn show(
         .into_iter()
         .map(|e| {
             serde_json::json!([
-                        e.id,
-                        e.supported,
-                        e.accepted,
-                        e.performance,
-                        e.min_accepted,
-                        e.description
-                    ])
+                e.id,
+                e.supported,
+                e.accepted,
+                e.performance,
+                e.min_accepted,
+                e.description
+            ])
         })
         .collect();
     Ok(ResponseTable { columns, values }.into())
@@ -139,9 +136,6 @@ async fn show(
 async fn perf_mult(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
 ) -> Fallible<CommandResponse> {
-    let multiplier =
-    endpoint
-        .as_golem_comp()
-        .perf_mult().await?;
+    let multiplier = endpoint.as_golem_comp().perf_mult().await?;
     CommandResponse::object(format!("minimal performance multiplier is: {}", multiplier))
 }

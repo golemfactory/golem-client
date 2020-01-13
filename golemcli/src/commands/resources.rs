@@ -28,27 +28,21 @@ pub enum Section {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         match self {
-            Section::ListPresets => futures::future::Either::A(
-                endpoint
-                    .as_golem_res()
-                    .get_hw_presets()
-                    .from_err()
-                    .and_then(|presets| CommandResponse::object(presets)),
-            ),
-            Section::Show => futures::future::Either::B(show_presets(endpoint)),
+            Section::ListPresets => {
+                CommandResponse::object(endpoint.as_golem_res().get_hw_presets().await?)
+            }
+            Section::Show => show_presets(endpoint).await,
             Section::UpdatePresets {
                 cpu_cores,
                 disk,
                 memory,
                 apply,
-            } => futures::future::Either::B(update_presets(
-                endpoint, *apply, cpu_cores, disk, memory,
-            )),
+            } => update_presets(endpoint, *apply, cpu_cores, disk, memory).await,
         }
     }
 }
@@ -119,20 +113,20 @@ async fn update_presets(
     if let Some(cpu_cores) = cpu_cores {
         updates.cpu_cores = cpu_cores;
         if cpu_cores < presets.min.cpu_cores || cpu_cores > presets.max.cpu_cores {
-            return future::Either::B(future::err(failure::err_msg(format!(
+            return Err(failure::err_msg(format!(
                 "cpu cores should be {} >= int >= {}",
                 presets.max.cpu_cores, presets.min.cpu_cores
-            ))));
+            )));
         }
     }
 
     if let Some(memory) = memory {
         updates.memory = memory;
         if memory < presets.min.memory || memory > presets.max.memory {
-            return future::Either::B(future::err(failure::err_msg(format!(
+            return Err(failure::err_msg(format!(
                 "memory should be {} >= int >= {}",
                 presets.max.memory, presets.min.memory
-            ))));
+            )));
         }
     }
 
@@ -140,10 +134,10 @@ async fn update_presets(
         eprintln!("disk={}", disk);
         updates.disk = disk;
         if disk < presets.min.disk || disk > presets.max.disk {
-            return future::Either::B(future::err(failure::err_msg(format!(
+            return Err(failure::err_msg(format!(
                 "disk should be {} >= int >= {}",
                 presets.max.disk as u64, presets.min.disk as u64
-            ))));
+            )));
         }
     }
 
@@ -185,41 +179,38 @@ struct HwCapsStatus {
     max: HwCaps,
 }
 
-fn get_presets(
+async fn get_presets(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-) -> impl Future<Item = HwCapsStatus, Error = Error> + 'static {
-    let active_caps = endpoint
-        .as_golem()
-        .get_setting::<provider::NumCores>()
-        .join3(
-            endpoint.as_golem().get_setting::<provider::MaxMemorySize>(),
-            endpoint
-                .as_golem()
-                .get_setting::<provider::MaxResourceSize>(),
-        )
-        .and_then(|(num_cores, memory, disk)| {
-            Ok(HwCaps {
-                cpu_cores: num_cores as u32,
-                disk,
-                memory: memory as u64,
-            })
-        });
-    let max_caps = endpoint.as_golem_res().get_hw_caps();
-    let pending_caps = endpoint.as_golem_res().get_hw_preset("custom".into());
+) -> Fallible<HwCapsStatus> {
+    let (num_cores, memory, disk) = future::try_join3(
+        endpoint.as_golem().get_setting::<provider::NumCores>(),
+        endpoint.as_golem().get_setting::<provider::MaxMemorySize>(),
+        endpoint
+            .as_golem()
+            .get_setting::<provider::MaxResourceSize>(),
+    )
+    .await?;
 
-    active_caps
-        .join3(max_caps, pending_caps)
-        .from_err()
-        .and_then(|(active, max, pending)| {
-            Ok(HwCapsStatus {
-                active,
-                pending: pending.caps,
-                min: HwCaps {
-                    cpu_cores: 1,
-                    memory: 1048576,
-                    disk: 1048576.0,
-                },
-                max,
-            })
-        })
+    let active_caps = HwCaps {
+        cpu_cores: num_cores as u32,
+        disk,
+        memory: memory as u64,
+    };
+
+    let (max_caps, pending_caps) = future::try_join(
+        endpoint.as_golem_res().get_hw_caps(),
+        endpoint.as_golem_res().get_hw_preset("custom".into()),
+    )
+    .await?;
+
+    Ok(HwCapsStatus {
+        active: active_caps,
+        pending: pending_caps.caps,
+        min: HwCaps {
+            cpu_cores: 1,
+            memory: 1048576,
+            disk: 1048576.0,
+        },
+        max: max_caps,
+    })
 }
