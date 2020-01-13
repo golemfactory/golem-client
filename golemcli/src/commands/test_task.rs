@@ -49,7 +49,8 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         task_file: &Path,
     ) -> Fallible<CommandResponse> {
-        let task_spec = serde_json::from_reader(fs::OpenOptions::new().read(true).open(task_file)?);
+        let task_spec =
+            serde_json::from_reader(fs::OpenOptions::new().read(true).open(task_file)?)?;
         let result = endpoint.as_golem_comp().run_test_task(task_spec).await?;
 
         CommandResponse::object(if result { "Success" } else { "Error" })
