@@ -119,7 +119,7 @@ impl Section {
 
         let exceptions = exceptions.clone();
 
-        let known_peers = endpoint
+        let mut known_peers = endpoint
             .as_golem_net()
             .get_known_peers()
             .await?
@@ -127,16 +127,15 @@ impl Section {
             .map(|p| p.key)
             .collect::<BTreeSet<_>>();
 
-        let connected_peers = endpoint
+        let mut connected_peers = endpoint
             .as_golem_net()
             .get_connected_peers()
             .await?
-            .from_err()
             .into_iter()
             .map(|p| p.node_info.key)
             .collect::<BTreeSet<_>>();
 
-        let current_acl = endpoint
+        let mut current_acl = endpoint
             .as_golem_net()
             .acl_status()
             .await?
@@ -153,9 +152,9 @@ impl Section {
             .collect::<BTreeSet<_>>();
 
         let mut b = BTreeSet::new();
-        b.append(known_peers);
-        b.append(connected_peers);
-        b.append(current_acl);
+        b.append(&mut known_peers);
+        b.append(&mut connected_peers);
+        b.append(&mut current_acl);
 
         let candidates: Vec<String> = b.into_iter().collect();
         let nodes = crate::utils::resolve_from_list(candidates, exceptions.clone())?;
@@ -168,7 +167,7 @@ impl Section {
         ips: &Vec<IpAddr>,
         nodes: &Vec<GolemIdPattern>,
         timeout: i32,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         let block_ips = future::try_join_all(
             ips.into_iter()
                 .cloned()
@@ -187,7 +186,9 @@ impl Section {
         let status = endpoint.as_golem_net().acl_status().await?;
 
         let nodes = match status.default_rule {
-            AclRule::Allow => crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes),
+            AclRule::Allow => {
+                crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes).await?
+            }
             AclRule::Deny => crate::utils::resolve_from_list(
                 status
                     .rules
@@ -202,7 +203,7 @@ impl Section {
                     )
                     .collect::<Vec<_>>(),
                 nodes,
-            ),
+            )?,
         };
         let (_ips, _nodes) = future::try_join(
             block_ips,
@@ -213,7 +214,7 @@ impl Section {
             ),
         )
         .await?;
-        list(list_ep, false, false)
+        list(list_ep, false, false).await
     }
 
     async fn allow(
@@ -221,65 +222,61 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         ips: &Vec<IpAddr>,
         nodes: &Vec<GolemIdPattern>,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         let list_ep = endpoint.clone();
 
         let allow_ips = future::try_join_all(
             ips.into_iter()
                 .cloned()
                 .map(|ip| {
-                    endpoint
-                        .as_golem_net()
-                        .allow_ip(ip, -1)
-                        .from_err()
-                        .and_then(|_| Ok(()))
+                    async move {
+                        endpoint.as_golem_net().allow_ip(ip, -1).await?;
+
+                        Ok(())
+                    }
                 })
                 .collect::<Vec<_>>(),
         );
 
         let nodes = nodes.clone();
-        let allow_nodes = endpoint
-            .as_golem_net()
-            .acl_status()
-            .from_err()
-            .and_then(move |status| {
-                async move {
-                    match status.default_rule {
-                        AclRule::Deny => {
-                            crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes)
-                        }
-                        AclRule::Allow => crate::utils::resolve_from_list(
-                            status
-                                .rules
-                                .into_iter()
-                                .map(
-                                    |AclRuleItem {
-                                         identity,
-                                         node_name: _,
-                                         rule: _,
-                                         deadline: _,
-                                     }| identity,
-                                )
-                                .collect::<Vec<_>>(),
-                            nodes,
-                        ),
-                    }
-                    .and_then(move |nodes| {
-                        future::join_all(
-                            nodes
-                                .into_iter()
-                                .map(|identity: String| {
-                                    endpoint.as_golem_net().allow_node(identity, -1).from_err()
-                                })
-                                .collect::<Vec<_>>(),
-                        )
-                        .and_then(|_| future::ok(()))
-                    })
+        let allow_nodes = async {
+            let status = endpoint.as_golem_net().acl_status().await?;
+            let nodes = match status.default_rule {
+                AclRule::Deny => {
+                    crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes).await
                 }
-            });
+                AclRule::Allow => crate::utils::resolve_from_list(
+                    status
+                        .rules
+                        .into_iter()
+                        .map(
+                            |AclRuleItem {
+                                 identity,
+                                 node_name: _,
+                                 rule: _,
+                                 deadline: _,
+                             }| identity,
+                        )
+                        .collect::<Vec<_>>(),
+                    nodes,
+                ),
+            }?;
+            future::try_join_all(
+                nodes
+                    .into_iter()
+                    .map(|identity: String| {
+                        endpoint
+                            .as_golem_net()
+                            .allow_node(identity, -1)
+                            .map_err(failure::Error::from)
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .await
+        };
 
         let (_ips, _nodes) = future::try_join(allow_ips, allow_nodes).await?;
-        list(list_ep, false, false)
+        list(list_ep, false, false).await
     }
 }
 

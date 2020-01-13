@@ -140,36 +140,26 @@ pub fn resolve_from_list(
     }
 }
 
-pub fn resolve_from_known_hosts(
+pub async fn resolve_from_known_hosts(
     endpoint: impl actix_wamp::RpcEndpoint + 'static,
     patterns: Vec<GolemIdPattern>,
-) -> impl Future<Item = Vec<String>, Error = failure::Error> + 'static {
+) -> failure::Fallible<Vec<String>> {
     if patterns.iter().all(|p| p.is_exact()) {
-        future::Either::B(future::ok(
-            patterns
-                .into_iter()
-                .filter_map(|p| p.exact_value().map(|v| v.to_owned()))
-                .collect(),
-        ))
+        Ok(patterns
+            .into_iter()
+            .filter_map(|p| p.exact_value().map(|v| v.to_owned()))
+            .collect())
     } else {
-        future::Either::A(
-            endpoint
-                .as_golem_net()
-                .get_known_peers()
-                .from_err()
-                .and_then(
-                    move |known_peers: Vec<NodeInfo>| -> Result<Vec<String>, failure::Error> {
-                        let v: Result<Vec<String>, _> = patterns
-                            .into_iter()
-                            .map(|p| {
-                                p.resolve(known_peers.iter().map(|p| p.key.as_ref()))
-                                    .map(|k| k.to_owned())
-                            })
-                            .collect();
-                        v
-                    },
-                ),
-        )
+        let known_peers: Vec<NodeInfo> = endpoint.as_golem_net().get_known_peers().await?;
+
+        let v: Result<Vec<String>, _> = patterns
+            .into_iter()
+            .map(|p| {
+                p.resolve(known_peers.iter().map(|p| p.key.as_ref()))
+                    .map(|k| k.to_owned())
+            })
+            .collect();
+        v
     }
 }
 
