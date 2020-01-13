@@ -3,6 +3,7 @@ use futures::future::Either;
 use futures::prelude::*;
 use golem_rpc_api::comp::{AsGolemComp, CompEnvStatus};
 use structopt::StructOpt;
+use failure::Fallible;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -104,26 +105,25 @@ impl Section {
     }
 }
 
-fn show(
+async fn show(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-    endpoint
-        .as_golem_comp()
-        .get_environments()
-        .from_err()
-        .and_then(|envs: Vec<CompEnvStatus>| {
-            let columns = vec![
-                "name".into(),
-                "supported".into(),
-                "active".into(),
-                "performance".into(),
-                "min accept. perf.".into(),
-                "description".into(),
-            ];
-            let values = envs
-                .into_iter()
-                .map(|e| {
-                    serde_json::json!([
+) -> Fallible<CommandResponse> {
+    let envs: Vec<CompEnvStatus> =
+        endpoint
+            .as_golem_comp()
+            .get_environments().await?;
+    let columns = vec![
+        "name".into(),
+        "supported".into(),
+        "active".into(),
+        "performance".into(),
+        "min accept. perf.".into(),
+        "description".into(),
+    ];
+    let values = envs
+        .into_iter()
+        .map(|e| {
+            serde_json::json!([
                         e.id,
                         e.supported,
                         e.accepted,
@@ -131,20 +131,17 @@ fn show(
                         e.min_accepted,
                         e.description
                     ])
-                })
-                .collect();
-            Ok(ResponseTable { columns, values }.into())
         })
+        .collect();
+    Ok(ResponseTable { columns, values }.into())
 }
 
-fn perf_mult(
+async fn perf_mult(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+) -> Fallible<CommandResponse> {
+    let multiplier =
     endpoint
         .as_golem_comp()
-        .perf_mult()
-        .from_err()
-        .and_then(|multiplier| {
-            CommandResponse::object(format!("minimal performance multiplier is: {}", multiplier))
-        })
+        .perf_mult().await?;
+    CommandResponse::object(format!("minimal performance multiplier is: {}", multiplier))
 }
