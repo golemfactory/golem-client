@@ -90,13 +90,12 @@ impl AccountSection {
             return Ok(CommandResponse::NoOutput);
         }
 
-        let transactions = endpoint
-            .as_pay()
+        let transactions = AsGolemPay::as_golem_pay(&endpoint)
             .withdraw(
                 currency.from_user(amount),
                 destination.clone(),
                 currency.to_string(),
-                gas_price,
+                gas_price.map(|g| ETH.from_user(&g)),
             )
             .await?;
         CommandResponse::object(transactions)

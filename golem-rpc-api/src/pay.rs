@@ -28,7 +28,7 @@ rpc_interface! {
         fn get_pay_ident(&self) -> Result<String>;
 
         #[rpc_uri = "pay.withdraw"]
-        fn withdraw(&self, amount : BigDecimal, destination : String, currency : String, gas_price : Option<BigDecimal>) -> Result<Vec<String>>;
+        fn withdraw(&self, amount : String, destination : String, currency : String, gas_price : Option<String>) -> Result<Vec<String>>;
     }
 
     converter AsGolemPay as_golem_pay;

@@ -1,7 +1,7 @@
 use crate::context::*;
 use crate::formaters::*;
 use failure::Fallible;
-use futures::{future, Future};
+use futures::prelude::*;
 use golem_rpc_api::concent::*;
 use golem_rpc_api::net::AsGolemNet;
 use golem_rpc_api::pay::{AsGolemPay, DepositPayment};
@@ -101,16 +101,13 @@ impl Section {
         }
     }
 
-    fn run_turn(
+    async fn run_turn(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         on: bool,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_concent()
-            .turn(on)
-            .from_err()
-            .and_then(move |()| CommandResponse::object(status_to_msg(on)))
+    ) -> Fallible<CommandResponse> {
+        endpoint.as_golem_concent().turn(on).await?;
+        CommandResponse::object(status_to_msg(on))
     }
 
     fn status(

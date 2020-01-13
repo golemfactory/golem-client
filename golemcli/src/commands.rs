@@ -244,7 +244,7 @@ impl ShutdownCommand {
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Result<CommandResponse, crate::context::Error> {
-        let ret = endpoint
+        let ret: serde_json::Value = endpoint
             .as_invoker()
             .rpc_call("golem.graceful_shutdown", &())
             .await?;
