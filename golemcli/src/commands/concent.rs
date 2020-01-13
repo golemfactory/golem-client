@@ -90,14 +90,14 @@ impl Section {
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     ) -> Fallible<CommandResponse> {
         match self {
-            Section::On => self.run_turn(endpoint, true),
-            Section::Off => self.run_turn(endpoint, false),
-            Section::Status => self.status(endpoint),
-            Section::Deposit(Deposit { command: None }) => self.deposit_status(endpoint),
+            Section::On => self.run_turn(endpoint, true).await,
+            Section::Off => self.run_turn(endpoint, false).await,
+            Section::Status => self.status(endpoint).await,
+            Section::Deposit(Deposit { command: None }) => self.deposit_status(endpoint).await,
             Section::Deposit(Deposit {
                 command: Some(DepositCommands::Payments { filter_by, sort_by }),
-            }) => self.deposit_payments(endpoint, filter_by, sort_by),
-            Section::Terms(terms) => terms.run(endpoint),
+            }) => self.deposit_payments(endpoint, filter_by, sort_by).await,
+            Section::Terms(terms) => terms.run(endpoint).await,
         }
     }
 
@@ -110,63 +110,55 @@ impl Section {
         CommandResponse::object(status_to_msg(on))
     }
 
-    fn status(
+    async fn status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_concent()
-            .is_on()
-            .from_err()
-            .and_then(|is_on| CommandResponse::object(status_to_msg(is_on)))
+    ) -> Fallible<CommandResponse> {
+        CommandResponse::object(status_to_msg(endpoint.as_golem_concent().is_on().await?))
     }
 
-    fn deposit_status(
+    async fn deposit_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_pay()
-            .get_deposit_balance()
-            .from_err()
-            .and_then(|balance_info| CommandResponse::object(balance_info.map(Humanize::humanize)))
+    ) -> Fallible<CommandResponse> {
+        let balance_info = endpoint.as_golem_pay().get_deposit_balance().await?;
+        CommandResponse::object(balance_info.map(Humanize::humanize))
     }
 
-    fn deposit_payments(
+    async fn deposit_payments(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         filter_by: &Option<crate::eth::PaymentStatus>,
         sort_by: &Option<String>,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         let sort_by = sort_by.clone();
         let filter_by = filter_by.clone();
 
-        endpoint
+        let payments = endpoint
             .as_golem_pay()
             .get_deposit_payments_list(None, None)
-            .from_err()
-            .and_then(move |payments| {
-                let columns = DEPOSIT_COLUMNS.iter().map(|&name| name.into()).collect();
-                let values = payments
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|payment| {
-                        filter_by
-                            .map(|f| f.is_match_with(&payment.status))
-                            .unwrap_or(true)
-                    })
-                    .map(|payment: DepositPayment| {
-                        let value = crate::eth::Currency::GNT.format_decimal(&payment.value);
-                        let fee = payment
-                            .fee
-                            .map(|fee| crate::eth::Currency::ETH.format_decimal(&fee));
+            .await?;
 
-                        serde_json::json!([payment.transaction, payment.status, value, fee])
-                    })
-                    .collect();
-
-                Ok(ResponseTable { columns, values }.sort_by(&sort_by).into())
+        let columns = DEPOSIT_COLUMNS.iter().map(|&name| name.into()).collect();
+        let values = payments
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|payment| {
+                filter_by
+                    .map(|f| f.is_match_with(&payment.status))
+                    .unwrap_or(true)
             })
+            .map(|payment: DepositPayment| {
+                let value = crate::eth::Currency::GNT.format_decimal(&payment.value);
+                let fee = payment
+                    .fee
+                    .map(|fee| crate::eth::Currency::ETH.format_decimal(&fee));
+
+                serde_json::json!([payment.transaction, payment.status, value, fee])
+            })
+            .collect();
+
+        Ok(ResponseTable { columns, values }.sort_by(&sort_by).into())
     }
 }
 
