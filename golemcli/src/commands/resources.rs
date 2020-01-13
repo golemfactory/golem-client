@@ -1,4 +1,5 @@
 use crate::context::*;
+use failure::Fallible;
 use futures::{future, Future};
 use golem_rpc_api::res::*;
 use golem_rpc_api::{core::AsGolemCore, settings::provider};
@@ -60,136 +61,121 @@ fn none_if_eq<T: Eq>(v1: T, v2: &T) -> Option<T> {
     }
 }
 
-fn show_presets(
+async fn show_presets(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-    Box::new(get_presets(endpoint).and_then(|r| {
-        let columns = vec![
-            "".into(),
-            "active".into(),
-            "pending".into(),
-            "min".into(),
-            "max".into(),
-        ];
+) -> Fallible<CommandResponse> {
+    let r = get_presets(endpoint).await?;
 
-        let values = vec![
-            serde_json::json!([
-                "cpu_cores",
-                r.active.cpu_cores,
-                none_if_eq(r.pending.cpu_cores, &r.active.cpu_cores),
-                r.min.cpu_cores,
-                r.max.cpu_cores
-            ]),
-            serde_json::json!([
-                "disk [kB]",
-                r.active.disk as u64,
-                none_if_eq(r.pending.disk as u64, &(r.active.disk as u64)),
-                r.min.disk,
-                r.max.disk
-            ]),
-            serde_json::json!([
-                "memory [kB]",
-                r.active.memory,
-                none_if_eq(r.pending.memory, &r.active.memory),
-                r.min.memory,
-                r.max.memory
-            ]),
-        ];
+    let columns = vec![
+        "".into(),
+        "active".into(),
+        "pending".into(),
+        "min".into(),
+        "max".into(),
+    ];
 
-        Ok(ResponseTable { columns, values }.into())
-    }))
-    /*  Box::new(endpoint.as_golem().get_setting::<provider::NumCores>().join3(
-        endpoint.as_golem().get_setting::<provider::MaxMemorySize>(),
-        endpoint.as_golem().get_setting::<provider::MaxResourceSize>()
-    ).from_err().and_then(|(num_cores, max_memory_size, max_res_size)| {
-        eprintln!("num_cores={}, max_memory_size={}, max_res_size={}", num_cores, max_memory_size, max_res_size);
-        CommandResponse::object("ok")
-    }))*/
+    let values = vec![
+        serde_json::json!([
+            "cpu_cores",
+            r.active.cpu_cores,
+            none_if_eq(r.pending.cpu_cores, &r.active.cpu_cores),
+            r.min.cpu_cores,
+            r.max.cpu_cores
+        ]),
+        serde_json::json!([
+            "disk [kB]",
+            r.active.disk as u64,
+            none_if_eq(r.pending.disk as u64, &(r.active.disk as u64)),
+            r.min.disk,
+            r.max.disk
+        ]),
+        serde_json::json!([
+            "memory [kB]",
+            r.active.memory,
+            none_if_eq(r.pending.memory, &r.active.memory),
+            r.min.memory,
+            r.max.memory
+        ]),
+    ];
+
+    Ok(ResponseTable { columns, values }.into())
 }
 
-fn update_presets(
+async fn update_presets(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     apply: bool,
     cpu_cores: &Option<u32>,
     disk: &Option<f64>,
     memory: &Option<u64>,
-) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+) -> Fallible<CommandResponse> {
     let cpu_cores = cpu_cores.clone();
     let disk = disk.clone();
     let memory = memory.clone();
 
-    Box::new(get_presets(endpoint.clone()).and_then(move |presets| {
-        let mut updates = presets.pending.clone();
+    let presets = get_presets(endpoint).await?;
 
-        if let Some(cpu_cores) = cpu_cores {
-            updates.cpu_cores = cpu_cores;
-            if cpu_cores < presets.min.cpu_cores || cpu_cores > presets.max.cpu_cores {
-                return future::Either::B(future::err(failure::err_msg(format!(
-                    "cpu cores should be {} >= int >= {}",
-                    presets.max.cpu_cores, presets.min.cpu_cores
-                ))));
-            }
+    let mut updates = presets.pending.clone();
+
+    if let Some(cpu_cores) = cpu_cores {
+        updates.cpu_cores = cpu_cores;
+        if cpu_cores < presets.min.cpu_cores || cpu_cores > presets.max.cpu_cores {
+            return future::Either::B(future::err(failure::err_msg(format!(
+                "cpu cores should be {} >= int >= {}",
+                presets.max.cpu_cores, presets.min.cpu_cores
+            ))));
         }
+    }
 
-        if let Some(memory) = memory {
-            updates.memory = memory;
-            if memory < presets.min.memory || memory > presets.max.memory {
-                return future::Either::B(future::err(failure::err_msg(format!(
-                    "memory should be {} >= int >= {}",
-                    presets.max.memory, presets.min.memory
-                ))));
-            }
+    if let Some(memory) = memory {
+        updates.memory = memory;
+        if memory < presets.min.memory || memory > presets.max.memory {
+            return future::Either::B(future::err(failure::err_msg(format!(
+                "memory should be {} >= int >= {}",
+                presets.max.memory, presets.min.memory
+            ))));
         }
+    }
 
-        if let Some(disk) = disk {
-            eprintln!("disk={}", disk);
-            updates.disk = disk;
-            if disk < presets.min.disk || disk > presets.max.disk {
-                return future::Either::B(future::err(failure::err_msg(format!(
-                    "disk should be {} >= int >= {}",
-                    presets.max.disk as u64, presets.min.disk as u64
-                ))));
-            }
+    if let Some(disk) = disk {
+        eprintln!("disk={}", disk);
+        updates.disk = disk;
+        if disk < presets.min.disk || disk > presets.max.disk {
+            return future::Either::B(future::err(failure::err_msg(format!(
+                "disk should be {} >= int >= {}",
+                presets.max.disk as u64, presets.min.disk as u64
+            ))));
         }
+    }
 
-        let update = HwPreset {
-            caps: updates.clone(),
-            name: "custom".to_string(),
-        };
+    let update = HwPreset {
+        caps: updates.clone(),
+        name: "custom".to_string(),
+    };
 
-        future::Either::A(
-            endpoint
-                .as_golem_res()
-                .update_hw_preset(update)
-                .from_err()
-                .and_then(move |_| {
-                    let changed = presets.active.cpu_cores != updates.cpu_cores
-                        || presets.active.disk != updates.disk
-                        || presets.active.memory != updates.memory;
+    endpoint.as_golem_res().update_hw_preset(update).await?;
 
-                    if changed
-                        && apply
-                        && crate::context::prompt_for_acceptance(
-                            "Changing resources will interrupt performed tasks.\nAre you sure ?",
-                        )
-                    {
-                        eprintln!("Updating resources. please wait");
-                        future::Either::A(
-                            endpoint
-                                .as_golem_res()
-                                .activate_hw_preset("custom".into(), true)
-                                .from_err()
-                                .and_then(|b| CommandResponse::object(b)),
-                        )
-                    } else {
-                        if apply && !changed {
-                            eprintln!("No changes detected");
-                        }
-                        future::Either::B(show_presets(endpoint))
-                    }
-                }),
+    let changed = presets.active.cpu_cores != updates.cpu_cores
+        || presets.active.disk != updates.disk
+        || presets.active.memory != updates.memory;
+
+    if changed
+        && apply
+        && crate::context::prompt_for_acceptance(
+            "Changing resources will interrupt performed tasks.\nAre you sure ?",
         )
-    }))
+    {
+        eprintln!("Updating resources. please wait");
+        let b = endpoint
+            .as_golem_res()
+            .activate_hw_preset("custom".into(), true)
+            .await?;
+        CommandResponse::object(b)
+    } else {
+        if apply && !changed {
+            eprintln!("No changes detected");
+        }
+        show_presets(endpoint).await
+    }
 }
 
 struct HwCapsStatus {

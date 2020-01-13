@@ -77,8 +77,10 @@ pub fn connect_to_app(
     net: impl Into<Option<Net>>,
     rpc_addr: Option<(&str, u16)>,
 ) -> impl Future<
-    Item = impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone,
-    Error = super::Error,
+    Output = Result<
+        impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone,
+        super::Error,
+    >,
 > {
     let (address, port) = rpc_addr.unwrap_or_else(|| ("127.0.0.1", 61000));
     let data_dir = data_dir.to_owned();
@@ -88,9 +90,8 @@ pub fn connect_to_app(
             let net = match net.into().or_else(|| hash_to_net(&data_dir, hash?)) {
                 Some(net) => net,
                 None => {
-                    return future::Either::B(future::err(super::Error::Other(
-                        "invalid rpc cert".into(),
-                    )))
+                    return future::err(super::Error::Other("invalid rpc cert".into()))
+                        .right_future()
                 }
             };
             let net_data_dir = data_dir.join(net.data_dir());
@@ -101,10 +102,10 @@ pub fn connect_to_app(
                     log::debug!("reading secret from: {}", secret_file_path.display());
                     Ok(std::fs::read(secret_file_path)?)
                 });
-            future::Either::A(
-                actix_wamp::SessionBuilder::with_auth("golem", "golemcli", auth_method)
-                    .create(transport)
-                    .from_err(),
-            )
+
+            actix_wamp::SessionBuilder::with_auth("golem", "golemcli", auth_method)
+                .create(transport)
+                .map_err(From::from)
+                .left_future()
         })
 }

@@ -1,10 +1,13 @@
 use crate::error::Error;
 use crate::messages::{Dict, WampError};
 use actix::Message;
+use futures::channel::mpsc;
 use futures::prelude::*;
-use futures::sync::mpsc;
+use futures::task::{Context, Poll};
+use futures::StreamExt;
 use serde_json::Value;
 use std::borrow::Cow;
+use std::pin::Pin;
 
 #[derive(Debug)]
 pub struct WampMessage {
@@ -13,7 +16,7 @@ pub struct WampMessage {
 }
 
 pub trait PubSubEndpoint {
-    type Events: Stream<Item = WampMessage, Error = Error>;
+    type Events: Stream<Item = Result<WampMessage, Error>>;
 
     fn subscribe(&self, uri: &str) -> Self::Events;
 }
@@ -48,16 +51,11 @@ impl Drop for Subscription {
 }
 
 impl Stream for Subscription {
-    type Item = WampMessage;
-    type Error = Error;
+    type Item = Result<WampMessage, Error>;
 
-    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
-        match self.stream.poll() {
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
-            Ok(Async::Ready(Some(Err(e)))) => Err(Error::WampError(e)),
-            Ok(Async::Ready(Some(Ok(message)))) => Ok(Async::Ready(Some(message))),
-            Err(_) => Err(Error::ConnectionClosed),
-        }
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.stream
+            .poll_next_unpin(cx)
+            .map(|v| v.map(|v| v.map_err(Error::WampError)))
     }
 }

@@ -2,7 +2,6 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use futures::future::Err;
 use futures::prelude::*;
 use humantime::format_duration;
 use openssl::rsa::Padding;
@@ -12,6 +11,7 @@ use golem_rpc_api::comp::{AsGolemComp, StatsCounters, SubtaskStats, TaskInfo};
 use serde_json::json;
 
 use crate::context::*;
+use failure::Fallible;
 
 #[derive(StructOpt, Debug)]
 pub enum Section {
@@ -119,62 +119,53 @@ pub enum SubtaskCommand {
 pub const TASK_TYPES: &[&str] = &["blender", "wasm", "glambda"];
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> failure::Fallible<CommandResponse> {
         match self {
-            Section::Abort { task_id } => Box::new(self.abort(endpoint, task_id)),
+            Section::Abort { task_id } => self.abort(endpoint, task_id).await,
             Section::Create {
                 file_name,
                 dry_run,
                 out_file,
             } => {
                 if *dry_run {
-                    Box::new(self.create_dry_run(endpoint, file_name, out_file))
+                    self.create_dry_run(endpoint, file_name, out_file).await
                 } else {
-                    Box::new(self.create(endpoint, &file_name, out_file))
+                    self.create(endpoint, &file_name, out_file).await
                 }
             }
-            Section::Delete { task_id } => Box::new(self.delete(endpoint, task_id)),
-            Section::Dump { task_id, out_file } => Box::new(self.dump(endpoint, task_id, out_file)),
-            Section::Purge => Box::new(self.purge(endpoint)),
-            Section::Restart { task_id } => Box::new(self.restart(endpoint, task_id)),
-            Section::List { current, sort } => Box::new(self.show(endpoint, &None, *current, sort)),
+            Section::Delete { task_id } => self.delete(endpoint, task_id).await,
+            Section::Dump { task_id, out_file } => self.dump(endpoint, task_id, out_file).await,
+            Section::Purge => self.purge(endpoint).await,
+            Section::Restart { task_id } => self.restart(endpoint, task_id).await,
+            Section::List { current, sort } => self.show(endpoint, &None, *current, sort).await,
             Section::Show {
                 task_id,
                 current,
                 sort,
-            } => Box::new(self.show(endpoint, task_id, *current, sort)),
-            Section::Template { task_type } => Box::new(template(task_type)),
-            Section::Stats => Box::new(self.stats(endpoint)),
-            Section::Subtasks(subtask_command) => subtask_command.run(endpoint),
+            } => self.show(endpoint, task_id, *current, sort).await,
+            Section::Template { task_type } => template(task_type).await,
+            Section::Stats => self.stats(endpoint).await,
+            Section::Subtasks(subtask_command) => subtask_command.run(endpoint).await,
 
-            Section::Unsupport { last_days } => Box::new(self.unsupport(endpoint, last_days)),
+            Section::Unsupport { last_days } => self.unsupport(endpoint, last_days).await,
         }
     }
 
-    fn create(
+    async fn create(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         file_name: &Path,
         out_file: &Option<PathBuf>,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         use std::fs;
-        /*
-         if error:
-                    if isinstance(error, dict):
-                        error = error['error_msg']
-                    if task_id:
-                        return CommandResult(error="task {} failed: {}"
-                                             .format(task_id, error))
-                    return CommandResult(error=error)
-                return task_id
-        */
+
 
         let out_file = out_file.clone();
 
-        fs::OpenOptions::new()
+        Ok(fs::OpenOptions::new()
             .read(true)
             .open(file_name)
             .into_future()
@@ -188,10 +179,10 @@ impl Section {
                 } else {
                     CommandResponse::object(task_id)
                 }
-            })
+            })?)
     }
 
-    fn create_dry_run(
+    async fn create_dry_run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         file_name: &Path,
@@ -229,7 +220,7 @@ impl Section {
             })
     }
 
-    fn abort(
+    async fn abort(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         task_id: &str,
@@ -241,68 +232,63 @@ impl Section {
             .and_then(|()| CommandResponse::object("Completed"))
     }
 
-    fn delete(
+    async fn delete(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         task_id: &str,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         endpoint
             .as_golem_comp()
-            .delete_task(task_id.into())
-            .from_err()
-            .and_then(|()| CommandResponse::object("Completed"))
+            .delete_task(task_id.into()).await?;
+        CommandResponse::object("Completed")
     }
 
-    fn purge(
+    async fn purge(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         endpoint
             .as_golem_comp()
-            .purge_tasks()
-            .from_err()
-            .and_then(|()| CommandResponse::object("Completed"))
+            .purge_tasks().await?;
+        CommandResponse::object("Completed")
     }
 
-    fn restart(
+    async fn restart(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         task_id: &str,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
+    ) -> Fallible<CommandResponse> {
+        let (_task_id, err_msg) = endpoint
             .as_golem_comp()
             .restart_task(task_id.into())
-            .from_err()
-            .and_then(|(task_id, err_msg)| CommandResponse::object(task_id.or(err_msg)))
+            .await?;
+        CommandResponse::object(task_id.or(err_msg))
     }
 
-    fn dump(
+    async fn dump(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         task_id: &str,
         out_file: &Option<PathBuf>,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let out_file = out_file.clone();
-
-        endpoint
+    ) -> Fallible<CommandResponse> {
+        let v = endpoint
             .as_golem_comp()
             .get_task(task_id.into())
-            .from_err()
-            .and_then(move |v| {
-                if let Some(out_file) = out_file {
-                    serde_json::to_writer_pretty(
-                        OpenOptions::new()
-                            .write(true)
-                            .truncate(true)
-                            .create(true)
-                            .open(out_file)?,
-                        &v,
-                    )?;
-                } else {
-                    println!("{}", serde_json::to_string_pretty(&v)?)
-                }
-                Ok(CommandResponse::NoOutput)
-            })
+            .await?;
+
+        if let Some(out_file) = out_file {
+            serde_json::to_writer_pretty(
+                OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .create(true)
+                    .open(out_file)?,
+                &v,
+            )?;
+        } else {
+            println!("{}", serde_json::to_string_pretty(&v)?)
+        }
+        Ok(CommandResponse::NoOutput)
     }
 
     fn show(
@@ -443,10 +429,10 @@ fn fraction_to_percent(progress: f64) -> String {
 }
 
 impl SubtaskCommand {
-    fn run(
+    async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> fa
         match self {
             SubtaskCommand::List { task_id } => Box::new(list_subtasks(endpoint, task_id.into())),
             SubtaskCommand::Show { subtask_id } => {

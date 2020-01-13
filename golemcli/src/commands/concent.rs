@@ -1,5 +1,6 @@
 use crate::context::*;
 use crate::formaters::*;
+use failure::Fallible;
 use futures::{future, Future};
 use golem_rpc_api::concent::*;
 use golem_rpc_api::net::AsGolemNet;
@@ -84,18 +85,18 @@ fn status_to_msg(on: bool) -> &'static str {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> Fallible<CommandResponse> {
         match self {
-            Section::On => Box::new(self.run_turn(endpoint, true)),
-            Section::Off => Box::new(self.run_turn(endpoint, false)),
-            Section::Status => Box::new(self.status(endpoint)),
-            Section::Deposit(Deposit { command: None }) => Box::new(self.deposit_status(endpoint)),
+            Section::On => self.run_turn(endpoint, true),
+            Section::Off => self.run_turn(endpoint, false),
+            Section::Status => self.status(endpoint),
+            Section::Deposit(Deposit { command: None }) => self.deposit_status(endpoint),
             Section::Deposit(Deposit {
                 command: Some(DepositCommands::Payments { filter_by, sort_by }),
-            }) => Box::new(self.deposit_payments(endpoint, filter_by, sort_by)),
+            }) => self.deposit_payments(endpoint, filter_by, sort_by),
             Section::Terms(terms) => terms.run(endpoint),
         }
     }
@@ -173,37 +174,23 @@ impl Section {
 }
 
 impl Terms {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> Fallible<CommandResponse> {
         match self {
-            Terms::Accept => Box::new(
-                endpoint
-                    .as_golem_concent()
-                    .accept_terms()
-                    .from_err()
-                    .and_then(|()| {
-                        CommandResponse::object("Concent terms of use have been accepted.")
-                    }),
-            ),
-            Terms::Show => Box::new(
-                endpoint
-                    .as_golem_concent()
-                    .show_terms()
-                    .from_err()
-                    .and_then(|terms_html| {
-                        let text = html2text::from_read(std::io::Cursor::new(terms_html), 78);
-                        CommandResponse::object(text)
-                    }),
-            ),
-            Terms::Status => Box::new(
-                endpoint
-                    .as_golem_concent()
-                    .is_terms_accepted()
-                    .from_err()
-                    .and_then(|is_terms_accepted| CommandResponse::object(is_terms_accepted)),
-            ),
+            Terms::Accept => {
+                endpoint.as_golem_concent().accept_terms().await?;
+                CommandResponse::object("Concent terms of use have been accepted.")
+            }
+            Terms::Show => {
+                let terms_html = endpoint.as_golem_concent().show_terms().await?;
+                let text = html2text::from_read(std::io::Cursor::new(terms_html), 78);
+                CommandResponse::object(text)
+            }
+            Terms::Status => {
+                CommandResponse::object(endpoint.as_golem_concent().is_terms_accepted().await?)
+            }
         }
     }
 }

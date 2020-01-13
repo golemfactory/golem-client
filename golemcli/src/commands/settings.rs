@@ -1,4 +1,5 @@
 use crate::context::*;
+use failure::Fallible;
 use futures::prelude::*;
 use golem_rpc_api::settings::DynamicSetting;
 use golem_rpc_api::{core::AsGolemCore, settings, Map};
@@ -39,88 +40,82 @@ pub enum Section {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         match self {
             &Section::Show {
                 basic,
                 provider,
                 requestor,
             } => show(endpoint, basic, provider, requestor),
-            Section::Set { key, value } => self.set(endpoint, key, value),
+            Section::Set { key, value } => self.set(endpoint, key, value).await,
         }
     }
 
-    pub fn set(
+    async fn set(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         key: &str,
         value: &str,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        let setting: &'static dyn DynamicSetting = settings::from_name(key).unwrap();
+    ) -> Fallible<CommandResponse> {
+        let setting: &'static dyn DynamicSetting = settings::from_name(key)?;
+        endpoint
+            .as_golem()
+            .update_setting_dyn(setting, value)
+            .await?;
 
-        Box::new(
-            endpoint
-                .as_golem()
-                .update_setting_dyn(setting, value)
-                .from_err()
-                .and_then(move |()| endpoint.as_golem().get_settings().from_err())
-                .and_then(move |s| {
-                    CommandResponse::object(match s.get(setting.name()) {
-                        Some(s) => Some(format!(
-                            "{} [{}] = {}",
-                            setting.description(),
-                            setting.name(),
-                            setting.display_value(s)?
-                        )),
-                        None => None,
-                    })
-                }),
-        )
+        let new_settings = endpoint.as_golem().get_settings().await?;
+        CommandResponse::object(match new_settings.get(setting.name()) {
+            Some(s) => Some(format!(
+                "{} [{}] = {}",
+                setting.description(),
+                setting.name(),
+                setting.display_value(s)?
+            )),
+            None => None,
+        })
     }
 }
 
-pub fn show(
+pub async fn show(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     basic: bool,
     provider: bool,
     requestor: bool,
-) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-    Box::new(endpoint.as_golem().get_settings().from_err().and_then(
-        move |settings: Map<String, Value>| {
-            Ok(CommandResponse::FormattedObject({
-                if basic || provider || requestor {
-                    let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
+) -> Fallible<CommandResponse> {
+    let settings = endpoint.as_golem().get_settings().await?;
 
-                    let mut add_settings =
-                        |list: Vec<&'static (dyn DynamicSetting + 'static)>| -> Result<(), Error> {
-                            for setting in list {
-                                if let Some(value) = settings.get(setting.name()) {
-                                    filtered_settings.insert(setting.name().into(), value.clone());
-                                }
-                            }
-                            Ok(())
-                        };
+    Ok(CommandResponse::FormattedObject(Box::new(
+        if basic || provider || requestor {
+            let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
 
-                    if basic {
-                        add_settings(settings::general::list().collect())?;
+            let mut add_settings =
+                |list: Vec<&'static (dyn DynamicSetting + 'static)>| -> Result<(), Error> {
+                    for setting in list {
+                        if let Some(value) = settings.get(setting.name()) {
+                            filtered_settings.insert(setting.name().into(), value.clone());
+                        }
                     }
-                    if provider {
-                        add_settings(settings::provider::list().collect())?;
-                    }
-                    if requestor {
-                        add_settings(settings::requestor::list().collect())?;
-                    }
+                    Ok(())
+                };
 
-                    Box::new(FormattedSettings(filtered_settings))
-                } else {
-                    Box::new(FormattedSettings(settings))
-                }
-            }))
+            if basic {
+                add_settings(settings::general::list().collect())?;
+            }
+            if provider {
+                add_settings(settings::provider::list().collect())?;
+            }
+            if requestor {
+                add_settings(settings::requestor::list().collect())?;
+            }
+
+            Box::new(FormattedSettings(filtered_settings))
+        } else {
+            Box::new(FormattedSettings(settings))
         },
-    ))
+    )))
 }
 
 struct FormattedSettings(Map<String, Value>);

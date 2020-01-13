@@ -2,6 +2,7 @@ use crate::rpc::*;
 use crate::serde::ts_seconds;
 use bigdecimal::BigDecimal;
 use serde::*;
+use std::vec::Vec;
 
 rpc_interface! {
     trait GolemPay {
@@ -25,6 +26,9 @@ rpc_interface! {
 
         #[rpc_uri = "pay.ident"]
         fn get_pay_ident(&self) -> Result<String>;
+
+        #[rpc_uri = "pay.withdraw"]
+        fn withdraw(&self, amount : BigDecimal, destination : String, currency : String, gas_price : Option<BigDecimal>) -> Result<Vec<String>>;
     }
 
     converter AsGolemPay as_golem_pay;

@@ -1,3 +1,4 @@
+use failure::Fallible;
 use futures::{future, prelude::*};
 use golem_rpc_api::net::{AsGolemNet, NodeInfo};
 use std::str::FromStr;
@@ -120,28 +121,22 @@ impl FromStr for GolemIdPattern {
 }
 
 pub fn resolve_from_list(
-    candidates: impl Future<Item = Vec<String>, Error = failure::Error> + 'static,
+    candidates: Vec<String>,
     patterns: Vec<GolemIdPattern>,
-) -> impl Future<Item = Vec<String>, Error = failure::Error> + 'static {
+) -> Fallible<Vec<String>> {
     if patterns.iter().all(|p| p.is_exact()) {
-        future::Either::B(future::ok(
-            patterns
-                .into_iter()
-                .filter_map(|p| p.exact_value().map(|v| v.to_owned()))
-                .collect(),
-        ))
+        Ok(patterns
+            .into_iter()
+            .filter_map(|p| p.exact_value().map(|v| v.to_owned()))
+            .collect())
     } else {
-        future::Either::A(candidates.and_then(
-            move |candidates: Vec<String>| -> Result<Vec<String>, failure::Error> {
-                patterns
-                    .into_iter()
-                    .map(|p| {
-                        p.resolve(candidates.iter().map(|c| c.as_ref()))
-                            .map(|k| k.to_owned())
-                    })
-                    .collect()
-            },
-        ))
+        patterns
+            .into_iter()
+            .map(|p| {
+                p.resolve(candidates.iter().map(|c| c.as_ref()))
+                    .map(|k| k.to_owned())
+            })
+            .collect()
     }
 }
 

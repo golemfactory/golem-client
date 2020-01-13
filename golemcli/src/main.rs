@@ -134,7 +134,8 @@ impl CliArgs {
     }
 }
 
-fn main() -> failure::Fallible<()> {
+#[actix_rt::main]
+async fn main() -> failure::Fallible<()> {
     let args = CliArgs::from_args();
 
     if args.version {
