@@ -43,7 +43,8 @@ pub struct Connection<W>
 where
     W: Sink<ws::Message, Error = ws::ProtocolError> + Unpin,
 {
-    writer: actix::io::SinkWrite<ws::Message, W>,
+    // TODO: Add wait for ready before write
+    writer: actix::io::SinkWrite<ws::Message, futures::sink::Buffer<W, ws::Message>>,
     state: ConnectionState,
 }
 
@@ -101,7 +102,7 @@ where
 {
     fn new(w: W, ctx: &mut <Self as Actor>::Context) -> Self {
         Connection {
-            writer: io::SinkWrite::new(w, ctx),
+            writer: io::SinkWrite::new(w.buffer(128), ctx),
             state: ConnectionState::Closed,
         }
     }

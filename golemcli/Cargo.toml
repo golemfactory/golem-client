@@ -7,7 +7,7 @@ edition = "2018"
 license = "GPL-3.0"
 
 [features]
-default = ['debug_cli', 'concent_cli', 'test_task_cli']
+default = ['interactive_cli', 'debug_cli', 'concent_cli', 'test_task_cli']
 concent_cli = []
 debug_cli = []
 interactive_cli = ["rustyline", "atty", "ansi_term"]

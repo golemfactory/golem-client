@@ -115,9 +115,9 @@ impl CliArgs {
     }
 
     #[cfg(feature = "interactive_cli")]
-    fn post_command(&self, ctx: &mut CliCtx) {
+    async fn post_command(&self, ctx: &mut CliCtx) {
         if self.interactive {
-            interactive::interactive_shell(ctx)
+            interactive::interactive_shell(ctx).await
         }
     }
 
@@ -130,7 +130,7 @@ impl CliArgs {
                 ctx.output(resp);
             }
         }
-        Ok(self.post_command(&mut ctx))
+        Ok(self.post_command(&mut ctx).await)
     }
 }
 
