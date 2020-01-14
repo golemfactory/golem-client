@@ -93,7 +93,10 @@ impl TryFrom<&CliArgs> for CliCtx {
         let json_output = value.json;
         let net = value.net.clone();
         let accept_any_prompt = value.accept_any_prompt;
+        #[cfg(feature = "interactive_cli")]
         let interactive = value.interactive;
+        #[cfg(not(feature = "interactive_cli"))]
+        let interactive = false;
 
         Ok(CliCtx {
             rpc_addr,
