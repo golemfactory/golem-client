@@ -2,7 +2,7 @@
 
 use super::CliArgs;
 pub use failure::Error;
-use futures::Future;
+use futures::prelude::*;
 use serde::Serialize;
 use std::convert::TryFrom;
 use std::path::PathBuf;
@@ -106,17 +106,16 @@ impl TryFrom<&CliArgs> for CliCtx {
     }
 }
 
-fn wait_for_server(
+async fn wait_for_server(
     endpoint: impl actix_wamp::PubSubEndpoint + Clone + 'static,
-) -> impl Future<Item = bool, Error = actix_wamp::Error> {
+) -> Result<bool, actix_wamp::Error> {
     use futures::stream::Stream;
 
     eprintln!("Waiting for server start");
-    endpoint
-        .subscribe("golem.rpc_ready")
-        .into_future()
-        .and_then(|(_, _)| Ok(true))
-        .map_err(|(e, _)| e)
+    let mut subscribe = endpoint.subscribe("golem.rpc_ready");
+    futures::pin_mut!(subscribe);
+    subscribe.try_next().await?;
+    Ok(true)
 }
 
 impl CliCtx {
