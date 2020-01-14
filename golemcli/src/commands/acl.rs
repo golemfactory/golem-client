@@ -172,6 +172,7 @@ impl Section {
             ips.into_iter()
                 .cloned()
                 .map(|ip| {
+                    let endpoint = endpoint.clone();
                     async move {
                         endpoint.as_golem_net().block_ip(ip, timeout).await?;
                         Ok(())
@@ -229,6 +230,7 @@ impl Section {
             ips.into_iter()
                 .cloned()
                 .map(|ip| {
+                    let endpoint = endpoint.clone();
                     async move {
                         endpoint.as_golem_net().allow_ip(ip, -1).await?;
 

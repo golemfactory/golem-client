@@ -106,7 +106,7 @@ async fn update_presets(
     let disk = disk.clone();
     let memory = memory.clone();
 
-    let presets = get_presets(endpoint).await?;
+    let presets = get_presets(endpoint.clone()).await?;
 
     let mut updates = presets.pending.clone();
 
