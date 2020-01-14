@@ -111,18 +111,15 @@ impl TryFrom<&CliArgs> for CliCtx {
 
 async fn wait_for_server(
     endpoint: impl actix_wamp::PubSubEndpoint + Clone + 'static,
-) -> Result< bool, actix_wamp::Error> {
+) -> Result<bool, actix_wamp::Error> {
     use futures::stream::Stream;
 
     eprintln!("Waiting for server start");
-    let subscribe =  endpoint
-        .subscribe("golem.rpc_ready");
+    let subscribe = endpoint.subscribe("golem.rpc_ready");
     futures::pin_mut!(subscribe);
-    let _ =subscribe
-        .try_next().await?;
+    let _ = subscribe.try_next().await?;
     Ok(true)
 }
-
 
 impl CliCtx {
     pub async fn unlock_app(

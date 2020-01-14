@@ -313,7 +313,7 @@ impl Section {
     async fn get_running_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        _ctx: &CliCtx,
+        ctx: &CliCtx,
     ) -> Fallible<RunningStatus> {
         let (is_mainnet, server_status, node_info, version, disk_usage) = future::try_join5(
             endpoint.as_golem().is_mainnet(),
@@ -324,7 +324,7 @@ impl Section {
         )
         .await?;
 
-        let is_golem_running = true; //Section::check_is_golem_run(is_mainnet, ctx);
+        let is_golem_running = Section::check_is_golem_run(is_mainnet, ctx);
         Ok(RunningStatus {
             process_state: match is_golem_running {
                 true => ProcessState::Running,
