@@ -115,7 +115,7 @@ async fn wait_for_server(
     use futures::stream::Stream;
 
     eprintln!("Waiting for server start");
-    let mut subscribe = endpoint.subscribe("golem.rpc_ready");
+    let subscribe = endpoint.subscribe("golem.rpc_ready");
     futures::pin_mut!(subscribe);
     subscribe.try_next().await?;
     Ok(true)
