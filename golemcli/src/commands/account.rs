@@ -95,7 +95,7 @@ impl AccountSection {
                 currency.from_user(amount),
                 destination.clone(),
                 currency.to_string(),
-                gas_price.map(|g| ETH.from_user(&g)),
+                gas_price.as_ref().map(|g| ETH.from_user(&g)),
             )
             .await?;
         CommandResponse::object(transactions)
