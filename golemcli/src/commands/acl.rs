@@ -158,6 +158,7 @@ impl Section {
 
         let candidates: Vec<String> = b.into_iter().collect();
         let nodes = crate::utils::resolve_from_list(candidates, exceptions.clone())?;
+        endpoint.as_golem_net().acl_setup(default_rule, nodes).await?;
         CommandResponse::object("ACL reset")
     }
 
