@@ -4,6 +4,7 @@ use crate::context::CliCtx;
 use actix::prelude::*;
 use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
 use fs2::FileExt;
+use failure::Fallible;
 use golem_rpc_api::Net;
 use std::convert::TryInto;
 use std::fmt::Debug;
@@ -88,7 +89,7 @@ impl CliArgs {
         }
     }
 
-    pub fn get_rcp_address(&self) -> failure::Fallible<(String, u16)> {
+    pub fn get_rcp_address(&self) -> Fallible<(String, u16)> {
         let address = match &self.address {
             Some(a) => a.as_str(),
             None => "127.0.0.1",
@@ -121,7 +122,7 @@ impl CliArgs {
         }
     }
 
-    async fn run_command(&self) -> failure::Fallible<()> {
+    async fn run_command(&self) -> Fallible<()> {
         let mut ctx: CliCtx = self.try_into()?;
         match &self.command {
             None => self.no_command(),
@@ -135,7 +136,7 @@ impl CliArgs {
 }
 
 #[actix_rt::main]
-async fn main() -> failure::Fallible<()> {
+async fn main() -> Fallible<()> {
     let args = CliArgs::from_args();
 
     if args.version {

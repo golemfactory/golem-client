@@ -93,7 +93,7 @@ pub async fn show(
             let mut filtered_settings: Map<String, serde_json::Value> = Map::new();
 
             let mut add_settings =
-                |list: Vec<&'static (dyn DynamicSetting + 'static)>| -> Result<(), Error> {
+                |list: Vec<&'static (dyn DynamicSetting + 'static)>| -> Fallible<()> {
                     for setting in list {
                         if let Some(value) = settings.get(setting.name()) {
                             filtered_settings.insert(setting.name().into(), value.clone());
@@ -128,7 +128,7 @@ impl FormattedSettings {
         keys: &mut HashSet<&'static str>,
         section_name: &str,
         settings: impl Iterator<Item = &'static dyn DynamicSetting>,
-    ) -> Result<(), Error> {
+    ) -> Fallible<()> {
         use prettytable::*;
 
         let mut header = false;
@@ -157,11 +157,11 @@ impl FormattedSettings {
 }
 
 impl FormattedObject for FormattedSettings {
-    fn to_json(&self) -> Result<Value, Error> {
+    fn to_json(&self) -> Fallible<Value> {
         Ok(serde_json::to_value(&self.0)?)
     }
 
-    fn print(&self) -> Result<(), Error> {
+    fn print(&self) -> Fallible<()> {
         use prettytable::*;
 
         let mut table = create_table(vec!["description [name]", "value", "type"]);

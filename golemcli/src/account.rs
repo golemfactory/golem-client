@@ -1,9 +1,9 @@
-use failure::Error;
+use failure::Fallible;
 use futures::prelude::*;
 use golem_rpc_api::core::AsGolemCore;
 use zxcvbn::zxcvbn;
 
-pub async fn account_unlock(rpc: impl actix_wamp::RpcEndpoint + 'static) -> Result<(), Error> {
+pub async fn account_unlock(rpc: impl actix_wamp::RpcEndpoint + 'static) -> Fallible<()> {
     let key_exists = rpc.as_golem().key_exists().await?;
 
     if key_exists {

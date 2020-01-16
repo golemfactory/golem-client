@@ -94,7 +94,7 @@ impl NetworkSection {
 fn format_nodes(
     peers: impl IntoIterator<Item = NodeInfo>,
     full: bool,
-) -> Result<ResponseTable, Error> {
+) -> Fallible<ResponseTable> {
     let columns = vec!["ip".into(), "port".into(), "id".into(), "name".into()];
 
     let values = peers
@@ -112,7 +112,7 @@ fn format_nodes(
 fn format_peers(
     peers: impl IntoIterator<Item = PeerInfo>,
     full: bool,
-) -> Result<ResponseTable, Error> {
+) -> Fallible<ResponseTable> {
     let columns = vec!["ip".into(), "port".into(), "id".into(), "name".into()];
 
     let values = peers

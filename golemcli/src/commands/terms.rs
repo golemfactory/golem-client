@@ -19,7 +19,7 @@ impl Section {
         &self,
         ctx: &CliCtx,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Result<CommandResponse, Error> {
+    ) -> Fallible<CommandResponse> {
         match self {
             Section::Show => {
                 let html = endpoint.as_golem_terms().show_terms().await?;

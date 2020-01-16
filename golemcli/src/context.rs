@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use super::CliArgs;
-pub use failure::Error;
+pub use failure::Fallible;
 use futures::prelude::*;
 use serde::Serialize;
 use std::convert::TryFrom;
@@ -43,9 +43,9 @@ impl ResponseTable {
 }
 
 pub trait FormattedObject {
-    fn to_json(&self) -> Result<serde_json::Value, Error>;
+    fn to_json(&self) -> Fallible<serde_json::Value>;
 
-    fn print(&self) -> Result<(), Error>;
+    fn print(&self) -> Fallible<()>;
 }
 
 pub enum CommandResponse {
@@ -60,7 +60,7 @@ pub enum CommandResponse {
 }
 
 impl CommandResponse {
-    pub fn object<T: Serialize>(value: T) -> Result<Self, Error> {
+    pub fn object<T: Serialize>(value: T) -> Fallible<Self> {
         Ok(CommandResponse::Object(serde_json::to_value(value)?))
     }
 }
@@ -85,7 +85,7 @@ pub struct CliCtx {
 }
 
 impl TryFrom<&CliArgs> for CliCtx {
-    type Error = Error;
+    type Error = failure::Error;
 
     fn try_from(value: &CliArgs) -> Result<Self, Self::Error> {
         let data_dir = value.get_data_dir();
@@ -125,7 +125,7 @@ impl CliCtx {
     pub async fn unlock_app(
         &mut self,
         endpoint: impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone + 'static,
-    ) -> Result<impl actix_wamp::RpcEndpoint + Clone, Error> {
+    ) -> Fallible<impl actix_wamp::RpcEndpoint + Clone> {
         let is_unlocked = endpoint.as_golem().is_account_unlocked().await?;
         let mut wait_for_start = false;
 
@@ -184,7 +184,7 @@ impl CliCtx {
 
     pub async fn connect_to_app(
         &mut self,
-    ) -> Result<impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone, Error> {
+    ) -> Fallible<impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone> {
         let (address, port) = &self.rpc_addr;
 
         let endpoint = golem_rpc_api::connect_to_app(

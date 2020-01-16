@@ -301,14 +301,14 @@ impl AclListOutput {
 }
 
 impl FormattedObject for AclListOutput {
-    fn to_json(&self) -> Result<serde_json::Value, Error> {
+    fn to_json(&self) -> Fallible<serde_json::Value> {
         Ok(match &self.ips {
             Some(ips) => serde_json::json!({"nodes": self.nodes, "ips": ips}),
             None => serde_json::json!({"nodes": self.nodes}),
         })
     }
 
-    fn print(&self) -> Result<(), Error> {
+    fn print(&self) -> Fallible<()> {
         use prettytable::*;
 
         if let Some(ref ips) = self.ips {

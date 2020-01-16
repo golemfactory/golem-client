@@ -470,7 +470,7 @@ async fn restart_subtasks(
 }
 
 // TODO: read it though rpc; requires exposing such RPC from Brass
-pub async fn template(task_type: &str) -> failure::Fallible<CommandResponse> {
+pub async fn template(task_type: &str) -> Fallible<CommandResponse> {
     let template = match task_type {
         "blender" => serde_json::to_string_pretty(&golem_rpc_api::apps::blender::template())?,
         "wasm" => serde_json::to_string_pretty(&golem_rpc_api::apps::wasm::template())?,

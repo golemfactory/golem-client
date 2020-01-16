@@ -1,4 +1,5 @@
 use crate::context::{CliCtx, CommandResponse};
+use failure::Fallible;
 use futures::{future, prelude::*};
 use golem_rpc_api::rpc::*;
 use std::fmt::{self, Debug};
@@ -164,7 +165,7 @@ impl CommandSection {
     pub async fn run_command(
         &self,
         ctx: &mut CliCtx,
-    ) -> Result<CommandResponse, crate::context::Error> {
+    ) -> Fallible<CommandResponse> {
         dispatch_subcommand! {
             on (self, ctx);
             async {
@@ -223,7 +224,7 @@ impl Debug for InternalSection {
 }
 
 impl InternalSection {
-    fn run_command(&self) -> Result<CommandResponse, crate::context::Error> {
+    fn run_command(&self) -> Fallible<CommandResponse> {
         match self {
             InternalSection::Complete { shell } => super::CliArgs::clap().gen_completions_to(
                 "golemcli",
@@ -243,7 +244,7 @@ impl ShutdownCommand {
     async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Result<CommandResponse, crate::context::Error> {
+    ) -> Fallible<CommandResponse> {
         let ret: serde_json::Value = endpoint
             .as_invoker()
             .rpc_call("golem.graceful_shutdown", &())

@@ -497,11 +497,11 @@ impl Section {
 }
 
 impl FormattedObject for FormattedGeneralStatus {
-    fn to_json(&self) -> Result<Value, Error> {
+    fn to_json(&self) -> Fallible<Value> {
         Ok(serde_json::to_value(&self)?)
     }
 
-    fn print(&self) -> Result<(), Error> {
+    fn print(&self) -> Fallible<()> {
         let mut section_builder = SectionBuilder::new("  ");
 
         section_builder
