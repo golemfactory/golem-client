@@ -123,8 +123,8 @@ fn wait_for_server(
 }
 
 impl CliCtx {
-    pub fn block_on<F: Future>(&mut self, f: F) -> Result<F::Item, F::Error> {
-        self.sys.block_on(f)
+    pub fn block_on<F: Future>(&mut self, fut: F) -> Result<F::Item, F::Error> {
+        self.sys.block_on(fut)
     }
 
     pub fn unlock_app(
@@ -193,7 +193,7 @@ impl CliCtx {
     ) -> Result<impl actix_wamp::RpcEndpoint + actix_wamp::PubSubEndpoint + Clone, Error> {
         let (address, port) = &self.rpc_addr;
 
-        let endpoint = self.sys.block_on(golem_rpc_api::connect_to_app(
+        let endpoint = self.block_on(golem_rpc_api::connect_to_app(
             &self.data_dir,
             self.net.clone(),
             Some((address.as_str(), *port)),

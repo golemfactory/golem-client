@@ -8,38 +8,38 @@ use std::path::PathBuf;
 rpc_interface! {
     trait GolemRes {
 
-        #[id = "res.dirs"]
+        #[rpc_uri = "res.dirs"]
         fn get_res_dirs(&self) -> Result<CachePaths>;
 
-        #[id = "res.dirs.size"]
+        #[rpc_uri = "res.dirs.size"]
         fn get_res_dirs_sizes(&self) -> Result<CacheSizes>;
 
         //
-        #[id = "res.dir"]
+        #[rpc_uri = "res.dir"]
         fn get_res_dir(&self, dir_type : DirType) -> Result<Value>;
 
-        #[id = "res.dir.clear"]
+        #[rpc_uri = "res.dir.clear"]
         fn clear_dir(&self, dir_type : DirType, #[kwarg] older_than_seconds : Option<usize>) -> Result<()>;
 
-        #[id = "env.hw.caps"]
+        #[rpc_uri = "env.hw.caps"]
         fn get_hw_caps(&self) -> Result<HwCaps>;
 
-        #[id = "env.hw.preset"]
+        #[rpc_uri = "env.hw.preset"]
         fn get_hw_preset(&self, name : String) -> Result<HwPreset>;
 
-        #[id = "env.hw.presets"]
+        #[rpc_uri = "env.hw.presets"]
         fn get_hw_presets(&self) -> Result<Vec<HwPreset>>;
 
-        #[id = "env.hw.preset.create"]
+        #[rpc_uri = "env.hw.preset.create"]
         fn create_hw_preset(&self, preset : HwPreset) -> Result<HwPreset>;
 
-        #[id = "env.hw.preset.update"]
+        #[rpc_uri = "env.hw.preset.update"]
         fn update_hw_preset(&self, preset_update : HwPreset) -> Result<HwPreset>;
 
-        #[id = "env.hw.preset.delete"]
+        #[rpc_uri = "env.hw.preset.delete"]
         fn delete_hw_preset(&self, name : String) -> Result<bool>;
 
-        #[id = "env.hw.preset.activate"]
+        #[rpc_uri = "env.hw.preset.activate"]
         fn activate_hw_preset(&self, name : String, run_benchmarks : bool) -> Result<Option<BTreeMap<String, f64>>>;
 
     }

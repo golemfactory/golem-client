@@ -4,71 +4,56 @@ version = "0.3.0"
 description = "Command line interface for Brass Golem Node"
 authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
+license = "GPL-3.0"
 
 [features]
-default=['interactive_cli', 'debug_cli', 'concent_cli', 'test_task_cli']
-concent_cli=[]
-debug_cli=[]
-interactive_cli=["rustyline", "atty", "ansi_term"]
-test_task_cli=[]
+default = ['interactive_cli', 'debug_cli', 'concent_cli', 'test_task_cli']
+concent_cli = []
+debug_cli = []
+interactive_cli = ["rustyline", "atty", "ansi_term"]
+test_task_cli = []
 
 [dependencies]
+actix-wamp = "0.1.0"
+golem-rpc-api = { version = "0.1.0", features = ['settings'] }
+
 actix = "0.8.1"
 actix-http = "0.2"
 ansi_term = "0.11.0"
-appdirs="0.2"
+appdirs = "0.2"
+atty = { version = "0.2.2", optional = true }
 base64 = "0.10.1"
-bigdecimal = {version = "0.1.0", features=["serde"]}
-num-bigint= { version = "0.2", features=["serde"]}
+bigdecimal = { version = "0.1.0", features = ["serde"] }
+chrono = { version = "0.4.6", features = ["serde"] }
 crossbeam-channel = "0.3.8"
 ethkey = "0.2.5"
-failure="0.1"
+failure = "0.1"
 flexi_logger = "0.11.4"
-futures-cpupool="0.1"
-futures="0.1"
+fs2 = "0.4.3"
+futures = "0.1"
+futures-cpupool = "0.1"
 hmac = "0.7.0"
+html2text = "0.1.8"
 humantime = "1.2.0"
-lazy_static="1.1"
-log="0.4"
+lazy_static = "1.1"
+log = "0.4"
+num-bigint = { version = "0.2", features = ["serde"] }
+openssl = "0.10.20"
 prettytable-rs = "0.8"
 promptly = "0.1.5"
-rand="0.5"
+rand = "0.5"
 rmp = "0.8.7"
 rmp-serde = "0.13.7"
 rmpv = "0.4.0"
 rpassword = "3.0.2"
 rustc-hex = "2.0"
-serde={ version ="1.0", features=["derive"]}
-
-serde_json = { version = "1.0.39", features= ["preserve_order"]}
+rustyline = { version = "4.0.0", optional = true, default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0.39", features = ["preserve_order"] }
 serde_yaml = "0.8"
 sha2 = "0.8.0"
-structopt="0.2.15"
-fs2 = "0.4.3"
+structopt = "0.2.15"
 zxcvbn = "1.0.1"
-
-# Needed for terms show
-html2text = "0.1.8"
-chrono = {version = "0.4.6", features=["serde"]}
-
-[dependencies.openssl]
-version="0.10.20"
-
-[dependencies.actix-wamp]
-path="../actix-wamp"
-
-[dependencies.golem-rpc-api]
-path="../golem-rpc-api"
-features=['settings']
-
-[dependencies.rustyline]
-version="4.0.0"
-optional=true
-default-features=false
-
-[dependencies.atty]
-version = "0.2.2"
-optional=true
 
 [target."cfg(not(windows))".dependencies.ansi_term]
 version = "0.11"
