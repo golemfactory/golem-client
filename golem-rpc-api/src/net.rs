@@ -51,7 +51,7 @@ rpc_interface! {
         fn allow_ip(&self, ip : IpAddr, timeout_seconds : i32) -> Result<()>;
 
         #[id="net.peer.allow"]
-        fn allow_node(&self, node_id : String, timeout_seconds : i32) -> Result<()>;
+        fn allow_node(&self, node_id : String, timeout_seconds : i32) -> Result<(bool, Option<String>)>;
 
         #[id="net.peer.acl"]
         fn acl_status(&self) -> Result<AclStatus<String>>;
