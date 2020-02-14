@@ -201,6 +201,7 @@ impl Section {
             .acl_status()
             .from_err()
             .and_then(move |status| {
+                let default_rule = status.default_rule;
                 match status.default_rule {
                     AclRule::Allow => future::Either::B(crate::utils::resolve_from_known_hosts(
                         endpoint.clone(),
@@ -233,6 +234,22 @@ impl Section {
                                     .as_golem_net()
                                     .block_node(identity, timeout)
                                     .from_err()
+                                    .and_then(move |( result, identity )| {
+                                        if !result {
+                                            let adverb = match default_rule {
+                                                AclRule::Deny => "not",
+                                                AclRule::Allow => "already",
+                                            };
+                                            println!();
+                                            eprintln!(
+                                                "Info: {} is {} in the list.", 
+                                                format_key(&identity.unwrap(), false),
+                                                adverb
+                                            );
+                                            println!();
+                                        }
+                                        Ok(())
+                                    })
                             })
                             .collect::<Vec<_>>(),
                     )
@@ -273,6 +290,7 @@ impl Section {
             .acl_status()
             .from_err()
             .and_then(move |status| {
+                let default_rule = status.default_rule;
                 match status.default_rule {
                     AclRule::Deny => future::Either::B(crate::utils::resolve_from_known_hosts(
                         endpoint.clone(),
@@ -301,7 +319,25 @@ impl Section {
                         nodes
                             .into_iter()
                             .map(|identity: String| {
-                                endpoint.as_golem_net().allow_node(identity, -1).from_err()
+                                endpoint.as_golem_net()
+                                    .allow_node(identity, -1)
+                                    .from_err()
+                                    .and_then(move |( result, identity )| {
+                                        if !result {
+                                            let adverb = match default_rule {
+                                                AclRule::Deny => "already",
+                                                AclRule::Allow => "not",
+                                            };
+                                            println!();
+                                            eprintln!(
+                                                "Info: {} is {} in the list.", 
+                                                format_key(&identity.unwrap(), false),
+                                                adverb,
+                                            );
+                                            println!();
+                                        }
+                                        Ok(())
+                                    })
                             })
                             .collect::<Vec<_>>(),
                     )
