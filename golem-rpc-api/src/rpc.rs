@@ -35,7 +35,7 @@ impl<'a, Inner: RpcEndpoint + ?Sized> Invoker<'a, Inner> {
             move |RpcCallResponse { args, .. }| {
                 if args.len() != 1 {
                     Err(Error::protocol_err(
-                        "invalid rpc response, only 1 args expected",
+                        "invalid rpc response, exactly 1 argument expected",
                     ))
                 } else {
                     Ok(serde_json::from_value(args[0].clone()).map_err(move |e| {
@@ -54,14 +54,14 @@ impl<'a, Inner: RpcEndpoint + ?Sized> Invoker<'a, Inner> {
     ) -> impl Future<Item = Ret, Error = Error> + 'static {
         let uri = uri.into().to_owned();
         let request = match RpcCallRequest::with_va_args(uri.clone(), va_args) {
-            Ok(resuest) => resuest,
+            Ok(request) => request,
             Err(e) => return future::Either::B(future::err(e)),
         };
         future::Either::A(self.0.rpc_call(request).and_then(
             move |RpcCallResponse { args, .. }| {
                 if args.len() != 1 {
                     Err(Error::protocol_err(
-                        "invalid rpc response, only 1 args expected",
+                        "invalid rpc response, exactly 1 argument expected",
                     ))
                 } else {
                     Ok(serde_json::from_value(args[0].clone()).map_err(move |e| {
@@ -80,7 +80,7 @@ macro_rules! rpc_interface {
         trait $interface_name:ident {
             $(
                 $(#[doc = $doc:expr])*
-                #[id = $rpc_uri:expr]
+                #[rpc_uri = $rpc_uri:expr]
                 fn $it:tt $args:tt -> Result<$ret:ty>;
             )*
         }
@@ -98,7 +98,10 @@ macro_rules! rpc_interface {
 
                 impl_async_rpc_item! {
                     $(#[doc = $doc])*
-                    #[id = $rpc_uri]
+                    #[doc = "Calls `"]
+                    #[doc = $rpc_uri]
+                    #[doc = "` RPC URI."]
+                    #[rpc_uri = $rpc_uri]
                     fn $it $args -> Result<$ret, Error>;
                 }
 
@@ -125,13 +128,11 @@ macro_rules! rpc_interface {
 macro_rules! impl_async_rpc_item {
     {
                 $(#[doc = $doc:expr])*
-                #[id = $rpc_uri:expr]
+                #[rpc_uri = $rpc_uri:expr]
                 fn $name:ident(&self) -> Result<$ret:ty, Error>;
 
     } => {
                 $(#[doc = $doc])*
-                #[doc = "RPC uri="]
-                #[doc = $rpc_uri]
                 pub fn $name<'b>(&'b self) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> + 'static {
                     self.0.rpc_call($rpc_uri, &())
                 }
@@ -139,13 +140,11 @@ macro_rules! impl_async_rpc_item {
 
     {
                 $(#[doc = $doc:expr])*
-                #[id = $rpc_uri:expr]
+                #[rpc_uri = $rpc_uri:expr]
                 fn $name:ident(&self $(, $arg_id:ident : $t:ty)* $(, #[kwarg] $kw_arg_id:ident : $kw_t:ty)*) -> Result<$ret:ty, Error>;
 
     }=> {
                 $(#[doc = $doc])*
-                #[doc = "RPC uri="]
-                #[doc = $rpc_uri]
                 #[allow(unused)]
                 pub fn $name(&self $(, $arg_id : $t)* $(, $kw_arg_id : $kw_t)*) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> {
                     self.0.rpc_call($rpc_uri, &($($arg_id,)*))
@@ -155,13 +154,12 @@ macro_rules! impl_async_rpc_item {
 
     {
                 $(#[doc = $doc:expr])*
-                #[id = $rpc_uri:expr]
+                #[rpc_uri = $rpc_uri:expr]
                 fn $name:ident(&self $(, #[kwarg] $kw_arg_id:ident : $kw_t:ty)+) -> Result<$ret:ty, Error>;
 
     } => {
                 $(#[doc = $doc])*
-                #[doc = "RPC uri="]
-                #[doc = $rpc_uri]
+                #[allow(unused)]
                 pub fn $name<'b>(&'b self $(, $kw_arg_id : $kw_t)+) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> + 'static {
                     self.0.rpc_call($rpc_uri, &())
                 }
@@ -171,29 +169,20 @@ macro_rules! impl_async_rpc_item {
 #[cfg(test)]
 #[allow(dead_code)]
 mod test {
-
     use super::*;
 
     rpc_interface! {
-    trait Test {
+        trait Test {
 
-        /// Test function example
-        #[id = "test"]
-        fn test(&self, a : u8) -> Result<()>;
+            /// Test function example
+            #[rpc_uri = "test"]
+            fn test(&self, a : u8) -> Result<()>;
 
-        #[id = "rpc.test.x2"]
-        fn test2(&self) -> Result<Vec<String>>;
-    }
-    }
-
-    pub trait AsTest: RpcEndpoint {
-        fn as_test<'a>(&'a self) -> Test<'a, Self>;
-    }
-
-    impl<Endpoint: RpcEndpoint> AsTest for Endpoint {
-        fn as_test<'a>(&'a self) -> Test<'a, Endpoint> {
-            Test(self.as_invoker())
+            #[rpc_uri = "rpc.test.x2"]
+            fn test2(&self) -> Result<Vec<String>>;
         }
+
+        converter AsTest as_test;
     }
 
     struct RpcMock;
@@ -203,7 +192,10 @@ mod test {
 
         fn rpc_call(&self, request: RpcCallRequest) -> Self::Response {
             eprintln!("request={:?}", request);
-            future::ok(RpcCallResponse::default())
+            future::ok(RpcCallResponse {
+                args: vec![serde_json::json!(["foo"])],
+                kw_args: None,
+            })
         }
     }
 
@@ -213,5 +205,6 @@ mod test {
         let t = rpc.as_test();
 
         let _ = t.test(10);
+        eprintln!("{:?}", t.test2().poll());
     }
 }

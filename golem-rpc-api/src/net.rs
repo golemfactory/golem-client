@@ -7,27 +7,27 @@ use std::net::IpAddr;
 rpc_interface! {
 
     trait GolemNet {
-        #[id = "net.ident"]
+        #[rpc_uri = "net.ident"]
         fn get_node(&self) -> Result<NodeInfo>;
 
-        #[id = "net.ident.key"]
+        #[rpc_uri = "net.ident.key"]
         fn get_node_key(&self) -> Result<String>;
 
-        #[id = "net.ident.name"]
+        #[rpc_uri = "net.ident.name"]
         fn get_node_name(&self) -> Result<String>;
 
-        #[id = "net.p2p.port"]
+        #[rpc_uri = "net.p2p.port"]
         fn get_p2p_port(&self) -> Result<u16>;
 
-        #[id = "net.tasks.port"]
+        #[rpc_uri = "net.tasks.port"]
         fn get_task_server_port(&self) -> Result<u16>;
 
-        #[id = "net.status"]
+        #[rpc_uri = "net.status"]
         fn connection_status(&self) -> Result<NetStatus>;
 
         /// Connect to specific node
         ///
-        #[id = "net.peer.connect"]
+        #[rpc_uri = "net.peer.connect"]
         fn connect(&self, peer: (String, u16)) -> Result<()>;
 
         ///
@@ -40,32 +40,32 @@ rpc_interface! {
         /// * `(true, None)` - if node is successively blocked.
         /// * `(false, reason)` - on error
         ///
-        #[id = "net.peer.block"]
+        #[rpc_uri = "net.peer.block"]
         fn block_node(&self, node_id: String, timeout_seconds : i32) -> Result<(bool, Option<String>)>;
 
-        #[id = "net.peer.block_ip"]
+        #[rpc_uri = "net.peer.block_ip"]
         fn block_ip(&self, ip_addr: IpAddr, timeout_seconds : i32) -> Result<()>;
 
 
-        #[id="net.peer.allow_ip"]
+        #[rpc_uri="net.peer.allow_ip"]
         fn allow_ip(&self, ip : IpAddr, timeout_seconds : i32) -> Result<()>;
 
-        #[id="net.peer.allow"]
+        #[rpc_uri="net.peer.allow"]
         fn allow_node(&self, node_id : String, timeout_seconds : i32) -> Result<(bool, Option<String>)>;
 
-        #[id="net.peer.acl"]
+        #[rpc_uri="net.peer.acl"]
         fn acl_status(&self) -> Result<AclStatus<String>>;
 
-        #[id="net.peer.acl_ip"]
+        #[rpc_uri="net.peer.acl_ip"]
         fn acl_ip_status(&self) -> Result<AclStatus<IpAddr>>;
 
-        #[id="net.peer.acl.new"]
+        #[rpc_uri="net.peer.acl.new"]
         fn acl_setup(&self, default_rule : AclRule, exceptions : Vec<String>) -> Result<()>;
 
-        #[id = "net.peers.known"]
+        #[rpc_uri = "net.peers.known"]
         fn get_known_peers(&self) -> Result<Vec<NodeInfo>>;
 
-        #[id = "net.peers.connected"]
+        #[rpc_uri = "net.peers.connected"]
         fn get_connected_peers(&self) -> Result<Vec<PeerInfo>>;
 
     }

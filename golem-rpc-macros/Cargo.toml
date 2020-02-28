@@ -1,14 +1,20 @@
 [package]
 name = "golem-rpc-macros"
 version = "0.1.0"
+description = "Procedural macros for binding Brass Golem RPC endpoints"
+keywords = ["Golem", "RPC"]
 authors = ["Przemysław K. Rekucki <przemyslaw.rekucki@golem.network>"]
+homepage = "https://github.com/golemfactory/golem-client/tree/master/golem-rpc-macros"
+repository = "https://github.com/golemfactory/golem-client.git"
+documentation = "https://docs.rs/golem-rpc-macros"
+license = "GPL-3.0"
 edition = "2018"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-syn = { version = "0.15"}
+syn = { version = "0.15", features = ["full", "extra-traits"]}
 quote = "0.6"
 heck = "0.3.1"
 failure="0.1"

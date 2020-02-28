@@ -4,13 +4,13 @@ use crate::rpc::*;
 
 rpc_interface! {
     trait GolemTerms {
-        #[id = "golem.terms"]
+        #[rpc_uri = "golem.terms"]
         fn are_terms_accepted(&self) -> Result<bool>;
 
-        #[id = "golem.terms.accept"]
+        #[rpc_uri = "golem.terms.accept"]
         fn accept_terms(&self, enable_monitor: Option<bool>, enable_talkback: Option<bool>) -> Result<()>;
 
-        #[id= "golem.terms.show"]
+        #[rpc_uri= "golem.terms.show"]
         fn show_terms(&self) -> Result<String>;
     }
 }

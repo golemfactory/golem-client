@@ -185,7 +185,7 @@ fn bool_from_value(value: &Value) -> Result<bool, Error> {
 
 fn usize_from_value(value: &Value) -> Result<usize, Error> {
     (match value {
-        Value::Bool(b) => Err(()),
+        Value::Bool(_b) => Err(()),
         Value::Number(n) => n
             .as_u64()
             .ok_or(())
