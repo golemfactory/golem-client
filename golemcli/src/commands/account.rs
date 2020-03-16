@@ -176,7 +176,7 @@ fn account_info(
                     let gnt_locked = Currency::GNT.format_decimal(&balance.gnt_lock);
 
                     CommandResponse::object(AccountInfo {
-                        node_name: node.node_name,
+                        node_name: node.node_name.unwrap_or_default(),
                         golem_id: node.key,
                         requestor_reputation: (requesting_trust.unwrap_or_default()*100.0) as u64,
                         provider_reputation: (computing_trust.unwrap_or_default()*100.0) as u64,
