@@ -306,6 +306,7 @@ pub enum SubtaskStatus {
     Failure,
     Restart,
     Cancelled,
+    Timeout,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
