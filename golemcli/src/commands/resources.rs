@@ -149,7 +149,7 @@ async fn update_presets(
     endpoint.as_golem_res().update_hw_preset(update).await?;
 
     let changed = presets.active.cpu_cores != updates.cpu_cores
-        || presets.active.disk != updates.disk
+        || (presets.active.disk - updates.disk).abs() > 0.001
         || presets.active.memory != updates.memory;
 
     if changed
