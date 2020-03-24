@@ -35,8 +35,10 @@ jobs:
       if: matrix.os == 'windows'
       with:
         path: c:/vcpkg/installed
-        key: vcpkg-v0-${{ runner.os }}
-        
+        key: vcpkg-${{ runner.os }}-v0
+        restore-keys: 
+          - vcpkg-${{ runner.os }}
+
     - name: Install openssl
       if: matrix.os == 'windows'
       run: |
