@@ -168,10 +168,7 @@ macro_rules! dispatch_subcommand {
 }
 
 impl CommandSection {
-    pub async fn run_command(
-        &self,
-        ctx: &mut CliCtx,
-    ) -> Fallible<CommandResponse> {
+    pub async fn run_command(&self, ctx: &mut CliCtx) -> Fallible<CommandResponse> {
         dispatch_subcommand! {
             on (self, ctx);
             async {

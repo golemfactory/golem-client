@@ -73,13 +73,12 @@ impl<'a, Endpoint: wamp::RpcEndpoint + 'static> GolemCore<'a, Endpoint> {
     }
 
     pub fn get_setting<S: Setting>(&self) -> impl Future<Output = Result<S::Item, wamp::Error>> {
-        self.raw_get_setting(S::NAME.to_string()).and_then(|value| {
-            async move {
+        self.raw_get_setting(S::NAME.to_string())
+            .and_then(|value| async move {
                 Ok(S::from_value(&value).map_err(|e| {
                     wamp::Error::ProtocolError(std::borrow::Cow::Owned(format!("{}", e)))
                 })?)
-            }
-        })
+            })
     }
 }
 

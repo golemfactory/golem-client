@@ -367,7 +367,7 @@ impl Section {
             },
             disk_usage: disk_usage,
             golem_version: version,
-            node_name: node_info.node_name,
+            node_name: node_info.node_name.unwrap_or_default(),
         })
     }
 

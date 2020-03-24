@@ -3,8 +3,8 @@
 use crate::context::CliCtx;
 use actix::prelude::*;
 use actix_wamp::{Error, RpcCallRequest, RpcEndpoint};
-use fs2::FileExt;
 use failure::Fallible;
+use fs2::FileExt;
 use golem_rpc_api::Net;
 use std::convert::TryInto;
 use std::fmt::Debug;
