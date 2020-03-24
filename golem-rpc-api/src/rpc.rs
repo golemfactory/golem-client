@@ -1,5 +1,5 @@
 use actix_wamp::{Error, RpcCallRequest, RpcCallResponse, RpcEndpoint, ToArgs};
-pub use futures::future::{self, Future};
+pub use futures::prelude::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::borrow::Cow;
@@ -26,13 +26,13 @@ impl<'a, Inner: RpcEndpoint + ?Sized> Invoker<'a, Inner> {
         &self,
         uri: &'static str,
         args: &Args,
-    ) -> impl Future<Item = Ret, Error = Error> + 'static {
+    ) -> impl Future<Output = Result<Ret, Error>> + 'static {
         let request = match RpcCallRequest::with_args(uri, args) {
             Ok(resuest) => resuest,
-            Err(e) => return future::Either::B(future::err(e)),
+            Err(e) => return future::Either::Right(future::err(e)),
         };
-        future::Either::A(self.0.rpc_call(request).and_then(
-            move |RpcCallResponse { args, .. }| {
+        future::Either::Left(self.0.rpc_call(request).and_then(
+            move |RpcCallResponse { args, .. }| async move {
                 if args.len() != 1 {
                     Err(Error::protocol_err(
                         "invalid rpc response, exactly 1 argument expected",
@@ -51,14 +51,14 @@ impl<'a, Inner: RpcEndpoint + ?Sized> Invoker<'a, Inner> {
         &self,
         uri: impl Into<Cow<'static, str>>,
         va_args: &Vec<T>,
-    ) -> impl Future<Item = Ret, Error = Error> + 'static {
+    ) -> impl Future<Output = Result<Ret, Error>> + 'static {
         let uri = uri.into().to_owned();
         let request = match RpcCallRequest::with_va_args(uri.clone(), va_args) {
             Ok(request) => request,
-            Err(e) => return future::Either::B(future::err(e)),
+            Err(e) => return future::Either::Right(future::err(e)),
         };
-        future::Either::A(self.0.rpc_call(request).and_then(
-            move |RpcCallResponse { args, .. }| {
+        future::Either::Left(self.0.rpc_call(request).and_then(
+            move |RpcCallResponse { args, .. }| async move {
                 if args.len() != 1 {
                     Err(Error::protocol_err(
                         "invalid rpc response, exactly 1 argument expected",
@@ -80,6 +80,7 @@ macro_rules! rpc_interface {
         trait $interface_name:ident {
             $(
                 $(#[doc = $doc:expr])*
+                $(#[deprecated(since= $since:expr, note=$note:expr)])*
                 #[rpc_uri = $rpc_uri:expr]
                 fn $it:tt $args:tt -> Result<$ret:ty>;
             )*
@@ -101,6 +102,7 @@ macro_rules! rpc_interface {
                     #[doc = "Calls `"]
                     #[doc = $rpc_uri]
                     #[doc = "` RPC URI."]
+                    $(#[deprecated(since= $since, note=$note)])*
                     #[rpc_uri = $rpc_uri]
                     fn $it $args -> Result<$ret, Error>;
                 }
@@ -128,25 +130,29 @@ macro_rules! rpc_interface {
 macro_rules! impl_async_rpc_item {
     {
                 $(#[doc = $doc:expr])*
+                $(#[deprecated(since= $since:expr, note=$note:expr)])*
                 #[rpc_uri = $rpc_uri:expr]
                 fn $name:ident(&self) -> Result<$ret:ty, Error>;
 
     } => {
                 $(#[doc = $doc])*
-                pub fn $name<'b>(&'b self) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> + 'static {
+                $(#[deprecated(since= $since, note=$note)])*
+                pub fn $name<'b>(&'b self) -> impl $crate::rpc::wamp::Future<Output=Result<$ret, $crate::rpc::wamp::Error>> + 'static {
                     self.0.rpc_call($rpc_uri, &())
                 }
     };
 
     {
                 $(#[doc = $doc:expr])*
+                $(#[deprecated(since= $since:expr, note=$note:expr)])*
                 #[rpc_uri = $rpc_uri:expr]
                 fn $name:ident(&self $(, $arg_id:ident : $t:ty)* $(, #[kwarg] $kw_arg_id:ident : $kw_t:ty)*) -> Result<$ret:ty, Error>;
 
     }=> {
                 $(#[doc = $doc])*
+                $(#[deprecated(since= $since, note=$note)])*
                 #[allow(unused)]
-                pub fn $name(&self $(, $arg_id : $t)* $(, $kw_arg_id : $kw_t)*) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> {
+                pub fn $name(&self $(, $arg_id : $t)* $(, $kw_arg_id : $kw_t)*) -> impl $crate::rpc::wamp::Future<Output=Result<$ret, $crate::rpc::wamp::Error>> {
                     self.0.rpc_call($rpc_uri, &($($arg_id,)*))
                 }
     };
@@ -154,11 +160,13 @@ macro_rules! impl_async_rpc_item {
 
     {
                 $(#[doc = $doc:expr])*
+                $(#[deprecated(since= $since:expr, note=$note:expr)])*
                 #[rpc_uri = $rpc_uri:expr]
                 fn $name:ident(&self $(, #[kwarg] $kw_arg_id:ident : $kw_t:ty)+) -> Result<$ret:ty, Error>;
 
     } => {
                 $(#[doc = $doc])*
+                $(#[deprecated(since= $since, note=$note)])*
                 #[allow(unused)]
                 pub fn $name<'b>(&'b self $(, $kw_arg_id : $kw_t)+) -> impl $crate::rpc::wamp::Future<Item=$ret, Error=$crate::rpc::wamp::Error> + 'static {
                     self.0.rpc_call($rpc_uri, &())
@@ -188,7 +196,7 @@ mod test {
     struct RpcMock;
 
     impl RpcEndpoint for RpcMock {
-        type Response = future::FutureResult<RpcCallResponse, Error>;
+        type Response = future::Ready<Result<RpcCallResponse, Error>>;
 
         fn rpc_call(&self, request: RpcCallRequest) -> Self::Response {
             eprintln!("request={:?}", request);
@@ -197,14 +205,5 @@ mod test {
                 kw_args: None,
             })
         }
-    }
-
-    #[test]
-    fn test_compile() {
-        let rpc = RpcMock;
-        let t = rpc.as_test();
-
-        let _ = t.test(10);
-        eprintln!("{:?}", t.test2().poll());
     }
 }

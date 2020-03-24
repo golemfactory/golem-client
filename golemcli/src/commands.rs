@@ -1,4 +1,5 @@
 use crate::context::{CliCtx, CommandResponse};
+use failure::Fallible;
 use futures::{future, prelude::*};
 use golem_rpc_api::rpc::*;
 use std::fmt::{self, Debug};
@@ -142,9 +143,9 @@ macro_rules! dispatch_subcommand {
                 $(
                       $(#[$async_meta])*
                       $async_command(command) => {
-                         let endpoint = $ctx.connect_to_app()?;
-                         let endpoint = $ctx.unlock_app(endpoint)?;
-                         $ctx.block_on(command.run(endpoint))
+                         let endpoint = $ctx.connect_to_app().await?;
+                         let endpoint = $ctx.unlock_app(endpoint).await?;
+                         command.run(endpoint).await
                       }
                 )*
             )?,
@@ -157,9 +158,8 @@ macro_rules! dispatch_subcommand {
                 $(
                     $(#[$async_with_context_meta])*
                     $async_with_context_command(command) => {
-                         let endpoint = $ctx.connect_to_app()?;
-                         let eval = command.run($ctx, endpoint);
-                         $ctx.block_on(eval)
+                         let endpoint = $ctx.connect_to_app().await?;
+                         command.run($ctx, endpoint).await
                     }
                 )*
             )?
@@ -168,7 +168,7 @@ macro_rules! dispatch_subcommand {
 }
 
 impl CommandSection {
-    pub fn run_command(&self, ctx: &mut CliCtx) -> Result<CommandResponse, crate::context::Error> {
+    pub async fn run_command(&self, ctx: &mut CliCtx) -> Fallible<CommandResponse> {
         dispatch_subcommand! {
             on (self, ctx);
             async {
@@ -228,7 +228,7 @@ impl Debug for InternalSection {
 }
 
 impl InternalSection {
-    fn run_command(&self) -> Result<CommandResponse, crate::context::Error> {
+    fn run_command(&self) -> Fallible<CommandResponse> {
         match self {
             InternalSection::Complete { shell } => super::CliArgs::clap().gen_completions_to(
                 "golemcli",
@@ -245,17 +245,16 @@ impl InternalSection {
 pub struct ShutdownCommand {}
 
 impl ShutdownCommand {
-    fn run(
+    async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = crate::context::Error> + 'static {
-        endpoint
+    ) -> Fallible<CommandResponse> {
+        let ret: serde_json::Value = endpoint
             .as_invoker()
             .rpc_call("golem.graceful_shutdown", &())
-            .and_then(|ret: u64| {
-                let result = format!("Graceful shutdown triggered result: {}", ret);
-                Ok(CommandResponse::Object(result.into()))
-            })
-            .from_err()
+            .await?;
+
+        let result = format!("Graceful shutdown triggered result: {}", ret);
+        Ok(CommandResponse::Object(result.into()))
     }
 }

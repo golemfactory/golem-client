@@ -1,0 +1,68 @@
+name: Continuous integration
+
+on: 
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      matrix:
+        os:
+          - ubuntu
+          - windows
+    env:
+      X86_64_PC_WINDOWS_MSVC_OPENSSL_DIR: c:/vcpkg/installed/x64-windows-static
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - name: Cargo fmt
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: --all -- --check
+    - name: Cache vcpkg's artifacts
+      uses: actions/cache@v1
+      if: matrix.os == 'windows'
+      with:
+        path: c:/vcpkg/installed
+        key: vcpkg-v0-${{ runner.os }}
+        
+    - name: Install openssl
+      if: matrix.os == 'windows'
+      run: |
+        vcpkg install openssl:x64-windows openssl:x64-windows-static
+        vcpkg list             
+        vcpkg integrate install
+    - name: Cache
+      uses: actions/cache@v1
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-target
+    - name: Cargo build 
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+    - name: Cargo test
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+    - run: rustup component add clippy
+      if: matrix.os == 'linux'
+    - uses: actions-rs/clippy-check@v1
+      if: matrix.os == 'linux'
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        args: --all-features
+
+
+# vim: sts=2 sw=2

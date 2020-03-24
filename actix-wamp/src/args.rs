@@ -92,7 +92,7 @@ impl Message for RpcCallRequest {
 }
 
 pub trait RpcEndpoint {
-    type Response: Future<Item = RpcCallResponse, Error = Error> + 'static;
+    type Response: Future<Output = Result<RpcCallResponse, Error>> + 'static;
 
     fn rpc_call(&self, request: RpcCallRequest) -> Self::Response;
 }

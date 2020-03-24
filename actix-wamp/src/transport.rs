@@ -12,12 +12,14 @@ pub fn wss(
     host: &str,
     port: u16,
 ) -> impl Future<
-    Item = (
-        impl Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
-            + Stream<Item = ws::Frame, Error = ws::ProtocolError>,
-        Option<Vec<u8>>,
-    ),
-    Error = WsClientError,
+    Output = Result<
+        (
+            impl Sink<ws::Message, Error = ws::ProtocolError>
+                + Stream<Item = Result<ws::Frame, ws::ProtocolError>>,
+            Option<Vec<u8>>,
+        ),
+        WsClientError,
+    >,
 > + 'static {
     let mut builder = ssl::SslConnector::builder(ssl::SslMethod::tls()).unwrap();
     //builder.set_verify();
@@ -51,6 +53,6 @@ pub fn wss(
         .and_then(move |(resp, framed): (ClientResponse, _)| {
             log::debug!("wss response={:?}", resp);
 
-            Ok((framed, cert_hash.lock().unwrap().take()))
+            future::ok((framed, cert_hash.lock().unwrap().take()))
         })
 }
