@@ -22,6 +22,7 @@ mod tasks;
 mod terms;
 #[cfg(feature = "test_task_cli")]
 mod test_task;
+mod wallet;
 
 mod acl;
 
@@ -105,6 +106,11 @@ pub enum CommandSection {
     #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
     Terms(terms::Section),
 
+    /// Wallet operations
+    #[structopt(name = "wallet")]
+    #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+    Wallet(wallet::Section),
+
     /// Quit after finishing ongoing tasks
     #[structopt(name = "shutdown")]
     Shutdown(ShutdownCommand),
@@ -175,6 +181,7 @@ impl CommandSection {
                 CommandSection::Envs,
                 CommandSection::Incomes,
                 CommandSection::Payments,
+                CommandSection::Wallet,
                 CommandSection::Cache,
                 CommandSection::Settings,
                 CommandSection::Tasks,

@@ -17,4 +17,4 @@ Cargo.lock
 /target
 *.iml
 .idea/
-
+*.swp
