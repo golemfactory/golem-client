@@ -1,7 +1,4 @@
-# golem-client [![build-status-travis]][travis] 
-
-[build-status-travis]: https://travis-ci.org/golemfactory/golem-client.svg?branch=master
-[travis]: https://travis-ci.org/golemfactory/golem-client
+# golem-client ![Continuous integration](https://github.com/golemfactory/golem-client/workflows/Continuous%20integration/badge.svg)
 
 Client for [Brass Golem](https://github.com/golemfactory/golem) Network.
 

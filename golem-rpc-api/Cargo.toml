@@ -1,6 +1,6 @@
 [package]
 name = "golem-rpc-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "Typesafe binding for Brass Golem RPC services"
 keywords = ["Golem", "Brass", "RPC", "API"]
 authors = ["Przemysław K. Rekucki <przemyslaw.rekucki@golem.network>"]
@@ -18,20 +18,20 @@ default = ["settings"]
 settings = ["golem-rpc-macros"]
 
 [dependencies]
-actix-wamp = "0.1.0"
-golem-rpc-macros = { version = "0.1.0", optional = true }
+actix-wamp = "0.2.0"
+golem-rpc-macros = { version = "0.2.0", optional = true }
 
 bigdecimal = { version = "0.1.0", features = ["serde"] }
 chrono = { version = "0.4.6", features = ["serde"] }
 failure = "0.1"
-futures = "0.1"
+futures = "0.3"
 log = "0.4"
 num-traits = "0.2"
 openssl = "0.10.20"
 serde = { version = "~1.0.80", features = ["derive"] }
 serde_json = "1.0"
 serde_repr = "0.1"
-tokio-timer = "0.2.11"
+tokio = { version = "0.2", features = ["time"] }
 
 [dev-dependencies]
 rand = "0.5"

@@ -16,7 +16,7 @@ pub use pubsub::PubSubEndpoint;
 pub use transport::{wss, ClientError};
 
 pub use args::{RpcCallRequest, RpcCallResponse, RpcEndpoint, ToArgs};
-use futures::Future;
+use futures::prelude::*;
 
 pub struct SessionBuilder {
     msg: connection::OpenSession,
@@ -44,32 +44,29 @@ impl SessionBuilder {
     pub fn create<Transport>(
         self,
         transport: Transport,
-    ) -> impl Future<Item = impl RpcEndpoint + PubSubEndpoint + Clone, Error = Error>
+    ) -> impl Future<Output = Result<impl RpcEndpoint + PubSubEndpoint + Clone, Error>>
     where
-        Transport: futures::Sink<
-                SinkItem = actix_http::ws::Message,
-                SinkError = actix_http::ws::ProtocolError,
-            > + futures::Stream<Item = actix_http::ws::Frame, Error = actix_http::ws::ProtocolError>
+        Transport: Sink<actix_http::ws::Message, Error = actix_http::ws::ProtocolError>
+            + Stream<Item = Result<actix_http::ws::Frame, actix_http::ws::ProtocolError>>
+            + Unpin
             + 'static,
     {
-        use futures::prelude::*;
-
         let connection = connection::connect(transport);
 
         connection
             .send(self.msg)
             .then(|r| match r {
-                Err(e) => Err(Error::MailboxError(e)),
-                Ok(v) => v,
+                Err(e) => future::err(Error::MailboxError(e)),
+                Ok(v) => future::ready(v),
             })
-            .and_then(|_| Ok(connection))
+            .and_then(|_| future::ok(connection))
     }
 
     pub fn create_wss(
         self,
         host: &str,
         port: u16,
-    ) -> impl Future<Item = impl RpcEndpoint + PubSubEndpoint + Clone, Error = Error> {
+    ) -> impl Future<Output = Result<impl RpcEndpoint + PubSubEndpoint + Clone, Error>> {
         wss(host, port)
             .map_err(|e| Error::WsClientError(format!("{}", e)))
             .and_then(move |(transport, _hash)| self.create(transport))

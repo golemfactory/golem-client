@@ -4,6 +4,7 @@ use actix::prelude::*;
 use ansi_term::Colour::{Green, Red};
 use ansi_term::{Colour, Style};
 use bigdecimal::{BigDecimal, Zero};
+use failure::Fallible;
 use fs2::FileExt;
 use futures::future::{ok, Future, Join};
 use futures::prelude::*;
@@ -255,45 +256,38 @@ struct FormattedGeneralStatus {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         ctx: &CliCtx,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        Box::new(self.status(endpoint, ctx))
+    ) -> failure::Fallible<CommandResponse> {
+        self.status(endpoint, ctx).await
     }
 
-    pub fn status(
+    async fn status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         ctx: &CliCtx,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let status = self
-            .get_network_status(endpoint.clone())
-            .join5(
+    ) -> failure::Fallible<CommandResponse> {
+        let (net_status, provider_status, running_status, requestor_tasks_progress, account_status) =
+            future::try_join5(
+                self.get_network_status(endpoint.clone()),
                 self.get_provider_status(endpoint.clone()),
                 self.get_running_status(endpoint.clone(), ctx),
                 self.get_requestor_status(endpoint.clone()),
                 self.get_account_status(endpoint.clone()),
             )
-            .map(
-                |(
-                    net_status,
-                    provider_status,
-                    running_status,
-                    requestor_tasks_progress,
-                    account_status,
-                )| {
-                    CommandResponse::FormattedObject(Box::new(FormattedGeneralStatus {
-                        running_status,
-                        net_status,
-                        account_status,
-                        provider_status,
-                        requestor_tasks_progress,
-                    }))
-                },
-            );
-        status
+            .await?;
+
+        Ok(CommandResponse::FormattedObject(Box::new(
+            FormattedGeneralStatus {
+                running_status,
+                net_status,
+                account_status,
+                provider_status,
+                requestor_tasks_progress,
+            },
+        )))
     }
 
     fn check_is_golem_run(is_mainnet: bool, ctx: &CliCtx) -> bool {
@@ -316,136 +310,132 @@ impl Section {
         }
     }
 
-    fn get_running_status(
+    async fn get_running_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-        _ctx: &CliCtx,
-    ) -> impl Future<Item = RunningStatus, Error = Error> {
-        let is_mainnet = endpoint.as_golem().is_mainnet().from_err();
-        let server_status = endpoint.as_golem().status().from_err();
-        let node_info = endpoint.as_golem_net().get_node().from_err();
-        let version = endpoint.as_golem().get_version().from_err();
-        let disk_usage = endpoint.as_golem_res().get_res_dirs_sizes().from_err();
+        ctx: &CliCtx,
+    ) -> Fallible<RunningStatus> {
+        let (is_mainnet, server_status, node_info, version, disk_usage) = future::try_join5(
+            endpoint.as_golem().is_mainnet(),
+            endpoint.as_golem().status(),
+            endpoint.as_golem_net().get_node(),
+            endpoint.as_golem().get_version(),
+            endpoint.as_golem_res().get_res_dirs_sizes(),
+        )
+        .await?;
 
-        is_mainnet
-            .join5(server_status, node_info, version, disk_usage)
-            .map(
-                move |(is_mainnet, server_status, node_info, version, disk_usage)| {
-                    let is_golem_running = true; //Section::check_is_golem_run(is_mainnet, ctx);
-                    RunningStatus {
-                        process_state: match is_golem_running {
-                            true => ProcessState::Running,
-                            false => ProcessState::Stopped,
-                        },
-                        network: if is_mainnet {
-                            GolemNet::Mainnet
-                        } else {
-                            GolemNet::Testnet
-                        },
-                        component_statuses: ComponentStatuses {
-                            docker_status: server_status.docker.map(|component_report| {
-                                String::from(map_statuses(
-                                    "docker",
-                                    &component_report.0,
-                                    &component_report.1,
-                                ))
-                            }),
-                            client: server_status.client.map(|component_report| {
-                                String::from(map_statuses(
-                                    "client",
-                                    &component_report.0,
-                                    &component_report.1,
-                                ))
-                            }),
-                            hyperdrive: server_status.hyperdrive.map(|component_report| {
-                                String::from(map_statuses(
-                                    "hyperdrive",
-                                    &component_report.0,
-                                    &component_report.1,
-                                ))
-                            }),
-                            hypervisor: server_status.hypervisor.map(|component_report| {
-                                String::from(map_statuses(
-                                    "hypervisor",
-                                    &component_report.0,
-                                    &component_report.1,
-                                ))
-                            }),
-                        },
-                        disk_usage: disk_usage,
-                        golem_version: version,
-                        node_name: node_info.node_name.unwrap_or_default(),
-                    }
-                },
-            )
+        let is_golem_running = Section::check_is_golem_run(is_mainnet, ctx);
+        Ok(RunningStatus {
+            process_state: match is_golem_running {
+                true => ProcessState::Running,
+                false => ProcessState::Stopped,
+            },
+            network: if is_mainnet {
+                GolemNet::Mainnet
+            } else {
+                GolemNet::Testnet
+            },
+            component_statuses: ComponentStatuses {
+                docker_status: server_status.docker.map(|component_report| {
+                    String::from(map_statuses(
+                        "docker",
+                        &component_report.0,
+                        &component_report.1,
+                    ))
+                }),
+                client: server_status.client.map(|component_report| {
+                    String::from(map_statuses(
+                        "client",
+                        &component_report.0,
+                        &component_report.1,
+                    ))
+                }),
+                hyperdrive: server_status.hyperdrive.map(|component_report| {
+                    String::from(map_statuses(
+                        "hyperdrive",
+                        &component_report.0,
+                        &component_report.1,
+                    ))
+                }),
+                hypervisor: server_status.hypervisor.map(|component_report| {
+                    String::from(map_statuses(
+                        "hypervisor",
+                        &component_report.0,
+                        &component_report.1,
+                    ))
+                }),
+            },
+            disk_usage: disk_usage,
+            golem_version: version,
+            node_name: node_info.node_name.unwrap_or_default(),
+        })
     }
 
-    fn get_network_status(
+    async fn get_network_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = NetworkStatus, Error = Error> {
-        let net_status = endpoint.as_golem_net().connection_status().from_err();
-        let online_nodes = endpoint.as_golem_net().get_connected_peers().from_err();
-
-        net_status
-            .join(online_nodes)
-            .map(|(net_status, online_nodes)| NetworkStatus {
-                is_connected: net_status.connected,
-                port_status: net_status.port_statuses,
-                nodes_online: online_nodes.len(),
-            })
+    ) -> Fallible<NetworkStatus> {
+        let (net_status, online_nodes) = future::try_join(
+            endpoint.as_golem_net().connection_status(),
+            endpoint.as_golem_net().get_connected_peers(),
+        )
+        .await?;
+        Ok(NetworkStatus {
+            is_connected: net_status.connected,
+            port_status: net_status.port_statuses,
+            nodes_online: online_nodes.len(),
+        })
     }
 
-    fn get_account_status(
+    async fn get_account_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = AccountStatus, Error = Error> {
-        let payment_address = endpoint.as_golem_pay().get_pay_ident().from_err();
-        let balance = endpoint.as_golem_pay().get_pay_balance().from_err();
-
-        payment_address
-            .join(balance)
-            .map(|(payment_address, balance)| AccountStatus {
-                eth_address: payment_address.clone(),
-                gnt_available: crate::eth::Currency::GNT
-                    .format_decimal(&balance.av_gnt.with_prec(3)),
-                eth_available: crate::eth::Currency::ETH.format_decimal(&balance.eth),
-            })
+    ) -> Fallible<AccountStatus> {
+        let (payment_address, balance) = future::try_join(
+            endpoint.as_golem_pay().get_pay_ident(),
+            endpoint.as_golem_pay().get_pay_balance(),
+        )
+        .await?;
+        Ok(AccountStatus {
+            eth_address: payment_address.clone(),
+            gnt_available: crate::eth::Currency::GNT.format_decimal(&balance.av_gnt.with_prec(3)),
+            eth_available: crate::eth::Currency::ETH.format_decimal(&balance.eth),
+        })
     }
 
-    fn get_provider_status(
+    async fn get_provider_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = ProviderStatus, Error = Error> {
-        let task_stats = endpoint.as_golem_comp().get_tasks_stats().from_err();
-        let awaiting_incomes = endpoint.as_golem_pay().get_incomes_list().from_err();
-
-        task_stats
-            .join(awaiting_incomes)
-            .map(|(task_stats, awaiting_incomes)| ProviderStatus {
-                subtasks_accepted: task_stats.subtasks_accepted.session,
-                subtasks_rejected: task_stats.subtasks_rejected.session,
-                subtasks_failed: task_stats.subtasks_with_errors.session,
-                subtasks_computed: task_stats.subtasks_computed.session,
-                subtasks_in_network: task_stats.in_network,
-                provider_state: task_stats.provider_state.status,
-                pending_payments: crate::eth::Currency::GNT.format_decimal(
-                    &awaiting_incomes
-                        .iter()
-                        .filter(|income| {
-                            mem::discriminant(&income.status)
-                                == mem::discriminant(&PaymentStatus::Awaiting)
-                        })
-                        .map(|x| &x.value)
-                        .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val),
-                ),
-            })
+    ) -> Fallible<ProviderStatus> {
+        let (task_stats, awaiting_incomes) = future::try_join(
+            endpoint.as_golem_comp().get_tasks_stats(),
+            endpoint.as_golem_pay().get_incomes_list(),
+        )
+        .await?;
+        Ok(ProviderStatus {
+            subtasks_accepted: task_stats.subtasks_accepted.session,
+            subtasks_rejected: task_stats.subtasks_rejected.session,
+            subtasks_failed: task_stats.subtasks_with_errors.session,
+            subtasks_computed: task_stats.subtasks_computed.session,
+            subtasks_in_network: task_stats.in_network,
+            provider_state: task_stats.provider_state.status,
+            pending_payments: crate::eth::Currency::GNT.format_decimal(
+                &awaiting_incomes
+                    .iter()
+                    .filter(|income| {
+                        mem::discriminant(&income.status)
+                            == mem::discriminant(&PaymentStatus::Awaiting)
+                    })
+                    .map(|x| &x.value)
+                    .fold(bigdecimal::BigDecimal::zero(), |sum, val| sum + val),
+            ),
+        })
     }
 
-    fn get_requestor_status(
+    async fn get_requestor_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = String, Error = Error> {
+    ) -> failure::Fallible<String> {
         let active_tasks = vec![
             TaskStatus::Restarted,
             TaskStatus::Computing,
@@ -459,68 +449,59 @@ impl Section {
 
         task_status_in_fly.extend(vec![TaskStatus::NotStarted]);
 
-        endpoint
-            .as_golem_comp()
-            .get_tasks()
-            .and_then(move |tasks: Vec<TaskInfo>| {
-                let mut subtasks = Vec::new();
+        let tasks: Vec<TaskInfo> = endpoint.as_golem_comp().get_tasks().await?;
+        let mut subtasks = Vec::new();
 
-                let tasks_in_fly: Vec<TaskInfo> = tasks
-                    .into_iter()
-                    .filter(|task| {
-                        task_status_in_fly.contains(&task.status) && task.subtasks_count.is_some()
-                    })
-                    .collect();
-                let total_subtasks = tasks_in_fly.iter().fold(0, |total_subtasks, task| {
-                    total_subtasks + task.subtasks_count.unwrap()
-                });
-                subtasks.reserve(tasks_in_fly.len() * 2);
-                for task_in_fly in &tasks_in_fly {
-                    let subtask = endpoint
-                        .as_golem_comp()
-                        .get_subtasks(task_in_fly.id.clone());
-                    subtasks.push(subtask);
-                }
-                futures::future::join_all(subtasks).join(futures::future::ok(total_subtasks))
+        let tasks_in_fly: Vec<TaskInfo> = tasks
+            .into_iter()
+            .filter(|task| {
+                task_status_in_fly.contains(&task.status) && task.subtasks_count.is_some()
             })
-            .map(|(all_subtasks, total_subtasks)| {
-                (
-                    total_subtasks,
-                    all_subtasks
-                        .into_iter()
-                        .fold(0, |finished_subtasks, subtasks| {
-                            finished_subtasks
-                                + subtasks.map_or_else(
-                                    || 0,
-                                    |subtasks: Vec<SubtaskInfo>| {
-                                        subtasks
-                                            .iter()
-                                            .filter(|subtask| {
-                                                mem::discriminant(&subtask.status)
-                                                    == mem::discriminant(&SubtaskStatus::Finished)
-                                            })
-                                            .count()
-                                    },
-                                )
-                        }),
-                )
-            })
-            .map(
-                |(total_subtasks, finished_subtasks)| match total_subtasks > 0 {
-                    true => format!("{}/{}", finished_subtasks, total_subtasks),
-                    false => String::from("0/0"),
-                },
-            )
-            .from_err()
+            .collect();
+        let total_subtasks = tasks_in_fly.iter().fold(0, |total_subtasks, task| {
+            total_subtasks + task.subtasks_count.unwrap()
+        });
+        subtasks.reserve(tasks_in_fly.len() * 2);
+        for task_in_fly in &tasks_in_fly {
+            let subtask = endpoint
+                .as_golem_comp()
+                .get_subtasks(task_in_fly.id.clone());
+            subtasks.push(subtask);
+        }
+
+        let all_subtasks = future::try_join_all(subtasks).await?;
+        let finished_subtasks = all_subtasks
+            .into_iter()
+            .fold(0, |finished_subtasks, subtasks| {
+                finished_subtasks
+                    + subtasks.map_or_else(
+                        || 0,
+                        |subtasks: Vec<SubtaskInfo>| {
+                            subtasks
+                                .iter()
+                                .filter(|subtask| {
+                                    mem::discriminant(&subtask.status)
+                                        == mem::discriminant(&SubtaskStatus::Finished)
+                                })
+                                .count()
+                        },
+                    )
+            });
+
+        Ok(if total_subtasks > 0 {
+            format!("{}/{}", finished_subtasks, total_subtasks)
+        } else {
+            "0/0".into()
+        })
     }
 }
 
 impl FormattedObject for FormattedGeneralStatus {
-    fn to_json(&self) -> Result<Value, Error> {
+    fn to_json(&self) -> Fallible<Value> {
         Ok(serde_json::to_value(&self)?)
     }
 
-    fn print(&self) -> Result<(), Error> {
+    fn print(&self) -> Fallible<()> {
         let mut section_builder = SectionBuilder::new("  ");
 
         section_builder

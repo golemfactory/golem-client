@@ -44,63 +44,54 @@ pub enum NetworkSection {
 }
 
 impl NetworkSection {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> failure::Fallible<CommandResponse> {
         match self {
-            NetworkSection::Connect { ip, port } => Box::new(
+            NetworkSection::Connect { ip, port } => {
                 endpoint
                     .as_golem_net()
                     .connect((ip.to_ascii_lowercase(), *port))
-                    .from_err()
-                    .and_then(|_| CommandResponse::object("Command Send")),
-            ),
-            NetworkSection::Dht { sort, full } => Box::new(self.dht(endpoint, sort, *full)),
-            NetworkSection::Show { sort, full } => Box::new(self.show(endpoint, sort, *full)),
-            NetworkSection::Status => Box::new(
-                endpoint
-                    .as_golem_net()
-                    .connection_status()
-                    .from_err()
-                    .and_then(|status| CommandResponse::object(status.msg)),
-            ),
+                    .await?;
+                CommandResponse::object("Command Send")
+            }
+            NetworkSection::Dht { sort, full } => self.dht(endpoint, sort, *full).await,
+            NetworkSection::Show { sort, full } => self.show(endpoint, sort, *full).await,
+            NetworkSection::Status => {
+                CommandResponse::object(endpoint.as_golem_net().connection_status().await?.msg)
+            }
         }
     }
 
-    fn dht(
+    async fn dht(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         sort: &Option<String>,
         full: bool,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let sort = sort.clone();
-        endpoint
-            .as_golem_net()
-            .get_known_peers()
-            .from_err()
-            .and_then(move |peers| Ok(format_nodes(peers, full)?.sort_by(&sort).into()))
+    ) -> failure::Fallible<CommandResponse> {
+        Ok(
+            format_nodes(endpoint.as_golem_net().get_known_peers().await?, full)?
+                .sort_by(sort)
+                .into(),
+        )
     }
 
-    fn show(
+    async fn show(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         sort: &Option<String>,
         full: bool,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let sort = sort.clone();
-        endpoint
-            .as_golem_net()
-            .get_connected_peers()
-            .from_err()
-            .and_then(move |peers| Ok(format_peers(peers, full)?.sort_by(&sort).into()))
+    ) -> failure::Fallible<CommandResponse> {
+        Ok(
+            format_peers(endpoint.as_golem_net().get_connected_peers().await?, full)?
+                .sort_by(sort)
+                .into(),
+        )
     }
 }
 
-fn format_nodes(
-    peers: impl IntoIterator<Item = NodeInfo>,
-    full: bool,
-) -> Result<ResponseTable, Error> {
+fn format_nodes(peers: impl IntoIterator<Item = NodeInfo>, full: bool) -> Fallible<ResponseTable> {
     let columns = vec!["ip".into(), "port".into(), "id".into(), "name".into()];
 
     let values = peers
@@ -110,15 +101,12 @@ fn format_nodes(
 
             serde_json::json!([p.pub_addr, port, format_key(&p.key, full), p.node_name])
         })
-        .collect();
+        .collect::<Vec<_>>();
 
     Ok(ResponseTable { columns, values })
 }
 
-fn format_peers(
-    peers: impl IntoIterator<Item = PeerInfo>,
-    full: bool,
-) -> Result<ResponseTable, Error> {
+fn format_peers(peers: impl IntoIterator<Item = PeerInfo>, full: bool) -> Fallible<ResponseTable> {
     let columns = vec!["ip".into(), "port".into(), "id".into(), "name".into()];
 
     let values = peers

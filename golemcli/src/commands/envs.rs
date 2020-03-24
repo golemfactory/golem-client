@@ -1,4 +1,5 @@
 use crate::context::*;
+use failure::Fallible;
 use futures::future::Either;
 use futures::prelude::*;
 use golem_rpc_api::comp::{AsGolemComp, CompEnvStatus};
@@ -40,124 +41,101 @@ pub enum Section {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> failure::Fallible<CommandResponse> {
         match self {
-            Section::Enable { name } => Box::new(self.enable(endpoint, name)),
-            Section::Disable { name } => Box::new(self.disable(endpoint, name)),
-            Section::Show => Box::new(show(endpoint)),
-            Section::PerfMult => Box::new(perf_mult(endpoint)),
-            Section::PerfMultSet { multiplier } => {
-                Box::new(self.perf_mult_set(endpoint, *multiplier))
-            }
-            Section::Recount { name } => Box::new(self.recount(endpoint, name)),
+            Section::Enable { name } => self.enable(endpoint, name).await,
+            Section::Disable { name } => self.disable(endpoint, name).await,
+            Section::Show => show(endpoint).await,
+            Section::PerfMult => perf_mult(endpoint).await,
+            Section::PerfMultSet { multiplier } => self.perf_mult_set(endpoint, *multiplier).await,
+            Section::Recount { name } => self.recount(endpoint, name).await,
         }
     }
 
-    fn enable(
+    async fn enable(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         name: &str,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
+    ) -> failure::Fallible<CommandResponse> {
+        if let Some(msg) = endpoint
             .as_golem_comp()
             .enable_environment(name.into())
-            .from_err()
-            .and_then(|msg: Option<String>| {
-                if let Some(msg) = msg {
-                    Either::B(CommandResponse::object(msg).into_future())
-                } else {
-                    Either::A(show(endpoint))
-                }
-            })
+            .await?
+        {
+            CommandResponse::object(msg)
+        } else {
+            show(endpoint).await
+        }
     }
 
-    fn disable(
+    async fn disable(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         name: &str,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
+    ) -> failure::Fallible<CommandResponse> {
+        if let Some(msg) = endpoint
             .as_golem_comp()
             .disable_environment(name.into())
-            .from_err()
-            .and_then(|msg: Option<String>| {
-                if let Some(msg) = msg {
-                    Either::B(CommandResponse::object(msg).into_future())
-                } else {
-                    Either::A(show(endpoint))
-                }
-            })
+            .await?
+        {
+            CommandResponse::object(msg)
+        } else {
+            show(endpoint).await
+        }
     }
 
-    fn recount(
+    async fn recount(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         name: &str,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_comp()
-            .run_benchmark(name.into())
-            .from_err()
-            .and_then(|v| CommandResponse::object(v))
+    ) -> failure::Fallible<CommandResponse> {
+        CommandResponse::object(endpoint.as_golem_comp().run_benchmark(name.into()).await?)
     }
 
-    fn perf_mult_set(
+    async fn perf_mult_set(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         multiplier: f64,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_comp()
-            .perf_mult_set(multiplier)
-            .from_err()
-            .and_then(|()| perf_mult(endpoint))
+    ) -> failure::Fallible<CommandResponse> {
+        endpoint.as_golem_comp().perf_mult_set(multiplier).await?;
+        perf_mult(endpoint).await
     }
 }
 
-fn show(
+async fn show(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-    endpoint
-        .as_golem_comp()
-        .get_environments()
-        .from_err()
-        .and_then(|envs: Vec<CompEnvStatus>| {
-            let columns = vec![
-                "name".into(),
-                "supported".into(),
-                "active".into(),
-                "performance".into(),
-                "min accept. perf.".into(),
-                "description".into(),
-            ];
-            let values = envs
-                .into_iter()
-                .map(|e| {
-                    serde_json::json!([
-                        e.id,
-                        e.supported,
-                        e.accepted,
-                        e.performance,
-                        e.min_accepted,
-                        e.description
-                    ])
-                })
-                .collect();
-            Ok(ResponseTable { columns, values }.into())
+) -> Fallible<CommandResponse> {
+    let envs: Vec<CompEnvStatus> = endpoint.as_golem_comp().get_environments().await?;
+    let columns = vec![
+        "name".into(),
+        "supported".into(),
+        "active".into(),
+        "performance".into(),
+        "min accept. perf.".into(),
+        "description".into(),
+    ];
+    let values = envs
+        .into_iter()
+        .map(|e| {
+            serde_json::json!([
+                e.id,
+                e.supported,
+                e.accepted,
+                e.performance,
+                e.min_accepted,
+                e.description
+            ])
         })
+        .collect();
+    Ok(ResponseTable { columns, values }.into())
 }
 
-fn perf_mult(
+async fn perf_mult(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-    endpoint
-        .as_golem_comp()
-        .perf_mult()
-        .from_err()
-        .and_then(|multiplier| {
-            CommandResponse::object(format!("minimal performance multiplier is: {}", multiplier))
-        })
+) -> Fallible<CommandResponse> {
+    let multiplier = endpoint.as_golem_comp().perf_mult().await?;
+    CommandResponse::object(format!("minimal performance multiplier is: {}", multiplier))
 }

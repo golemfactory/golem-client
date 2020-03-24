@@ -58,84 +58,80 @@ arg_enum! {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
-        Box::new(self.show(
+    ) -> failure::Fallible<CommandResponse> {
+        self.show(
             endpoint,
             &self.command.to_payment_status(),
             &self.sort_by,
             &self.full,
-        ))
+        )
+        .await
     }
 
-    pub fn show(
+    pub async fn show(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         filter_by: &Option<crate::eth::PaymentStatus>,
         sort_by: &Option<String>,
         full: &bool,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> failure::Fallible<CommandResponse> {
         let filter_by = filter_by.clone();
         let sort_by = sort_by.clone();
         let full = *full;
 
-        endpoint
-            .as_golem_pay()
-            .get_incomes_list()
-            .from_err()
-            .and_then(move |incomes| {
-                let mut total_value = BigDecimal::from(0u32);
-                let mut total_for_status: BTreeMap<PaymentStatus, BigDecimal> = BTreeMap::new();
+        let incomes = endpoint.as_golem_pay().get_incomes_list().await?;
+        let mut total_value = BigDecimal::from(0u32);
+        let mut total_for_status: BTreeMap<PaymentStatus, BigDecimal> = BTreeMap::new();
 
-                let columns = INCOMES_COLUMNS.iter().map(|&name| name.into()).collect();
-                let values = incomes
-                    .into_iter()
-                    .filter(|income| {
-                        filter_by
-                            .map(|f| f.is_match_with(&income.status))
-                            .unwrap_or(true)
-                    })
-                    .map(|income: Income| {
-                        let payer = match full {
-                            false => crate::eth::public_to_addres(income.payer),
-                            true => income.payer,
-                        };
+        let columns = INCOMES_COLUMNS.iter().map(|&name| name.into()).collect();
+        let values = incomes
+            .into_iter()
+            .filter(|income| {
+                filter_by
+                    .map(|f| f.is_match_with(&income.status))
+                    .unwrap_or(true)
+            })
+            .map(|income: Income| {
+                let payer = match full {
+                    false => crate::eth::public_to_addres(income.payer),
+                    true => income.payer,
+                };
 
-                        total_value += &income.value;
-                        if let Some(total) = total_for_status.get_mut(&income.status) {
-                            *total = total.clone() + income.value.clone();
-                        } else {
-                            total_for_status.insert(income.status.clone(), income.value.clone());
-                        }
-
-                        let status = income.status;
-                        let value = crate::eth::Currency::GNT.format_decimal(&income.value);
-
-                        serde_json::json!([payer, status, value])
-                    })
-                    .collect();
-
-                let mut summary = Vec::new();
-                if total_for_status.len() > 1 {
-                    for (k, v) in total_for_status {
-                        summary.push(serde_json::json!([
-                            "",
-                            k,
-                            crate::eth::Currency::GNT.format_decimal(&v)
-                        ]));
-                    }
+                total_value += &income.value;
+                if let Some(total) = total_for_status.get_mut(&income.status) {
+                    *total = total.clone() + income.value.clone();
+                } else {
+                    total_for_status.insert(income.status.clone(), income.value.clone());
                 }
+
+                let status = income.status;
+                let value = crate::eth::Currency::GNT.format_decimal(&income.value);
+
+                serde_json::json!([payer, status, value])
+            })
+            .collect();
+
+        let mut summary = Vec::new();
+        if total_for_status.len() > 1 {
+            for (k, v) in total_for_status {
                 summary.push(serde_json::json!([
                     "",
-                    "total",
-                    crate::eth::Currency::GNT.format_decimal(&total_value)
+                    k,
+                    crate::eth::Currency::GNT.format_decimal(&v)
                 ]));
+            }
+        }
+        summary.push(serde_json::json!([
+            "",
+            "total",
+            crate::eth::Currency::GNT.format_decimal(&total_value)
+        ]));
 
-                Ok(ResponseTable { columns, values }
-                    .sort_by(&sort_by)
-                    .with_summary(summary))
-            })
+        Ok(ResponseTable { columns, values }
+            .sort_by(&sort_by)
+            .with_summary(summary))
     }
 }

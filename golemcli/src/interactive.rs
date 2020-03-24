@@ -81,7 +81,7 @@ impl<C: Completer> Hinter for CliHelper<C> {}
 
 impl<C: Completer> Helper for CliHelper<C> {}
 
-pub fn interactive_shell(ctx: &mut CliCtx) {
+pub async fn interactive_shell(ctx: &mut CliCtx) {
     let mut editor: Editor<CliHelper<_>> =
         Editor::with_config(Config::builder().auto_add_history(true).build());
 
@@ -99,7 +99,7 @@ pub fn interactive_shell(ctx: &mut CliCtx) {
             Ok(LineArgs {
                 json: _,
                 command: Some(command),
-            }) => match command.run_command(ctx) {
+            }) => match command.run_command(ctx).await {
                 Ok(resp) => ctx.output(resp),
                 Err(e) => eprintln!("err: {:?}", e),
             },
