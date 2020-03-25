@@ -314,6 +314,7 @@ pub enum SubtaskStatus {
     Failure,
     Restart,
     Cancelled,
+    Timeout,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -324,7 +325,7 @@ pub struct SubtaskInfo {
     pub status: SubtaskStatus,
     pub progress: Option<f64>,
     pub time_started: Option<f64>,
-    pub results: Vec<String>,
+    pub results: Option<Vec<String>>,
     pub stderr: Option<String>,
     pub stdout: Option<String>,
 
