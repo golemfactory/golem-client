@@ -11,7 +11,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [badges]
-travis-ci = { repository = "golemfactory/golem-client", branch = "master" }
+github-actions = { repository = "golemfactory/golem-client", branch = "master" }
 
 [features]
 default = ["settings"]
