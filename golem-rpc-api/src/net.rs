@@ -37,11 +37,12 @@ rpc_interface! {
         ///
         /// Returns:
         ///
-        /// * `(true, None)` - if node is successively blocked.
-        /// * `(false, reason)` - on error
+        /// * `(true, [], None)` - if node is successively blocked.
+        /// * `(true, [node_id], None)` if node is already blocked
+        /// * `(false, [], reason)` - on error
         ///
         #[rpc_uri = "net.peer.block"]
-        fn block_node(&self, node_id: String, timeout_seconds : i32) -> Result<(bool, Option<String>)>;
+        fn block_node(&self, node_id: String, timeout_seconds : i32) -> Result<(bool, Option<Vec<String>>, Option<String>)>;
 
         #[rpc_uri = "net.peer.block_ip"]
         fn block_ip(&self, ip_addr: IpAddr, timeout_seconds : i32) -> Result<()>;
@@ -51,7 +52,7 @@ rpc_interface! {
         fn allow_ip(&self, ip : IpAddr, timeout_seconds : i32) -> Result<()>;
 
         #[rpc_uri="net.peer.allow"]
-        fn allow_node(&self, node_id : String, timeout_seconds : i32) -> Result<(bool, Option<String>)>;
+        fn allow_node(&self, node_id : String, timeout_seconds : i32) -> Result<(bool, Option<Vec<String>>, Option<String>)>;
 
         #[rpc_uri="net.peer.acl"]
         fn acl_status(&self) -> Result<AclStatus<String>>;
