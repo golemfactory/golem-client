@@ -222,6 +222,10 @@ impl Section {
                              exist,
                              message,
                          }| {
+                            if !success {
+                                println!();
+                                eprintln!("Error: {:?}", message.clone().unwrap());
+                            }
                             warn_if_exist(default_rule, AclRule::Deny, exist.clone());
                             (success, exist, message)
                         },
@@ -294,6 +298,10 @@ impl Section {
                                      exist,
                                      message,
                                  }| {
+                                    if !success {
+                                        println!();
+                                        eprintln!("Error: {:?}", message.clone().unwrap());
+                                    }
                                     warn_if_exist(default_rule, AclRule::Allow, exist.clone());
                                     (success, exist, message)
                                 },
