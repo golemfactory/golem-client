@@ -50,35 +50,35 @@ impl<'a, Endpoint: wamp::RpcEndpoint + 'static> GolemCore<'a, Endpoint> {
     pub fn update_setting<S: Setting>(
         &self,
         value: impl AsRef<S::Item>,
-    ) -> impl Future<Item = (), Error = super::Error> {
+    ) -> impl Future<Output = Result<(), super::Error>> {
         let value = match S::to_value(value.as_ref()) {
             Ok(value) => value,
-            Err(e) => return future::Either::B(future::err(e)),
+            Err(e) => return future::err(e).right_future(),
         };
 
-        future::Either::A(
-            self.raw_update_setting(S::NAME.to_string(), value)
-                .from_err(),
-        )
+        self.raw_update_setting(S::NAME.to_string(), value)
+            .map_err(From::from)
+            .left_future()
     }
 
     pub fn update_setting_dyn(
         &self,
         setting: &dyn DynamicSetting,
         value: &str,
-    ) -> impl Future<Item = (), Error = wamp::Error> + 'static {
+    ) -> impl Future<Output = Result<(), wamp::Error>> + 'static {
         let key = setting.name().into();
         let value = setting.parse_from_str(value).unwrap();
 
         self.raw_update_setting(key, value)
     }
 
-    pub fn get_setting<S: Setting>(&self) -> impl Future<Item = S::Item, Error = wamp::Error> {
-        self.raw_get_setting(S::NAME.to_string()).and_then(|value| {
-            Ok(S::from_value(&value).map_err(|e| {
-                wamp::Error::ProtocolError(std::borrow::Cow::Owned(format!("{}", e)))
-            })?)
-        })
+    pub fn get_setting<S: Setting>(&self) -> impl Future<Output = Result<S::Item, wamp::Error>> {
+        self.raw_get_setting(S::NAME.to_string())
+            .and_then(|value| async move {
+                Ok(S::from_value(&value).map_err(|e| {
+                    wamp::Error::ProtocolError(std::borrow::Cow::Owned(format!("{}", e)))
+                })?)
+            })
     }
 }
 

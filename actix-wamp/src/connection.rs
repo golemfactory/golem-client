@@ -4,17 +4,22 @@ use crate::args::*;
 use crate::error::Error;
 use crate::messages::{Dict, WampError};
 use crate::pubsub;
-use crate::pubsub::WampMessage;
+use crate::pubsub::{Subscription, WampMessage};
 use crate::{AuthMethod, ErrorKind};
 use actix::io::WriteHandler;
 use actix::prelude::*;
 use actix_http::ws;
-use futures::{prelude::*, stream::SplitSink, sync::mpsc, unsync::oneshot, Flatten, FlattenStream};
+use futures::task::Poll;
+use futures::{
+    channel::mpsc, channel::oneshot, prelude::*, stream::SplitSink, FutureExt, StreamExt,
+    TryFutureExt,
+};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::Cursor;
+use std::pin::Pin;
 
 fn gen_id() -> u64 {
     use rand::Rng;
@@ -36,9 +41,10 @@ impl Message for OpenSession {
 
 pub struct Connection<W>
 where
-    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>,
+    W: Sink<ws::Message, Error = ws::ProtocolError> + Unpin,
 {
-    writer: actix::io::SinkWrite<W>,
+    // TODO: Add wait for ready before write
+    writer: actix::io::SinkWrite<ws::Message, futures::sink::Buffer<W, ws::Message>>,
     state: ConnectionState,
 }
 
@@ -92,11 +98,11 @@ impl OpenSession {
 
 impl<W: 'static> Connection<W>
 where
-    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>,
+    W: Sink<ws::Message, Error = ws::ProtocolError> + Unpin,
 {
     fn new(w: W, ctx: &mut <Self as Actor>::Context) -> Self {
         Connection {
-            writer: io::SinkWrite::new(w, ctx),
+            writer: io::SinkWrite::new(w.buffer(128), ctx),
             state: ConnectionState::Closed,
         }
     }
@@ -337,12 +343,12 @@ where
 
 impl<W: 'static> Actor for Connection<W>
 where
-    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>,
+    W: Sink<ws::Message, Error = ws::ProtocolError> + Unpin,
 {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        let _ = self.writer.write(ws::Message::Ping("smok".to_string()));
+        let _ = self.writer.write(ws::Message::Ping("smok".into()));
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
@@ -350,14 +356,16 @@ where
     }
 }
 
-impl<W: 'static> StreamHandler<ws::Frame, ws::ProtocolError> for Connection<W>
+impl<W: 'static> StreamHandler<Result<ws::Frame, ws::ProtocolError>> for Connection<W>
 where
-    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>,
+    W: Sink<ws::Message, Error = ws::ProtocolError> + Unpin,
 {
-    fn handle(&mut self, item: ws::Frame, _ctx: &mut Self::Context) {
+    fn handle(&mut self, item: Result<ws::Frame, ws::ProtocolError>, _ctx: &mut Self::Context) {
+        let item = item.unwrap();
+
         match item {
-            ws::Frame::Binary(Some(bytes)) => {
-                let value = rmpv::decode::read_value(&mut Cursor::new(&bytes)).unwrap();
+            ws::Frame::Binary(bytes) => {
+                let value = rmpv::decode::read_value(&mut Cursor::new(bytes.as_ref())).unwrap();
                 log::trace!("got message ={}", value);
 
                 match value[0].as_i64().unwrap() as u8 {
@@ -438,7 +446,7 @@ where
 
 impl<W: 'static> WriteHandler<ws::ProtocolError> for Connection<W>
 where
-    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>,
+    W: Sink<ws::Message, Error = ws::ProtocolError> + Unpin,
 {
     fn error(&mut self, err: ws::ProtocolError, _ctx: &mut Self::Context) -> Running {
         log::error!("protocol error: {}", err);
@@ -449,7 +457,7 @@ where
 
 impl<W> Handler<OpenSession> for Connection<W>
 where
-    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError> + 'static,
+    W: Sink<ws::Message, Error = ws::ProtocolError> + Unpin + 'static,
 {
     type Result = ActorResponse<Self, u64, crate::error::Error>;
 
@@ -474,7 +482,7 @@ where
             }
         }
 
-        let (tx, rx) = futures::unsync::oneshot::channel();
+        let (tx, rx) = futures::channel::oneshot::channel();
         let auth_methods_id = auth_methods.iter().map(|method| method.auth_method());
 
         let auth_id_ref = match &auth_id {
@@ -501,8 +509,8 @@ where
 
         ActorResponse::r#async(
             rx.then(|r| match r {
-                Err(_e) => Err(Error::ConnectionClosed),
-                Ok(resp) => resp,
+                Err(_e) => future::err(Error::ConnectionClosed),
+                Ok(resp) => future::ready(resp),
             })
             .into_actor(self),
         )
@@ -511,7 +519,7 @@ where
 
 impl<W> Handler<RpcCallRequest> for Connection<W>
 where
-    W: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError> + 'static,
+    W: Sink<ws::Message, Error = ws::ProtocolError> + Unpin + 'static,
 {
     type Result = ActorResponse<Self, RpcCallResponse, crate::error::Error>;
 
@@ -568,19 +576,17 @@ where
         }
 
         ActorResponse::r#async(
-            rx.then(|r| match r {
-                Err(_) => Err(Error::ConnectionClosed),
-                Ok(resp) => resp,
-            })
-            .into_actor(self),
+            async move { rx.await.map_err(|_| Error::ConnectionClosed)? }.into_actor(self),
         )
     }
 }
 
-pub fn connect<Transport>(transport: Transport) -> Addr<Connection<SplitSink<Transport>>>
+pub fn connect<Transport>(
+    transport: Transport,
+) -> Addr<Connection<SplitSink<Transport, ws::Message>>>
 where
-    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
-        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+    Transport: Sink<ws::Message, Error = ws::ProtocolError>
+        + Stream<Item = Result<ws::Frame, ws::ProtocolError>>
         + 'static,
 {
     let (split_sink, split_stream) = transport.split();
@@ -590,44 +596,97 @@ where
     })
 }
 
-impl<Transport> RpcEndpoint for Addr<Connection<SplitSink<Transport>>>
+impl<Transport> RpcEndpoint for Addr<Connection<SplitSink<Transport, ws::Message>>>
 where
-    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
-        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+    Transport: Sink<ws::Message, Error = ws::ProtocolError>
+        + Stream<Item = Result<ws::Frame, ws::ProtocolError>>
+        + Unpin
         + 'static,
 {
-    type Response = Box<dyn Future<Item = RpcCallResponse, Error = Error> + 'static>;
+    type Response = Pin<Box<dyn Future<Output = Result<RpcCallResponse, Error>> + 'static>>;
 
     fn rpc_call(&self, request: RpcCallRequest) -> Self::Response {
-        Box::new(self.send(request).then(|resp| match resp {
-            Err(e) => Err(Error::MailboxError(e)),
-            Ok(v) => v,
+        self.send(request)
+            .then(|resp| match resp {
+                Err(e) => future::err(Error::MailboxError(e)),
+                Ok(v) => future::ready(v),
+            })
+            .boxed_local()
+    }
+}
+
+pub enum FromRequest<Transport>
+where
+    Transport: Sink<ws::Message, Error = ws::ProtocolError>
+        + Stream<Item = Result<ws::Frame, ws::ProtocolError>>
+        + Unpin
+        + 'static,
+{
+    Request(Request<Connection<SplitSink<Transport, ws::Message>>, crate::pubsub::Subscribe>),
+    Subscription(Subscription),
+    Closed,
+}
+
+impl<Transport> Stream for FromRequest<Transport>
+where
+    Transport: Sink<ws::Message, Error = ws::ProtocolError>
+        + Stream<Item = Result<ws::Frame, ws::ProtocolError>>
+        + Unpin
+        + 'static,
+{
+    type Item = Result<WampMessage, Error>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut futures::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let (ret, next_state) = match &mut *self {
+            FromRequest::Request(r) => match r.poll_unpin(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Err(e)) => (Poll::Ready(Some(Err(e.into()))), FromRequest::Closed),
+                Poll::Ready(Ok(subscription)) => match subscription {
+                    Ok(subscription) => (Poll::Pending, FromRequest::Subscription(subscription)),
+                    Err(e) => (Poll::Ready(Some(Err(e.into()))), FromRequest::Closed),
+                },
+            },
+            FromRequest::Closed => return Poll::Ready(None),
+            FromRequest::Subscription(sub) => {
+                return sub
+                    .stream
+                    .poll_next_unpin(cx)
+                    .map(|item_or_end| item_or_end.map(|r| r.map_err(|e| Error::WampError(e))))
+            }
+        };
+        self.set(next_state);
+        if ret.is_ready() {
+            ret
+        } else {
+            self.poll_next(cx)
+        }
+    }
+}
+
+impl<Transport> super::PubSubEndpoint for Addr<Connection<SplitSink<Transport, ws::Message>>>
+where
+    Transport: Sink<ws::Message, Error = ws::ProtocolError>
+        + Stream<Item = Result<ws::Frame, ws::ProtocolError>>
+        + Unpin
+        + 'static,
+{
+    type Events = FromRequest<Transport>;
+    //FlattenStream<Flatten<Request<Connection<SplitSink<Transport, ws::Message>>, crate::pubsub::Subscribe>, Error>>;
+
+    fn subscribe(&self, uri: &str) -> Self::Events {
+        FromRequest::Request(self.send(crate::pubsub::Subscribe {
+            topic: Cow::Owned(uri.into()),
         }))
     }
 }
 
-impl<Transport> super::PubSubEndpoint for Addr<Connection<SplitSink<Transport>>>
+impl<Transport> Handler<crate::pubsub::Subscribe> for Connection<SplitSink<Transport, ws::Message>>
 where
-    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
-        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
-        + 'static,
-{
-    type Events =
-        FlattenStream<Flatten<Request<Connection<SplitSink<Transport>>, crate::pubsub::Subscribe>>>;
-
-    fn subscribe(&self, uri: &str) -> Self::Events {
-        self.send(crate::pubsub::Subscribe {
-            topic: Cow::Owned(uri.into()),
-        })
-        .flatten()
-        .flatten_stream()
-    }
-}
-
-impl<Transport> Handler<crate::pubsub::Subscribe> for Connection<SplitSink<Transport>>
-where
-    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
-        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+    Transport: Sink<ws::Message, Error = ws::ProtocolError>
+        + Stream<Item = Result<ws::Frame, ws::ProtocolError>>
         + 'static,
 {
     type Result = ActorResponse<Self, crate::pubsub::Subscription, Error>;
@@ -646,12 +705,13 @@ where
             .unwrap();
 
         ActorResponse::r#async(
-            rx.from_err()
-                .and_then(|response| response)
+            rx.map_err(From::from)
+                .and_then(|response| future::ready(response))
                 .into_actor(self)
-                .and_then(|subscription_id, act: &mut Self, ctx: &mut Self::Context| {
+                .then(|subscription_id, act: &mut Self, ctx: &mut Self::Context| {
                     let (tx, rx) = mpsc::unbounded();
                     actix::fut::result((|| {
+                        let subscription_id = subscription_id?;
                         act.subscribers()?.insert(subscription_id, tx);
                         Ok(crate::pubsub::Subscription {
                             subscription_id,
@@ -664,10 +724,11 @@ where
     }
 }
 
-impl<Transport> Handler<crate::pubsub::Unsubscribe> for Connection<SplitSink<Transport>>
+impl<Transport> Handler<crate::pubsub::Unsubscribe>
+    for Connection<SplitSink<Transport, ws::Message>>
 where
-    Transport: Sink<SinkItem = ws::Message, SinkError = ws::ProtocolError>
-        + Stream<Item = ws::Frame, Error = ws::ProtocolError>
+    Transport: Sink<ws::Message, Error = ws::ProtocolError>
+        + Stream<Item = Result<ws::Frame, ws::ProtocolError>>
         + 'static,
 {
     type Result = ();

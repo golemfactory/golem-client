@@ -1,8 +1,11 @@
 use crate::context::*;
 use crate::utils::GolemIdPattern;
+use failure::Fallible;
 use futures::{future, prelude::*};
 use golem_rpc_api::core::AsGolemCore;
-use golem_rpc_api::net::{AclRule, AclRuleItem, AclStatus, AsGolemNet, NodeInfo, PeerInfo};
+use golem_rpc_api::net::{
+    ACLResult, AclRule, AclRuleItem, AclStatus, AsGolemNet, NodeInfo, PeerInfo,
+};
 use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::net::IpAddr;
@@ -83,249 +86,227 @@ pub enum Setup {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         ctx: &mut CliCtx,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> Fallible<CommandResponse> {
         match self {
-            Section::List { full, ip, .. } => Box::new(list(endpoint, *full, *ip)),
+            Section::List { full, ip, .. } => list(endpoint, *full, *ip).await,
             Section::Deny { ip, node, for_secs } => {
-                Box::new(self.deny(endpoint, ip, node, for_secs.map(|s| s as i32).unwrap_or(-1)))
+                self.deny(endpoint, ip, node, for_secs.map(|s| s as i32).unwrap_or(-1))
+                    .await
             }
-            Section::Allow { ip, node } => Box::new(self.allow(endpoint, ip, node)),
+            Section::Allow { ip, node } => self.allow(endpoint, ip, node).await,
             Section::Setup(Setup::AllExcept { nodes }) => {
-                Box::new(self.setup(endpoint, AclRule::Allow, nodes, ctx))
+                self.setup(endpoint, AclRule::Allow, nodes, ctx).await
             }
             Section::Setup(Setup::OnlyListed { nodes }) => {
-                Box::new(self.setup(endpoint, AclRule::Deny, nodes, ctx))
+                self.setup(endpoint, AclRule::Deny, nodes, ctx).await
             }
         }
     }
 
-    fn setup(
+    async fn setup(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         default_rule: AclRule,
         exceptions: &Vec<GolemIdPattern>,
         ctx: &mut CliCtx,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         let ack = ctx.prompt_for_acceptance("Are you sure?", None, None);
         if !ack {
-            return future::Either::A(future::ok(CommandResponse::NoOutput));
+            return Ok(CommandResponse::NoOutput);
         }
 
         let exceptions = exceptions.clone();
 
-        let known_peers = endpoint
+        let mut known_peers = endpoint
             .as_golem_net()
             .get_known_peers()
-            .from_err()
-            .and_then(|peers: Vec<NodeInfo>| {
-                Ok(peers.into_iter().map(|p| p.key).collect::<BTreeSet<_>>())
-            });
-        let connected_peers = endpoint
+            .await?
+            .into_iter()
+            .map(|p| p.key)
+            .collect::<BTreeSet<_>>();
+
+        let mut connected_peers = endpoint
             .as_golem_net()
             .get_connected_peers()
-            .from_err()
-            .and_then(|peers: Vec<PeerInfo>| {
-                Ok(peers
-                    .into_iter()
-                    .map(|p| p.node_info.key)
-                    .collect::<BTreeSet<_>>())
-            });
-        let current_acl = endpoint.as_golem_net().acl_status().from_err().and_then(
-            |status: AclStatus<String>| {
-                Ok(status
-                    .rules
-                    .into_iter()
-                    .map(
-                        |AclRuleItem {
-                             identity,
-                             node_name: _,
-                             rule: _,
-                             deadline: _,
-                         }| identity,
-                    )
-                    .collect::<BTreeSet<_>>())
-            },
-        );
-        future::Either::B(
-            crate::utils::resolve_from_list(
-                known_peers.join3(connected_peers, current_acl).and_then(
-                    |(mut l1, mut l2, mut l3): (
-                        BTreeSet<String>,
-                        BTreeSet<String>,
-                        BTreeSet<String>,
-                    )| {
-                        l1.append(&mut l2);
-                        l1.append(&mut l3);
-                        Ok(l1.into_iter().collect::<Vec<_>>())
-                    },
-                ),
-                exceptions.clone(),
+            .await?
+            .into_iter()
+            .map(|p| p.node_info.key)
+            .collect::<BTreeSet<_>>();
+
+        let mut current_acl = endpoint
+            .as_golem_net()
+            .acl_status()
+            .await?
+            .rules
+            .into_iter()
+            .map(
+                |AclRuleItem {
+                     identity,
+                     node_name: _,
+                     rule: _,
+                     deadline: _,
+                 }| identity,
             )
-            .and_then(move |nodes| {
-                endpoint
-                    .as_golem_net()
-                    .acl_setup(default_rule, nodes)
-                    .from_err()
-            })
-            .and_then(|()| CommandResponse::object("ACL reset")),
-        )
+            .collect::<BTreeSet<_>>();
+
+        let mut b = BTreeSet::new();
+        b.append(&mut known_peers);
+        b.append(&mut connected_peers);
+        b.append(&mut current_acl);
+
+        let candidates: Vec<String> = b.into_iter().collect();
+        let nodes = crate::utils::resolve_from_list(candidates, exceptions.clone())?;
+        endpoint
+            .as_golem_net()
+            .acl_setup(default_rule, nodes)
+            .await?;
+        CommandResponse::object("ACL reset")
     }
 
-    fn deny(
+    async fn deny(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         ips: &Vec<IpAddr>,
         nodes: &Vec<GolemIdPattern>,
         timeout: i32,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        let block_ips = future::join_all(
+    ) -> Fallible<CommandResponse> {
+        let block_ips = future::try_join_all(
             ips.into_iter()
                 .cloned()
                 .map(|ip| {
-                    endpoint
-                        .as_golem_net()
-                        .block_ip(ip, timeout)
-                        .and_then(|_| Ok(()))
+                    let endpoint = endpoint.clone();
+                    async move {
+                        endpoint.as_golem_net().block_ip(ip, timeout).await?;
+                        Ok(())
+                    }
                 })
                 .collect::<Vec<_>>(),
         );
 
         let list_ep = endpoint.clone();
         let nodes = nodes.clone();
-        let block_nodes = endpoint
-            .as_golem_net()
-            .acl_status()
-            .from_err()
-            .and_then(move |status| {
-                let default_rule = status.default_rule;
-                match status.default_rule {
-                    AclRule::Allow => future::Either::B(crate::utils::resolve_from_known_hosts(
-                        endpoint.clone(),
-                        nodes,
-                    )),
-                    AclRule::Deny => future::Either::A(crate::utils::resolve_from_list(
-                        future::ok(
-                            status
-                                .rules
-                                .into_iter()
-                                .map(
-                                    |AclRuleItem {
-                                         identity,
-                                         node_name: _,
-                                         rule: _,
-                                         deadline: _,
-                                     }| identity,
-                                )
-                                .collect::<Vec<_>>(),
-                        ),
-                        nodes,
-                    )),
+        let block_nodes = async {
+            let status = endpoint.as_golem_net().acl_status().await?;
+            let default_rule = status.default_rule;
+            let nodes = match status.default_rule {
+                AclRule::Allow => {
+                    crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes).await?
                 }
-                .and_then(move |nodes| {
-                    future::join_all(
-                        nodes
-                            .into_iter()
-                            .map(|identity: String| {
-                                endpoint
-                                    .as_golem_net()
-                                    .block_node(identity, timeout)
-                                    .from_err()
-                                    .and_then(move |(_result, exist, _message)| {
-                                        warn_if_exist(default_rule, AclRule::Deny, exist);
-                                        Ok(())
-                                    })
-                            })
-                            .collect::<Vec<_>>(),
+                AclRule::Deny => crate::utils::resolve_from_list(
+                    status
+                        .rules
+                        .into_iter()
+                        .map(
+                            |AclRuleItem {
+                                 identity,
+                                 node_name: _,
+                                 rule: _,
+                                 deadline: _,
+                             }| identity,
+                        )
+                        .collect::<Vec<_>>(),
+                    nodes,
+                )?,
+            };
+            future::try_join_all(nodes.into_iter().map(|identity: String| {
+                endpoint
+                    .as_golem_net()
+                    .block_node(identity, timeout)
+                    .map_ok(
+                        |ACLResult {
+                             success,
+                             exist,
+                             message,
+                         }| {
+                            warn_if_exist(default_rule, AclRule::Deny, exist.clone());
+                            (success, exist, message)
+                        },
                     )
-                    .and_then(|_| Ok(()))
-                })
-            });
+                    .map_err(failure::Error::from)
+            }))
+            .await
+        };
 
-        block_ips
-            .from_err()
-            .join(block_nodes)
-            .and_then(move |(_ips, _nodes)| list(list_ep, false, false))
+        let (_ips, _nodes) = future::try_join(block_ips, block_nodes).await?;
+        list(list_ep, false, false).await
     }
 
-    fn allow(
+    async fn allow(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         ips: &Vec<IpAddr>,
         nodes: &Vec<GolemIdPattern>,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         let list_ep = endpoint.clone();
 
-        let allow_ips = future::join_all(
+        let allow_ips = future::try_join_all(
             ips.into_iter()
                 .cloned()
                 .map(|ip| {
-                    endpoint
-                        .as_golem_net()
-                        .allow_ip(ip, -1)
-                        .from_err()
-                        .and_then(|_| Ok(()))
+                    let endpoint = endpoint.clone();
+                    async move {
+                        endpoint.as_golem_net().allow_ip(ip, -1).await?;
+
+                        Ok(())
+                    }
                 })
                 .collect::<Vec<_>>(),
         );
 
         let nodes = nodes.clone();
-        let allow_nodes = endpoint
-            .as_golem_net()
-            .acl_status()
-            .from_err()
-            .and_then(move |status| {
-                let default_rule = status.default_rule;
-                match status.default_rule {
-                    AclRule::Deny => future::Either::B(crate::utils::resolve_from_known_hosts(
-                        endpoint.clone(),
-                        nodes,
-                    )),
-                    AclRule::Allow => future::Either::A(crate::utils::resolve_from_list(
-                        future::ok(
-                            status
-                                .rules
-                                .into_iter()
-                                .map(
-                                    |AclRuleItem {
-                                         identity,
-                                         node_name: _,
-                                         rule: _,
-                                         deadline: _,
-                                     }| identity,
-                                )
-                                .collect::<Vec<_>>(),
-                        ),
-                        nodes,
-                    )),
+        let allow_nodes = async {
+            let status = endpoint.as_golem_net().acl_status().await?;
+            let default_rule = status.default_rule;
+            let nodes = match default_rule {
+                AclRule::Deny => {
+                    crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes).await
                 }
-                .and_then(move |nodes| {
-                    future::join_all(
-                        nodes
-                            .into_iter()
-                            .map(|identity: String| {
-                                endpoint
-                                    .as_golem_net()
-                                    .allow_node(identity, -1)
-                                    .from_err()
-                                    .and_then(move |(_result, exist, _message)| {
-                                        warn_if_exist(default_rule, AclRule::Allow, exist);
-                                        Ok(())
-                                    })
-                            })
-                            .collect::<Vec<_>>(),
-                    )
-                    .and_then(|_| Ok(()))
-                })
-            });
+                AclRule::Allow => crate::utils::resolve_from_list(
+                    status
+                        .rules
+                        .into_iter()
+                        .map(
+                            |AclRuleItem {
+                                 identity,
+                                 node_name: _,
+                                 rule: _,
+                                 deadline: _,
+                             }| identity,
+                        )
+                        .collect::<Vec<_>>(),
+                    nodes,
+                ),
+            }?;
+            future::try_join_all(
+                nodes
+                    .into_iter()
+                    .map(|identity: String| {
+                        endpoint
+                            .as_golem_net()
+                            .allow_node(identity, -1)
+                            .map_ok(
+                                |ACLResult {
+                                     success,
+                                     exist,
+                                     message,
+                                 }| {
+                                    warn_if_exist(default_rule, AclRule::Allow, exist.clone());
+                                    (success, exist, message)
+                                },
+                            )
+                            .map_err(failure::Error::from)
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .await
+        };
 
-        allow_ips
-            .join(allow_nodes)
-            .from_err()
-            .and_then(move |(_ips, _nodes)| list(list_ep, false, false))
+        let (_ips, _nodes) = future::try_join(allow_ips, allow_nodes).await?;
+        list(list_ep, false, false).await
     }
 }
 
@@ -344,14 +325,14 @@ impl AclListOutput {
 }
 
 impl FormattedObject for AclListOutput {
-    fn to_json(&self) -> Result<serde_json::Value, Error> {
+    fn to_json(&self) -> Fallible<serde_json::Value> {
         Ok(match &self.ips {
             Some(ips) => serde_json::json!({"nodes": self.nodes, "ips": ips}),
             None => serde_json::json!({"nodes": self.nodes}),
         })
     }
 
-    fn print(&self) -> Result<(), Error> {
+    fn print(&self) -> Fallible<()> {
         use prettytable::*;
 
         if let Some(ref ips) = self.ips {
@@ -416,46 +397,35 @@ impl FormattedObject for AclListOutput {
     }
 }
 
-fn list(
+async fn list(
     endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
     full: bool,
     ip: bool,
-) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+) -> Fallible<CommandResponse> {
     if ip {
-        future::Either::A(
-            endpoint
-                .as_golem_net()
-                .acl_status()
-                .join(endpoint.as_golem_net().acl_ip_status())
-                .from_err()
-                .and_then(move |(node_acl, ip_acl)| {
-                    Ok(AclListOutput {
-                        nodes: node_acl,
-                        ips: Some(ip_acl.rules),
-                        full,
-                    }
-                    .to_response())
-                }),
+        let (node_acl, ip_acl) = future::try_join(
+            endpoint.as_golem_net().acl_status(),
+            endpoint.as_golem_net().acl_ip_status(),
         )
+        .await?;
+        Ok(AclListOutput {
+            nodes: node_acl,
+            ips: Some(ip_acl.rules),
+            full,
+        }
+        .to_response())
     } else {
-        future::Either::B(endpoint.as_golem_net().acl_status().from_err().and_then(
-            move |node_acl| {
-                Ok(AclListOutput {
-                    nodes: node_acl,
-                    ips: None,
-                    full,
-                }
-                .to_response())
-            },
-        ))
+        let node_acl = endpoint.as_golem_net().acl_status().await?;
+        Ok(AclListOutput {
+            nodes: node_acl,
+            ips: None,
+            full,
+        }
+        .to_response())
     }
 }
 
-fn warn_if_exist(
-    default_rule: AclRule,
-    direction: AclRule,
-    exist: Option<Vec<String>>,
-) {
+fn warn_if_exist(default_rule: AclRule, direction: AclRule, exist: Option<Vec<String>>) {
     if let Some(mut exist) = exist {
         let adverb = match default_rule {
             AclRule::Deny => match direction {

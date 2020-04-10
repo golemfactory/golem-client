@@ -1,6 +1,7 @@
 use crate::context::*;
 use crate::formaters::*;
-use futures::{future, Future};
+use failure::Fallible;
+use futures::prelude::*;
 use golem_rpc_api::concent::*;
 use golem_rpc_api::net::AsGolemNet;
 use golem_rpc_api::pay::{AsGolemPay, DepositPayment};
@@ -84,126 +85,101 @@ fn status_to_msg(on: bool) -> &'static str {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> Fallible<CommandResponse> {
         match self {
-            Section::On => Box::new(self.run_turn(endpoint, true)),
-            Section::Off => Box::new(self.run_turn(endpoint, false)),
-            Section::Status => Box::new(self.status(endpoint)),
-            Section::Deposit(Deposit { command: None }) => Box::new(self.deposit_status(endpoint)),
+            Section::On => self.run_turn(endpoint, true).await,
+            Section::Off => self.run_turn(endpoint, false).await,
+            Section::Status => self.status(endpoint).await,
+            Section::Deposit(Deposit { command: None }) => self.deposit_status(endpoint).await,
             Section::Deposit(Deposit {
                 command: Some(DepositCommands::Payments { filter_by, sort_by }),
-            }) => Box::new(self.deposit_payments(endpoint, filter_by, sort_by)),
-            Section::Terms(terms) => terms.run(endpoint),
+            }) => self.deposit_payments(endpoint, filter_by, sort_by).await,
+            Section::Terms(terms) => terms.run(endpoint).await,
         }
     }
 
-    fn run_turn(
+    async fn run_turn(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         on: bool,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_concent()
-            .turn(on)
-            .from_err()
-            .and_then(move |()| CommandResponse::object(status_to_msg(on)))
+    ) -> Fallible<CommandResponse> {
+        endpoint.as_golem_concent().turn(on).await?;
+        CommandResponse::object(status_to_msg(on))
     }
 
-    fn status(
+    async fn status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_concent()
-            .is_on()
-            .from_err()
-            .and_then(|is_on| CommandResponse::object(status_to_msg(is_on)))
+    ) -> Fallible<CommandResponse> {
+        CommandResponse::object(status_to_msg(endpoint.as_golem_concent().is_on().await?))
     }
 
-    fn deposit_status(
+    async fn deposit_status(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_pay()
-            .get_deposit_balance()
-            .from_err()
-            .and_then(|balance_info| CommandResponse::object(balance_info.map(Humanize::humanize)))
+    ) -> Fallible<CommandResponse> {
+        let balance_info = endpoint.as_golem_pay().get_deposit_balance().await?;
+        CommandResponse::object(balance_info.map(Humanize::humanize))
     }
 
-    fn deposit_payments(
+    async fn deposit_payments(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
         filter_by: &Option<crate::eth::PaymentStatus>,
         sort_by: &Option<String>,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         let sort_by = sort_by.clone();
         let filter_by = filter_by.clone();
 
-        endpoint
+        let payments = endpoint
             .as_golem_pay()
             .get_deposit_payments_list(None, None)
-            .from_err()
-            .and_then(move |payments| {
-                let columns = DEPOSIT_COLUMNS.iter().map(|&name| name.into()).collect();
-                let values = payments
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|payment| {
-                        filter_by
-                            .map(|f| f.is_match_with(&payment.status))
-                            .unwrap_or(true)
-                    })
-                    .map(|payment: DepositPayment| {
-                        let value = crate::eth::Currency::GNT.format_decimal(&payment.value);
-                        let fee = payment
-                            .fee
-                            .map(|fee| crate::eth::Currency::ETH.format_decimal(&fee));
+            .await?;
 
-                        serde_json::json!([payment.transaction, payment.status, value, fee])
-                    })
-                    .collect();
-
-                Ok(ResponseTable { columns, values }.sort_by(&sort_by).into())
+        let columns = DEPOSIT_COLUMNS.iter().map(|&name| name.into()).collect();
+        let values = payments
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|payment| {
+                filter_by
+                    .map(|f| f.is_match_with(&payment.status))
+                    .unwrap_or(true)
             })
+            .map(|payment: DepositPayment| {
+                let value = crate::eth::Currency::GNT.format_decimal(&payment.value);
+                let fee = payment
+                    .fee
+                    .map(|fee| crate::eth::Currency::ETH.format_decimal(&fee));
+
+                serde_json::json!([payment.transaction, payment.status, value, fee])
+            })
+            .collect();
+
+        Ok(ResponseTable { columns, values }.sort_by(&sort_by).into())
     }
 }
 
 impl Terms {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> Fallible<CommandResponse> {
         match self {
-            Terms::Accept => Box::new(
-                endpoint
-                    .as_golem_concent()
-                    .accept_terms()
-                    .from_err()
-                    .and_then(|()| {
-                        CommandResponse::object("Concent terms of use have been accepted.")
-                    }),
-            ),
-            Terms::Show => Box::new(
-                endpoint
-                    .as_golem_concent()
-                    .show_terms()
-                    .from_err()
-                    .and_then(|terms_html| {
-                        let text = html2text::from_read(std::io::Cursor::new(terms_html), 78);
-                        CommandResponse::object(text)
-                    }),
-            ),
-            Terms::Status => Box::new(
-                endpoint
-                    .as_golem_concent()
-                    .is_terms_accepted()
-                    .from_err()
-                    .and_then(|is_terms_accepted| CommandResponse::object(is_terms_accepted)),
-            ),
+            Terms::Accept => {
+                endpoint.as_golem_concent().accept_terms().await?;
+                CommandResponse::object("Concent terms of use have been accepted.")
+            }
+            Terms::Show => {
+                let terms_html = endpoint.as_golem_concent().show_terms().await?;
+                let text = html2text::from_read(std::io::Cursor::new(terms_html), 78);
+                CommandResponse::object(text)
+            }
+            Terms::Status => {
+                CommandResponse::object(endpoint.as_golem_concent().is_terms_accepted().await?)
+            }
         }
     }
 }

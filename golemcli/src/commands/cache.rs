@@ -1,4 +1,5 @@
 use crate::context::*;
+use failure::Fallible;
 use futures::prelude::*;
 use golem_rpc_api::res::*;
 use structopt::StructOpt;
@@ -15,59 +16,51 @@ pub enum Section {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> Box<dyn Future<Item = CommandResponse, Error = Error> + 'static> {
+    ) -> Fallible<CommandResponse> {
         match self {
-            Section::Show => Box::new(self.show(endpoint)),
-            Section::Clear => Box::new(self.clear(endpoint)),
+            Section::Show => self.show(endpoint).await,
+            Section::Clear => self.clear(endpoint).await,
         }
     }
 
-    fn show(
+    async fn show(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
-        endpoint
-            .as_golem_res()
-            .get_res_dirs_sizes()
-            .join(endpoint.as_golem_res().get_res_dirs())
-            .from_err()
-            .and_then(|(sizes, dirs)| {
-                CommandResponse::object(serde_json::json!({
-                    "cache_dir": dirs.received_files,
-                    "size": sizes.received_files
-                }))
-            })
+    ) -> Fallible<CommandResponse> {
+        let (sizes, dirs) = future::try_join(
+            endpoint.as_golem_res().get_res_dirs_sizes(),
+            endpoint.as_golem_res().get_res_dirs(),
+        )
+        .await?;
+
+        CommandResponse::object(serde_json::json!({
+            "cache_dir": dirs.received_files,
+            "size": sizes.received_files
+        }))
     }
 
-    fn clear(
+    async fn clear(
         &self,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
+        let (sizes, dirs) = future::try_join(
+            endpoint.as_golem_res().get_res_dirs_sizes(),
+            endpoint.as_golem_res().get_res_dirs(),
+        )
+        .await?;
         endpoint
             .as_golem_res()
-            .get_res_dirs_sizes()
-            .join(endpoint.as_golem_res().get_res_dirs())
-            .from_err()
-            .and_then(move |(sizes, dirs)| {
-                endpoint
-                    .as_golem_res()
-                    .clear_dir(DirType::Distributed, None)
-                    .from_err()
-                    .and_then(move |()| {
-                        endpoint
-                            .as_golem_res()
-                            .get_res_dirs_sizes()
-                            .from_err()
-                            .and_then(move |after_clean_size| {
-                                CommandResponse::object(serde_json::json!({
-                                "cache_dir": dirs.received_files,
-                                "before_clean_size": sizes.received_files,
-                                "size": after_clean_size.received_files}))
-                            })
-                    })
-            })
+            .clear_dir(DirType::Distributed, None)
+            .await?;
+
+        let after_clean_size = endpoint.as_golem_res().get_res_dirs_sizes().await?;
+        CommandResponse::object(serde_json::json!({
+            "cache_dir": dirs.received_files,
+            "before_clean_size": sizes.received_files,
+            "size": after_clean_size.received_files
+        }))
     }
 }

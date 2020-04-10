@@ -15,19 +15,16 @@ pub enum Section {
 }
 
 impl Section {
-    pub fn run(
+    pub async fn run(
         &self,
         ctx: &CliCtx,
         endpoint: impl actix_wamp::RpcEndpoint + Clone + 'static,
-    ) -> impl Future<Item = CommandResponse, Error = Error> + 'static {
+    ) -> Fallible<CommandResponse> {
         match self {
             Section::Show => {
-                future::Either::A(endpoint.as_golem_terms().show_terms().from_err().and_then(
-                    |html| {
-                        let text = html2text::from_read(std::io::Cursor::new(html), 78);
-                        CommandResponse::object(text)
-                    },
-                ))
+                let html = endpoint.as_golem_terms().show_terms().await?;
+                let text = html2text::from_read(std::io::Cursor::new(html), 78);
+                CommandResponse::object(text)
             }
             Section::Accept => {
                 let enable_monitor = ctx.prompt_for_acceptance(
@@ -41,13 +38,11 @@ impl Section {
                     Some("talkback will be DISABLED"),
                 );
 
-                future::Either::B(
-                    endpoint
-                        .as_golem_terms()
-                        .accept_terms(Some(enable_monitor), Some(enable_talkback))
-                        .from_err()
-                        .and_then(|()| CommandResponse::object("Terms of use have been accepted.")),
-                )
+                endpoint
+                    .as_golem_terms()
+                    .accept_terms(Some(enable_monitor), Some(enable_talkback))
+                    .await?;
+                CommandResponse::object("Terms of use have been accepted.")
             }
         }
     }

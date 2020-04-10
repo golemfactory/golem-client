@@ -3,22 +3,23 @@ use crate::serde::{opt_ts_seconds, ts_seconds};
 use bigdecimal::BigDecimal;
 use failure::_core::str::FromStr;
 use serde::*;
+use std::vec::Vec;
 
 rpc_interface! {
     trait GolemPay {
         #[rpc_uri = "pay.operations"]
         fn get_operations(&self, operation_type: Option<WalletOperationType>, direction: Option<WalletOperationDirection>, page: usize, per_page: usize) -> Result<(u32, Vec<WalletOperation>)>;
 
-        //#[deprecated(since="0.2.2", note="please use `get_operations` instead")]
+        #[deprecated(since="0.2.2", note="please use `get_operations` instead")]
         #[rpc_uri = "pay.incomes"]
         fn get_incomes_list(&self) -> Result<Vec<Income>>;
 
-        //#[deprecated(since="0.2.2", note="please use `get_operations` instead")]
+        #[deprecated(since="0.2.2", note="please use `get_operations` instead")]
         #[rpc_uri = "pay.payments"]
         fn get_payments_list(&self, #[kwarg] _num: Option<u32>, #[kwarg] _last_seconds: Option<u32>) -> Result<Vec<Payment>>;
 
         // TODO: kwargs limit=1000, offset=0
-        //#[deprecated(since="0.2.2", note="please use `get_operations` instead")]
+        #[deprecated(since="0.2.2", note="please use `get_operations` instead")]
         #[rpc_uri = "pay.deposit_payments"]
         fn get_deposit_payments_list(&self, #[kwarg] _limit : Option<usize>, #[kwarg] _offset : Option<usize>) -> Result<Option<Vec<DepositPayment>>>;
 
@@ -30,6 +31,9 @@ rpc_interface! {
 
         #[rpc_uri = "pay.ident"]
         fn get_pay_ident(&self) -> Result<String>;
+
+        #[rpc_uri = "pay.withdraw"]
+        fn withdraw(&self, amount : String, destination : String, currency : String, gas_price : Option<String>) -> Result<Vec<String>>;
     }
 
     converter AsGolemPay as_golem_pay;

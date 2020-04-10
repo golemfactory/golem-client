@@ -150,7 +150,7 @@ impl<'a, Inner: crate::rpc::wamp::RpcEndpoint + ?Sized + 'static> GolemComp<'a, 
     pub fn create_task(
         &self,
         task_spec: serde_json::Value,
-    ) -> impl Future<Item = String, Error = crate::Error> {
+    ) -> impl Future<Output = Result<String, crate::Error>> + 'static {
         fn map_to_error<F: FnOnce(&String) -> String>(
             err_obj: Value,
             format_msg: F,
@@ -166,28 +166,36 @@ impl<'a, Inner: crate::rpc::wamp::RpcEndpoint + ?Sized + 'static> GolemComp<'a, 
         }
 
         self.create_task_int(task_spec)
-            .from_err()
-            .and_then(|r: (Option<String>, Option<Value>)| match r {
-                (Some(task_id), Some(err_obj)) => Err(map_to_error(err_obj, |err_msg| {
-                    format!("task {} failed: {}", task_id, err_msg)
-                })),
-                (Some(task_id), None) => Ok(task_id),
-                (None, Some(err_obj)) => Err(map_to_error(err_obj, |err_msg| err_msg.to_string())),
-                (None, None) => Err(crate::Error::Other(format!("invalid error response: null"))),
+            .map_err(From::from)
+            .and_then(|r: (Option<String>, Option<Value>)| async move {
+                match r {
+                    (Some(task_id), Some(err_obj)) => Err(map_to_error(err_obj, |err_msg| {
+                        format!("task {} failed: {}", task_id, err_msg)
+                    })),
+                    (Some(task_id), None) => Ok(task_id),
+                    (None, Some(err_obj)) => {
+                        Err(map_to_error(err_obj, |err_msg| err_msg.to_string()))
+                    }
+                    (None, None) => {
+                        Err(crate::Error::Other(format!("invalid error response: null")))
+                    }
+                }
             })
     }
 
     pub fn create_dry_run(
         &self,
         task_spec: serde_json::Value,
-    ) -> impl Future<Item = TaskInfo, Error = crate::Error> {
-        self.create_dry_run_int(task_spec).from_err().and_then(
-            |r: (Option<TaskInfo>, Option<Value>)| match r {
-                (Some(task_info), None) => Ok(task_info),
-                (None, Some(err)) => Err(crate::Error::Other(err.to_string())),
-                _ => Err(crate::Error::Other(format!("invalid response"))),
-            },
-        )
+    ) -> impl Future<Output = Result<TaskInfo, crate::Error>> {
+        self.create_dry_run_int(task_spec)
+            .map_err(From::from)
+            .and_then(|r: (Option<TaskInfo>, Option<Value>)| async move {
+                match r {
+                    (Some(task_info), None) => Ok(task_info),
+                    (None, Some(err)) => Err(crate::Error::Other(err.to_string())),
+                    _ => Err(crate::Error::Other(format!("invalid response"))),
+                }
+            })
     }
 }
 
@@ -306,6 +314,7 @@ pub enum SubtaskStatus {
     Failure,
     Restart,
     Cancelled,
+    Timeout,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -316,7 +325,7 @@ pub struct SubtaskInfo {
     pub status: SubtaskStatus,
     pub progress: Option<f64>,
     pub time_started: Option<f64>,
-    pub results: Vec<String>,
+    pub results: Option<Vec<String>>,
     pub stderr: Option<String>,
     pub stdout: Option<String>,
 
