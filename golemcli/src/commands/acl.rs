@@ -234,7 +234,7 @@ impl Section {
                                     .as_golem_net()
                                     .block_node(identity, timeout)
                                     .from_err()
-                                    .and_then(move |( _result, exist, _message )| {
+                                    .and_then(move |(_result, exist, _message)| {
                                         warn_if_exist(default_rule, AclRule::Deny, exist);
                                         Ok(())
                                     })
@@ -307,10 +307,11 @@ impl Section {
                         nodes
                             .into_iter()
                             .map(|identity: String| {
-                                endpoint.as_golem_net()
+                                endpoint
+                                    .as_golem_net()
                                     .allow_node(identity, -1)
                                     .from_err()
-                                    .and_then(move |( _result, exist, _message )| {
+                                    .and_then(move |(_result, exist, _message)| {
                                         warn_if_exist(default_rule, AclRule::Allow, exist);
                                         Ok(())
                                     })
@@ -450,28 +451,27 @@ fn list(
     }
 }
 
-fn warn_if_exist(default_rule: AclRule, direction: AclRule, exist: Option<Vec<String>>) -> Option<bool> {
+fn warn_if_exist(
+    default_rule: AclRule,
+    direction: AclRule,
+    exist: Option<Vec<String>>,
+) {
     if let Some(mut exist) = exist {
         let adverb = match default_rule {
             AclRule::Deny => match direction {
                 AclRule::Deny => "not",
                 AclRule::Allow => "already",
-            }
+            },
             AclRule::Allow => match direction {
                 AclRule::Deny => "already",
                 AclRule::Allow => "not",
-            }
+            },
         };
-        
+
         println!();
         while let Some(node) = exist.pop() {
-            eprintln!(
-                "Info: {:?} is {} in the list.", 
-                node,
-                adverb
-            );
+            eprintln!("Info: {:?} is {} in the list.", node, adverb);
         }
         println!();
     }
-    return None;
 }
