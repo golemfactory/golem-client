@@ -229,7 +229,8 @@ impl Section {
                         warn_if_exist(default_rule, AclRule::Deny, exist.clone());
                         (success, exist, message)
                     },
-                ).map_err(failure::Error::from)
+                )
+                .map_err(failure::Error::from)
                 .await
         };
 
@@ -283,7 +284,7 @@ impl Section {
                     nodes,
                 ),
             }?;
-            
+
             endpoint
                 .as_golem_net()
                 .allow_node(nodes, -1)
