@@ -212,27 +212,25 @@ impl Section {
                     nodes,
                 )?,
             };
-            future::try_join_all(nodes.into_iter().map(|identity: String| {
-                endpoint
-                    .as_golem_net()
-                    .block_node(identity, timeout)
-                    .map_ok(
-                        |ACLResult {
-                             success,
-                             exist,
-                             message,
-                         }| {
-                            if !success {
-                                println!();
-                                eprintln!("Error: {:?}", message.clone().unwrap());
-                            }
-                            warn_if_exist(default_rule, AclRule::Deny, exist.clone());
-                            (success, exist, message)
-                        },
-                    )
-                    .map_err(failure::Error::from)
-            }))
-            .await
+
+            endpoint
+                .as_golem_net()
+                .block_node(nodes, timeout)
+                .map_ok(
+                    |ACLResult {
+                         success,
+                         exist,
+                         message,
+                     }| {
+                        if !success {
+                            println!();
+                            eprintln!("Error: {:?}", message.clone().unwrap());
+                        }
+                        warn_if_exist(default_rule, AclRule::Deny, exist.clone());
+                        (success, exist, message)
+                    },
+                ).map_err(failure::Error::from)
+                .await
         };
 
         let (_ips, _nodes) = future::try_join(block_ips, block_nodes).await?;
@@ -285,32 +283,26 @@ impl Section {
                     nodes,
                 ),
             }?;
-            future::try_join_all(
-                nodes
-                    .into_iter()
-                    .map(|identity: String| {
-                        endpoint
-                            .as_golem_net()
-                            .allow_node(identity, -1)
-                            .map_ok(
-                                |ACLResult {
-                                     success,
-                                     exist,
-                                     message,
-                                 }| {
-                                    if !success {
-                                        println!();
-                                        eprintln!("Error: {:?}", message.clone().unwrap());
-                                    }
-                                    warn_if_exist(default_rule, AclRule::Allow, exist.clone());
-                                    (success, exist, message)
-                                },
-                            )
-                            .map_err(failure::Error::from)
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .await
+            
+            endpoint
+                .as_golem_net()
+                .allow_node(nodes, -1)
+                .map_ok(
+                    |ACLResult {
+                         success,
+                         exist,
+                         message,
+                     }| {
+                        if !success {
+                            println!();
+                            eprintln!("Error: {:?}", message.clone().unwrap());
+                        }
+                        warn_if_exist(default_rule, AclRule::Allow, exist.clone());
+                        (success, exist, message)
+                    },
+                )
+                .map_err(failure::Error::from)
+                .await
         };
 
         let (_ips, _nodes) = future::try_join(allow_ips, allow_nodes).await?;
