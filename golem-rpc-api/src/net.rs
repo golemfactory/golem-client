@@ -145,7 +145,7 @@ pub struct AclRuleItem<Identity> {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ACLResult {
     pub success: bool,
-    pub exist: Option<Vec<String>>,
+    pub exist: Vec<String>,
     pub message: Option<String>,
 }
 

@@ -213,25 +213,24 @@ impl Section {
                 )?,
             };
 
-            endpoint
+            let acl_result = endpoint
                 .as_golem_net()
                 .block_node(nodes, timeout)
-                .map_ok(
-                    |ACLResult {
-                         success,
-                         exist,
-                         message,
-                     }| {
-                        if !success {
-                            println!();
-                            eprintln!("Error: {:?}", message.clone().unwrap());
-                        }
-                        warn_if_exist(default_rule, AclRule::Deny, exist.clone());
-                        (success, exist, message)
-                    },
-                )
                 .map_err(failure::Error::from)
-                .await
+                .await;
+            if let Ok(ACLResult {
+                success,
+                exist,
+                message,
+            }) = &acl_result
+            {
+                if !success {
+                    println!();
+                    eprintln!("Error: {:?}", message.clone().unwrap());
+                }
+                warn_if_exist(default_rule, AclRule::Deny, exist.clone());
+            }
+            acl_result
         };
 
         let (_ips, _nodes) = future::try_join(block_ips, block_nodes).await?;
@@ -285,25 +284,24 @@ impl Section {
                 ),
             }?;
 
-            endpoint
+            let acl_result = endpoint
                 .as_golem_net()
                 .allow_node(nodes, -1)
-                .map_ok(
-                    |ACLResult {
-                         success,
-                         exist,
-                         message,
-                     }| {
-                        if !success {
-                            println!();
-                            eprintln!("Error: {:?}", message.clone().unwrap());
-                        }
-                        warn_if_exist(default_rule, AclRule::Allow, exist.clone());
-                        (success, exist, message)
-                    },
-                )
                 .map_err(failure::Error::from)
-                .await
+                .await;
+            if let Ok(ACLResult {
+                success,
+                exist,
+                message,
+            }) = &acl_result
+            {
+                if !success {
+                    println!();
+                    eprintln!("Error: {:?}", message.clone().unwrap());
+                }
+                warn_if_exist(default_rule, AclRule::Allow, exist.clone());
+            }
+            acl_result
         };
 
         let (_ips, _nodes) = future::try_join(allow_ips, allow_nodes).await?;
@@ -426,8 +424,8 @@ async fn list(
     }
 }
 
-fn warn_if_exist(default_rule: AclRule, direction: AclRule, exist: Option<Vec<String>>) {
-    if let Some(mut exist) = exist {
+fn warn_if_exist(default_rule: AclRule, direction: AclRule, mut exist: Vec<String>) {
+    if exist.len() > 0 {
         let adverb = match default_rule {
             AclRule::Deny => match direction {
                 AclRule::Deny => "not",
