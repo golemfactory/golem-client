@@ -3,7 +3,9 @@ use crate::utils::GolemIdPattern;
 use failure::Fallible;
 use futures::{future, prelude::*};
 use golem_rpc_api::core::AsGolemCore;
-use golem_rpc_api::net::{AclRule, AclRuleItem, AclStatus, AsGolemNet, NodeInfo, PeerInfo};
+use golem_rpc_api::net::{
+    ACLResult, AclRule, AclRuleItem, AclStatus, AsGolemNet, NodeInfo, PeerInfo,
+};
 use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::net::IpAddr;
@@ -187,38 +189,51 @@ impl Section {
 
         let list_ep = endpoint.clone();
         let nodes = nodes.clone();
+        let block_nodes = async {
+            let status = endpoint.as_golem_net().acl_status().await?;
+            let default_rule = status.default_rule;
+            let nodes = match status.default_rule {
+                AclRule::Allow => {
+                    crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes).await?
+                }
+                AclRule::Deny => crate::utils::resolve_from_list(
+                    status
+                        .rules
+                        .into_iter()
+                        .map(
+                            |AclRuleItem {
+                                 identity,
+                                 node_name: _,
+                                 rule: _,
+                                 deadline: _,
+                             }| identity,
+                        )
+                        .collect::<Vec<_>>(),
+                    nodes,
+                )?,
+            };
 
-        let status = endpoint.as_golem_net().acl_status().await?;
-
-        let nodes = match status.default_rule {
-            AclRule::Allow => {
-                crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes).await?
+            let acl_result = endpoint
+                .as_golem_net()
+                .block_node(nodes, timeout)
+                .map_err(failure::Error::from)
+                .await;
+            if let Ok(ACLResult {
+                success,
+                exist,
+                message,
+            }) = &acl_result
+            {
+                if !success {
+                    println!();
+                    eprintln!("Error: {:?}", message.clone().unwrap());
+                }
+                warn_if_exist(default_rule, AclRule::Deny, exist.clone());
             }
-            AclRule::Deny => crate::utils::resolve_from_list(
-                status
-                    .rules
-                    .into_iter()
-                    .map(
-                        |AclRuleItem {
-                             identity,
-                             node_name: _,
-                             rule: _,
-                             deadline: _,
-                         }| identity,
-                    )
-                    .collect::<Vec<_>>(),
-                nodes,
-            )?,
+            acl_result
         };
-        let (_ips, _nodes) = future::try_join(
-            block_ips,
-            future::try_join_all(
-                nodes
-                    .into_iter()
-                    .map(|identity: String| endpoint.as_golem_net().block_node(identity, timeout)),
-            ),
-        )
-        .await?;
+
+        let (_ips, _nodes) = future::try_join(block_ips, block_nodes).await?;
         list(list_ep, false, false).await
     }
 
@@ -247,7 +262,8 @@ impl Section {
         let nodes = nodes.clone();
         let allow_nodes = async {
             let status = endpoint.as_golem_net().acl_status().await?;
-            let nodes = match status.default_rule {
+            let default_rule = status.default_rule;
+            let nodes = match default_rule {
                 AclRule::Deny => {
                     crate::utils::resolve_from_known_hosts(endpoint.clone(), nodes).await
                 }
@@ -267,18 +283,25 @@ impl Section {
                     nodes,
                 ),
             }?;
-            future::try_join_all(
-                nodes
-                    .into_iter()
-                    .map(|identity: String| {
-                        endpoint
-                            .as_golem_net()
-                            .allow_node(identity, -1)
-                            .map_err(failure::Error::from)
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .await
+
+            let acl_result = endpoint
+                .as_golem_net()
+                .allow_node(nodes, -1)
+                .map_err(failure::Error::from)
+                .await;
+            if let Ok(ACLResult {
+                success,
+                exist,
+                message,
+            }) = &acl_result
+            {
+                if !success {
+                    println!();
+                    eprintln!("Error: {:?}", message.clone().unwrap());
+                }
+                warn_if_exist(default_rule, AclRule::Allow, exist.clone());
+            }
+            acl_result
         };
 
         let (_ips, _nodes) = future::try_join(allow_ips, allow_nodes).await?;
@@ -398,5 +421,26 @@ async fn list(
             full,
         }
         .to_response())
+    }
+}
+
+fn warn_if_exist(default_rule: AclRule, direction: AclRule, mut exist: Vec<String>) {
+    if exist.len() > 0 {
+        let adverb = match default_rule {
+            AclRule::Deny => match direction {
+                AclRule::Deny => "not",
+                AclRule::Allow => "already",
+            },
+            AclRule::Allow => match direction {
+                AclRule::Deny => "already",
+                AclRule::Allow => "not",
+            },
+        };
+
+        println!();
+        while let Some(node) = exist.pop() {
+            eprintln!("Info: {:?} is {} in the list.", node, adverb);
+        }
+        println!();
     }
 }
