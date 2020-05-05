@@ -14,8 +14,8 @@ interactive_cli = ["rustyline", "atty", "ansi_term"]
 test_task_cli = []
 
 [dependencies]
-actix-wamp = "0.2.0"
-golem-rpc-api = { version = "0.2.0", features = ['settings'] }
+actix-wamp = { path = "../actix-wamp", version = "0.2.0" }
+golem-rpc-api = { path = "../golem-rpc-api", version = "0.2.0", features = ['settings'] }
 
 actix = "0.9"
 actix-rt="1.0.0"
